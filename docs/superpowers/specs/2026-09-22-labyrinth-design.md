@@ -54,20 +54,31 @@ A runner cannot distinguish a void square from a walled square. That is
 deliberate: it means a sealed-off pocket costs the author budget and buys them
 nothing, so the game self-corrects rather than needing a rule.
 
-### 2.3 Fog of war
+### 2.3 The labyrinth is enclosed
+
+A runner can never leave the labyrinth. Every edge of the painted shape that
+faces outward — the outer boundary and the border of any void square — is
+solid, and walking into it is an ordinary blocked move.
+
+This is guaranteed by construction rather than checked: outward-facing edges are
+implicit and are never stored as data (§3.1), so there is nothing to omit and
+no way to draw a leaky maze. It is written down here because it is a rule of
+the game, not an implementation detail.
+
+### 2.4 Fog of war
 
 The runner is told nothing at the start except that they are on the start cell.
 They do not know the grid dimensions, the shape of the labyrinth, where the
 treasure is, or where any key or gate is. Everything is learned by walking into
 it. This is why the server must be the sole authority (§7).
 
-### 2.4 Keys and gates
+### 2.5 Keys and gates
 
 Gates and keys are matched pairs, identified by id and colour-coded in the UI.
 Gate 1 is opened only by key 1. A gate, once opened, stays open for the rest of
 that run. Each gate id appears on exactly one segment and has exactly one key.
 
-### 2.5 Scoring
+### 2.6 Scoring
 
 Fewest penalties wins. Tiebreakers, in order: fewer total moves, then shorter
 elapsed run time. Both players' mazes share the same cell budget and gate count,
@@ -122,8 +133,19 @@ reuse a maze they have already drawn.
 - `cellCount` presets: 36, 64, 100, 144. Set per match.
 - `gateCount`: 0–8. Set per match. The cap keeps the solver's state space small
   (§4.2).
-- Bounding box of the drawn shape: at most 32 × 32, to bound rendering and the
-  coordinate space.
+- Bounding box of the drawn shape: at most 16 × 16.
+
+The 16 × 16 cap is set by the desktop board, not by storage. Wall edges need a
+~14 px hit strip to be comfortably clickable, which wants cells around 44 px;
+16 cells is then ~700 px of board, which sits beside the side panel on a
+1280 px laptop without cramping. At 20 cells the squares drop to ~35 px and the
+edges get fiddly.
+
+The cap is also what prevents degenerate shapes. There is deliberately **no
+minimum** — a corridor may be one square wide anywhere it likes — but a maze
+that is one square tall and sixty-four wide cannot exist, because 64 exceeds
+the width cap. The budget and the cap together do that work, so no separate
+rule is needed.
 
 ## 4. Validation
 
@@ -139,8 +161,7 @@ feedback and again on the server on submit. Only the server's verdict counts.
 - `start` and `treasure` are both in `cells` and are different cells.
 - The start cell holds no key and no treasure.
 - Each cell holds at most one of { key, treasure }.
-- The shape's bounding box is at most 32 × 32. This is a real constraint,
-  not just a rendering hint: a 144-cell shape one square wide is rejected.
+- The shape's bounding box is at most 16 × 16 (§3.3).
 - Every segment's two adjacent cells are both in `cells`.
 - No two segments share an `(o, x, y)`.
 - Gate ids are exactly `1..gateCount`, each on exactly one segment.
@@ -160,19 +181,22 @@ so the maze simply fails. No separate pass, no special cases.
 **Sealed-off pockets inside the shape are permitted.** Only the treasure must be
 reachable, not every cell. See §2.2 for why this needs no further rule.
 
+**Decorative gates are permitted.** A gate with nothing of value behind it,
+placed purely to waste the runner's time, is legal. So is a gate whose key sits
+somewhere the runner can never get to, making it permanently locked. Neither
+blocks the treasure, so neither fails validation. Misdirection is a legitimate
+design tool and the validator does not police it.
+
 ### 4.3 Derived metrics
 
-The same search returns, and the maze row stores:
+The search also returns `optimalMoves`, the shortest route from start to
+treasure, which is stored on the maze row because the solver computes it for
+free and the future single-player leaderboard will want it.
 
-- `optimalMoves` — shortest path in the state graph from start to treasure.
-- `gatesOnCriticalPath` — how many gates that path must pass. Where several
-  shortest paths exist the search returns the first in a deterministic
-  ordering, so the metric is reproducible; it is a difficulty hint for the
-  author, not a scored quantity.
-
-These are shown to the author live while drawing, so "how hard is this for my
-opponent" is an informed choice. They are never shown to the runner during a
-run; they may appear on the result screen.
+**It is never displayed.** There is no difficulty readout while drawing, no
+"your maze is too easy" hint, and no guidance about gate placement. Authors
+draw what they want. The only judgement the app makes about a maze is whether
+the treasure can be reached.
 
 ## 5. Architecture
 
@@ -216,16 +240,19 @@ user            id, email citext unique, passwordHash, displayName, locale, crea
                 (+ Better Auth session / verification tables)
 
 maze            id, authorId, name, cellCount, gateCount,
-                data jsonb, contentHash, optimalMoves, gatesOnCriticalPath,
+                data jsonb, contentHash, optimalMoves,
                 status (draft | submitted), createdAt, updatedAt
 
 match           id, code unique, cellCount, gateCount,
-                status, createdById, createdAt, expiresAt
+                status, createdById, createdAt,
+                lastActivityAt, deadlineAt,
+                winnerId nullable, endReason nullable
 
 match_player    matchId, userId, mazeId,          -- the maze THEY drew
                 runStatus (not_started | running | finished),
                 penalties, moveCount, runState jsonb,
-                submittedAt, startedAt, finishedAt
+                submittedAt, startedAt, lastMoveAt, finishedAt,
+                forfeitedAt nullable
                 primary key (matchId, userId)
 
 move            id, matchId, runnerId, seq, dir, outcome,
@@ -237,11 +264,23 @@ The maze a player *solves* is the opponent's `match_player.mazeId`, never their
 own. That join is the only place the mapping exists.
 
 A maze becomes **immutable once submitted** — it is referenced by finished
-matches and by their replays, so editing it would rewrite history. A submitted
-maze may be reused in a later match whose `cellCount` and `gateCount` match,
-which is what makes the "my labyrinths" library worth having. Reuse against an
-opponent who has already solved that maze is rejected. Editing a submitted maze
-copies it to a new draft.
+matches and by their replays, so editing it would rewrite history.
+
+A submitted maze may be **reused as-is** in a later match whose `cellCount` and
+`gateCount` match, which is what makes the "my labyrinths" library worth having.
+Reuse against an opponent who has already solved that maze is rejected.
+
+There is **no edit and no duplicate-to-edit.** Picking an old maze for a new
+match means playing it exactly as drawn. Wanting something different means
+drawing a new one from scratch. Drafts, which have never been submitted, remain
+freely editable.
+
+`deadlineAt` is recomputed on every phase transition and every move, following
+§9.1 — it is a single column rather than six rules scattered across the code,
+so the sweep is one indexed query. `endReason` is `finished | forfeit |
+abandoned`, and `winnerId` is null for everything except `finished` and
+`forfeit`, which is how "you cannot win without finding the treasure" is
+enforced at the schema level rather than by convention.
 
 `runState` holds position, keys held as a bitmask, opened gates, and the
 discovered set. It is a denormalized cache so a 300-move run does not replay
@@ -337,13 +376,38 @@ awaiting_opponent → drawing → running → complete
 - `drawing` — both players present, each drawing. Settings frozen.
 - `running` — both mazes submitted. Both runs unlock at once and proceed
   independently.
-- `complete` — both `finishedAt` set. Only now is the result computed and
-  revealed, so the second finisher cannot play to a known target.
-- `abandoned` — `expiresAt` passed before both mazes were submitted.
-  `expiresAt` is set to 7 days after creation. A match that reaches `running`
-  does not expire; an unfinished run stays open indefinitely, since the
-  opponent's result is withheld until both finish and there is no way to
-  fairly time someone out.
+- `complete` — both `finishedAt` set, or one player finished and the other ran
+  out of time. Only now is the result computed and revealed, so the second
+  finisher cannot play to a known target.
+- `abandoned` — closed with **no winner**. See §9.1.
+
+### 9.1 Deadlines
+
+| Situation | Deadline | Outcome |
+|---|---|---|
+| Nobody has joined | 24h from creation | `abandoned`, no winner |
+| Both joined, neither has submitted a maze | 48h with no activity from either | `abandoned`, no winner |
+| One submitted a maze, the other has not | 24h from that submission | `abandoned`, no winner; recorded against the player who did not draw |
+| Both submitted, neither has made a single move | 24h from the runs unlocking | `abandoned`, no winner |
+| Both have moved, neither has finished | 48h since the last move by either | `abandoned`, no winner |
+| One found the treasure, the other has not | 24h from that finish | `complete`; the non-finisher loses, the finisher wins |
+
+Two principles hold this together, and they resolve every case above.
+
+**You cannot win without finding the treasure.** A player who misses a deadline
+forfeits, but forfeiting does not hand the opponent a win unless that opponent
+actually reached the treasure. That is why every row but the last closes with no
+winner, including the case where you drew your maze and your opponent never drew
+theirs. Missing a drawing deadline is recorded against the player who missed it —
+which is what a future reliability or reputation stat would read — but it does
+not put an unearned win on the other player's record.
+
+**Nothing expires while both players are still engaged.** Every deadline is
+anchored to the last thing that actually happened, so an active match is never
+timed out from under anyone.
+
+A scheduled sweep evaluates these, so a stale match closes on its own rather
+than waiting for someone to open it.
 
 ## 10. Client
 
@@ -374,9 +438,11 @@ Required, not optional:
 - **Draft autosave** to the maze row. Losing a half-drawn labyrinth to a page
   refresh is the kind of thing that ends someone's interest in an app.
 
-The side panel runs the validator continuously: cells used, gates and keys
-placed, validity, and once valid the optimal path length and gates on the
-critical path. Submit is disabled while invalid and names the specific failure.
+The side panel runs the validator continuously and reports only facts, never
+judgement: squares used against the budget, gates and keys placed, and whether
+the maze is currently valid. Submit is disabled while invalid and names the
+specific failure. There is deliberately no difficulty score and no advice about
+gate placement (§4.3).
 
 **Known risk:** edge hit targets. A wall is a one-pixel line needing a ~14 px
 invisible hit strip, and the hit test must resolve "nearest edge" or "containing
@@ -394,10 +460,20 @@ blocked move shakes the board and draws the segment that stopped you.
 
 ### 10.4 Spectator and replay view
 
-The author already knows their maze, so they see it in full, with the runner's
-position and discovered overlay drawn on top and the live penalty count. Replay
-adds the scrubber. The runner sees a small "2 watching" badge fed from the
-presence member list.
+**Two boards side by side.** On the left, what the runner can see — their
+discovered cells and the segments they have bumped. On the right, the author's
+own maze in full, as drawn. The runner's position is marked on both, so you can
+watch them edge along a corridor and see the wall they are about to hit.
+
+The second board exists because authors do not remember their own walls. Drawing
+sixty segments and then recognising the maze from a partial fog-of-war view a day
+later is not realistic, and without the reference board spectating is mostly
+confusing.
+
+On narrow screens the two boards stack, with the runner's view first.
+
+Replay is the same two-board layout with a scrubber, play/pause and speed. The
+runner sees a small "2 watching" badge fed from the presence member list.
 
 ### 10.5 Theming
 
@@ -449,6 +525,12 @@ would.
 **Integration tests on the tRPC routers against real Postgres**, using a Neon
 branch per CI run — instant, disposable, no Docker, and the same engine as
 production rather than an approximation.
+
+The deadline rules in §9.1 get their own table-driven suite here, one case per
+row, with the clock injected rather than slept through. Six rules with
+different anchors and two different durations is exactly the kind of thing that
+quietly rots, and the one that matters most — a forfeit never producing a winner
+who did not reach the treasure — is asserted directly rather than inferred.
 
 **Playwright**, in two projects (desktop Chromium, mobile Safari viewport):
 
@@ -556,6 +638,13 @@ does not need to change to add a lobby later.
 | Realtime transport | Managed vendor (Pusher), behind a `RealtimePublisher` interface. |
 | Replay in v1? | Yes, and it is the primary use — the author is usually offline during the run. |
 | Maze footprint | A cell budget, any connected shape, not a rectangle. Void squares cost nothing. |
+| Shape size limits | Bounding box at most 16 × 16, sized by what fits comfortably on a desktop board. No minimum — corridors may be one square wide. The cap is what makes a long thin maze impossible. |
+| Difficulty feedback to the author | None. No difficulty score, no gate-placement advice, no "too easy" warning. The only judgement made about a maze is whether the treasure is reachable. |
+| Decorative gates | Legal, including a gate whose key is unreachable. Misdirection is a design tool, not an error. |
+| Enclosure | The labyrinth is always closed; a runner can never leave it. Guaranteed by construction, stated as a rule. |
+| Editing a submitted maze | Not possible, and no duplicate-to-edit either. Reuse it exactly as drawn, or draw a new one. Drafts stay editable. |
+| Forfeits | Missing a deadline never hands the opponent a win unless that opponent reached the treasure. Every deadline except the last closes the match with no winner. |
+| Spectating layout | Two boards side by side — the runner's fogged view and the author's full maze — because authors do not remember their own walls. |
 | Connectivity rule | Shape must be orthogonally connected and the treasure must be reachable. Sealed pockets allowed. |
 | ORM | Drizzle. |
 | Auth library | Better Auth (deviation from stock T3, accepted). |
