@@ -7,6 +7,8 @@ import { Geist } from "next/font/google";
 import { notFound } from "next/navigation";
 import { type ReactNode } from "react";
 
+import { SiteHeader } from "~/components/site-header";
+import { ThemeScript } from "~/components/theme-script";
 import { routing } from "~/i18n/routing";
 import { TRPCReactProvider } from "~/trpc/react";
 
@@ -47,9 +49,15 @@ export default async function LocaleLayout({
 
   return (
     <html lang={locale} className={geist.variable} suppressHydrationWarning>
-      <body>
+      <head>
+        <ThemeScript />
+      </head>
+      <body className="bg-bg text-fg min-h-dvh">
         <NextIntlClientProvider>
-          <TRPCReactProvider>{children}</TRPCReactProvider>
+          <TRPCReactProvider>
+            <SiteHeader />
+            {children}
+          </TRPCReactProvider>
         </NextIntlClientProvider>
       </body>
     </html>

@@ -5,3 +5,35 @@
     var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif,
     "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
 }
+
+:root {
+  --bg: oklch(99% 0 0);
+  --fg: oklch(22% 0 0);
+  --muted: oklch(55% 0 0);
+  --border: oklch(90% 0 0);
+  --accent: oklch(55% 0.18 260);
+  --danger: oklch(55% 0.19 25);
+}
+
+:root[data-theme="dark"] {
+  --bg: oklch(18% 0 0);
+  --fg: oklch(95% 0 0);
+  --muted: oklch(65% 0 0);
+  --border: oklch(32% 0 0);
+  --accent: oklch(70% 0.16 260);
+  --danger: oklch(68% 0.17 25);
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-danger: var(--danger);
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--fg);
+}

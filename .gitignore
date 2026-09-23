@@ -47,3 +47,9 @@ yarn-error.log*
 
 # claude coordination scratch (never commit)
 .superpowers/
+
+# playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
