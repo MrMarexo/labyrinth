@@ -57,6 +57,7 @@ production, and a personal development branch whose URL goes in `.env`.
 ### Task 1: Scaffold the application and the unit test harness
 
 **Files:**
+
 - Create: the `create-t3-app` output at the repository root
 - Create: `vitest.config.ts`
 - Create: `src/lib/cn.ts`
@@ -65,6 +66,7 @@ production, and a personal development branch whose URL goes in `.env`.
 - Modify: `.gitignore`, `package.json`, `tsconfig.json`
 
 **Interfaces:**
+
 - Consumes: nothing.
 - Produces: `cn(...inputs: ClassValue[]): string` from `~/lib/cn`, used by every
   component in every later task. The `~/*` path alias resolving to `src/*`. The
@@ -255,6 +257,7 @@ MSG
 ### Task 2: Internationalisation foundation
 
 **Files:**
+
 - Create: `src/i18n/routing.ts`, `src/i18n/navigation.ts`, `src/i18n/request.ts`
 - Create: `messages/en.json`, `messages/sk.json`
 - Create: `src/middleware.ts`
@@ -265,6 +268,7 @@ MSG
 - Test: `tests/unit/i18n-catalogues.test.ts`
 
 **Interfaces:**
+
 - Consumes: nothing from earlier tasks beyond the scaffold.
 - Produces: `locales` (readonly `["en", "sk"]`) and `routing` from
   `~/i18n/routing`; `Link`, `redirect`, `usePathname`, `useRouter`,
@@ -599,6 +603,7 @@ MSG
 ### Task 3: Theming, application shell, and the browser test harness
 
 **Files:**
+
 - Modify: `src/styles/globals.css`
 - Create: `src/components/theme-script.tsx`, `src/components/theme-toggle.tsx`
 - Create: `src/components/locale-switcher.tsx`
@@ -608,6 +613,7 @@ MSG
 - Test: `e2e/appearance.spec.ts`
 
 **Interfaces:**
+
 - Consumes: `Link`, `usePathname`, `useRouter`, `locales` (Task 2). Use `cn`
   from Task 1 for any conditional class list; the components below have none.
 - Produces: the colour tokens `--color-bg`, `--color-fg`, `--color-muted`,
@@ -906,7 +912,7 @@ export function LocaleSwitcher() {
 }
 ```
 
-`usePathname` from `~/i18n/navigation` returns the path *without* the locale
+`usePathname` from `~/i18n/navigation` returns the path _without_ the locale
 prefix, which is what makes "stay on the same page" work.
 
 - [ ] **Step 8: Add the site header and mount everything**
@@ -1018,6 +1024,7 @@ MSG
 ### Task 4: Database connection and the integration test harness
 
 **Files:**
+
 - Modify: `src/env.js`
 - Create: `src/server/db/index.ts`, `src/server/db/schema/index.ts`
 - Modify: `drizzle.config.ts`
@@ -1026,6 +1033,7 @@ MSG
 - Test: `tests/integration/db.test.ts`
 
 **Interfaces:**
+
 - Consumes: `env` from `~/env` (scaffolded in Task 1).
 - Produces: `db` from `~/server/db`, the Drizzle client every later task queries
   through. `src/server/db/schema/index.ts` as the single barrel that
@@ -1224,6 +1232,7 @@ MSG
 ### Task 5: Better Auth server configuration
 
 **Files:**
+
 - Modify: `src/env.js`, `.env.example`
 - Create: `src/server/auth/index.ts`
 - Create: `src/server/db/schema/auth.ts` (generated)
@@ -1233,6 +1242,7 @@ MSG
 - Test: `tests/integration/auth.test.ts`
 
 **Interfaces:**
+
 - Consumes: `db` (Task 4).
 - Produces: `auth` from `~/server/auth`, with `auth.api.getSession`,
   `auth.api.signUpEmail`, `auth.api.signInEmail`. The type `Session`.
@@ -1281,7 +1291,9 @@ describe("email and password authentication", () => {
     });
 
     await expect(
-      auth.api.signInEmail({ body: { email, password: "wrong-password-here" } }),
+      auth.api.signInEmail({
+        body: { email, password: "wrong-password-here" },
+      }),
     ).rejects.toThrow();
   });
 
@@ -1443,7 +1455,10 @@ export const publicProcedure = t.procedure;
 
 export const protectedProcedure = t.procedure.use(({ ctx, next }) => {
   if (!ctx.session?.user) {
-    throw new TRPCError({ code: "UNAUTHORIZED", message: "errors.notSignedIn" });
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "errors.notSignedIn",
+    });
   }
   return next({ ctx: { ...ctx, session: ctx.session } });
 });
@@ -1482,6 +1497,7 @@ MSG
 ### Task 6: Registration, sign-in and sign-out
 
 **Files:**
+
 - Create: `src/lib/auth-client.ts`
 - Create: `src/app/[locale]/(auth)/sign-up/page.tsx`
 - Create: `src/app/[locale]/(auth)/sign-in/page.tsx`
@@ -1492,6 +1508,7 @@ MSG
 - Test: `e2e/auth.spec.ts`
 
 **Interfaces:**
+
 - Consumes: `auth` (Task 5); `Link`, `useRouter`, `locales` (Task 2).
 - Produces: `authClient` from `~/lib/auth-client` with `signIn.email`,
   `signUp.email`, `signOut`, `useSession`. The routes `/[locale]/sign-in` and
@@ -1522,9 +1539,7 @@ test.describe("authentication", () => {
     await page.getByLabel("Password").fill(PASSWORD);
     await page.getByRole("button", { name: "Sign up" }).click();
 
-    await expect(
-      page.getByRole("button", { name: "Sign out" }),
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
 
     await page.getByRole("button", { name: "Sign out" }).click();
     await expect(page.getByRole("link", { name: "Sign in" })).toBeVisible();
@@ -1534,9 +1549,7 @@ test.describe("authentication", () => {
     await page.getByLabel("Password").fill(PASSWORD);
     await page.getByRole("button", { name: "Sign in" }).click();
 
-    await expect(
-      page.getByRole("button", { name: "Sign out" }),
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
   });
 
   test("a wrong password shows a translated error", async ({ page }) => {
@@ -1893,6 +1906,7 @@ MSG
 ### Task 7: Protected area and remembered language
 
 **Files:**
+
 - Create: `src/app/[locale]/(app)/layout.tsx`, `src/app/[locale]/(app)/play/page.tsx`
 - Create: `src/server/api/routers/profile.ts`
 - Modify: `src/server/api/root.ts`
@@ -1901,6 +1915,7 @@ MSG
 - Test: `tests/integration/profile.test.ts`, `e2e/protected.spec.ts`
 
 **Interfaces:**
+
 - Consumes: `protectedProcedure`, `auth` (Task 5); `authClient` (Task 6);
   `locales` (Task 2).
 - Produces: the route group `(app)`, which every signed-in page in later phases
@@ -2161,8 +2176,8 @@ handler. Replace the component body's handler with:
 and add these above the `return`:
 
 ```tsx
-  const session = useSession();
-  const setLocale = api.profile.setLocale.useMutation();
+const session = useSession();
+const setLocale = api.profile.setLocale.useMutation();
 ```
 
 with the imports:
@@ -2188,23 +2203,22 @@ the stored column is for, so apply it at sign-in. In
 `src/components/auth-form.tsx`, replace the success branch of `onSubmit`:
 
 ```tsx
-    if (result.error) {
-      setErrorKey(messageKeyFor(result.error.code));
-      return;
-    }
+if (result.error) {
+  setErrorKey(messageKeyFor(result.error.code));
+  return;
+}
 
-    const stored = (result.data?.user as { locale?: string } | undefined)
-      ?.locale;
+const stored = (result.data?.user as { locale?: string } | undefined)?.locale;
 
-    if (stored && stored !== locale && hasLocale(locales, stored)) {
-      // Signing in on a new browser: adopt the language saved on the account.
-      // router.replace also writes the NEXT_LOCALE cookie, so it sticks.
-      router.replace("/", { locale: stored });
-    } else {
-      router.replace("/");
-    }
+if (stored && stored !== locale && hasLocale(locales, stored)) {
+  // Signing in on a new browser: adopt the language saved on the account.
+  // router.replace also writes the NEXT_LOCALE cookie, so it sticks.
+  router.replace("/", { locale: stored });
+} else {
+  router.replace("/");
+}
 
-    router.refresh();
+router.refresh();
 ```
 
 and add to the imports and the component body:
@@ -2216,7 +2230,7 @@ import { locales } from "~/i18n/routing";
 ```
 
 ```tsx
-  const locale = useLocale();
+const locale = useLocale();
 ```
 
 Remove the now-duplicated `useTranslations` import line if your editor did not
@@ -2250,10 +2264,12 @@ MSG
 ### Task 8: Agent instructions and the module boundary rule
 
 **Files:**
+
 - Create: `AGENTS.md`, `CLAUDE.md`
 - Modify: `eslint.config.js`
 
 **Interfaces:**
+
 - Consumes: nothing.
 - Produces: the ESLint boundary that Phase 1 depends on — `src/maze/**` cannot
   import Next, React, tRPC or Drizzle, and nothing outside `src/server/**` can
@@ -2272,17 +2288,17 @@ plans live in `docs/superpowers/plans/`.
 
 ## Commands
 
-| Command | What it does |
-|---|---|
-| `pnpm dev` | Development server |
-| `pnpm typecheck` | `tsc --noEmit` |
-| `pnpm lint` | ESLint |
-| `pnpm format` | Prettier, writing in place |
-| `pnpm test` | Vitest unit tests (Node environment, no database) |
+| Command                 | What it does                                             |
+| ----------------------- | -------------------------------------------------------- |
+| `pnpm dev`              | Development server                                       |
+| `pnpm typecheck`        | `tsc --noEmit`                                           |
+| `pnpm lint`             | ESLint                                                   |
+| `pnpm format`           | Prettier, writing in place                               |
+| `pnpm test`             | Vitest unit tests (Node environment, no database)        |
 | `pnpm test:integration` | Vitest against a real Neon branch — needs `DATABASE_URL` |
-| `pnpm e2e` | Playwright, desktop and mobile projects |
-| `pnpm db:generate` | Generate a migration from the schema |
-| `pnpm db:migrate` | Apply migrations |
+| `pnpm e2e`              | Playwright, desktop and mobile projects                  |
+| `pnpm db:generate`      | Generate a migration from the schema                     |
+| `pnpm db:migrate`       | Apply migrations                                         |
 
 Use pnpm. Never `npm install`.
 
@@ -2456,10 +2472,12 @@ MSG
 ### Task 9: Continuous integration
 
 **Files:**
+
 - Create: `.github/workflows/ci.yml`
 - Modify: `AGENTS.md`
 
 **Interfaces:**
+
 - Consumes: every script defined in Tasks 1, 3, 4 and 6.
 - Produces: a CI pipeline that every later phase's tests run inside unchanged.
 

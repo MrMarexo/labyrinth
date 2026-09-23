@@ -30,7 +30,7 @@ any completed run afterwards.
 ### 2.1 Terms
 
 - **Cell** — one square of the labyrinth.
-- **Segment** — a wall or a gate, sitting on the edge *between* two cells.
+- **Segment** — a wall or a gate, sitting on the edge _between_ two cells.
 - **Void** — a square that is not part of the labyrinth.
 - **Penalty** — the score. Incremented by one on every blocked move. This is
   what the original description calls a "turn"; there is no alternating turn
@@ -40,15 +40,15 @@ any completed run afterwards.
 
 The runner occupies one cell and moves N/E/S/W one cell at a time.
 
-| Attempted move | Outcome | Penalty | Revealed to runner |
-|---|---|---|---|
-| Into an open edge | Moves | 0 | Destination cell and its contents; edge recorded open |
-| Into a wall | Stays | +1 | That segment, as blocked |
-| Into the outer boundary or a void cell | Stays | +1 | That edge, as blocked — **rendered identically to a wall** |
-| Into a gate without its key | Stays | +1 | That segment, as a gate, including its gate id/colour |
-| Into a gate holding its key | Moves | 0 | Gate marked open; destination cell and contents |
-| Onto a cell holding a key | Moves, key acquired | 0 | Destination cell, key id |
-| Onto the treasure cell | Moves, run ends | 0 | Treasure |
+| Attempted move                         | Outcome             | Penalty | Revealed to runner                                         |
+| -------------------------------------- | ------------------- | ------- | ---------------------------------------------------------- |
+| Into an open edge                      | Moves               | 0       | Destination cell and its contents; edge recorded open      |
+| Into a wall                            | Stays               | +1      | That segment, as blocked                                   |
+| Into the outer boundary or a void cell | Stays               | +1      | That edge, as blocked — **rendered identically to a wall** |
+| Into a gate without its key            | Stays               | +1      | That segment, as a gate, including its gate id/colour      |
+| Into a gate holding its key            | Moves               | 0       | Gate marked open; destination cell and contents            |
+| Onto a cell holding a key              | Moves, key acquired | 0       | Destination cell, key id                                   |
+| Onto the treasure cell                 | Moves, run ends     | 0       | Treasure                                                   |
 
 A runner cannot distinguish a void square from a walled square. That is
 deliberate: it means a sealed-off pocket costs the author budget and buys them
@@ -92,14 +92,17 @@ Stored as `jsonb`. Versioned. Validated by a `zod` schema on the way in and out.
 ```jsonc
 {
   "version": 1,
-  "cells": [ { "x": 0, "y": 0 }, { "x": 1, "y": 0 } ],
-  "start":    { "x": 0, "y": 0 },
+  "cells": [
+    { "x": 0, "y": 0 },
+    { "x": 1, "y": 0 },
+  ],
+  "start": { "x": 0, "y": 0 },
   "treasure": { "x": 7, "y": 4 },
   "segments": [
     { "o": "H", "x": 3, "y": 4, "kind": "wall" },
-    { "o": "V", "x": 5, "y": 2, "kind": "gate", "gate": 1 }
+    { "o": "V", "x": 5, "y": 2, "kind": "gate", "gate": 1 },
   ],
-  "keys": [ { "gate": 1, "x": 2, "y": 6 } ]
+  "keys": [{ "gate": 1, "x": 2, "y": 6 }],
 }
 ```
 
@@ -216,6 +219,7 @@ Tailwind v4 — with two deliberate choices:
   wrong does not fail loudly: it fails as a rare double-counted or lost penalty
   under a retry, which is the score. The WebSocket pool costs a little more on a
   cold connection and that is the right trade.
+
 - **Better Auth**, not NextAuth. A deviation from stock T3, taken because the
   requirement is email and password. Auth.js's Credentials provider forces JWT
   sessions — so no server-side revocation — and deliberately leaves hashing,
@@ -267,7 +271,7 @@ move            id, matchId, runnerId, seq, dir, outcome,
                 unique (matchId, runnerId, seq)
 ```
 
-The maze a player *solves* is the opponent's `match_player.mazeId`, never their
+The maze a player _solves_ is the opponent's `match_player.mazeId`, never their
 own. That join is the only place the mapping exists.
 
 A maze becomes **immutable once submitted** — it is referenced by finished
@@ -329,7 +333,7 @@ verdict is never trusted.
 ### 7.2 Idempotency
 
 `seq` is client-generated and unique per `(matchId, runnerId)`. A retried request
-on a flaky connection cannot produce a phantom penalty. Since penalties *are*
+on a flaky connection cannot produce a phantom penalty. Since penalties _are_
 the score, this matters more here than it normally would.
 
 ### 7.3 No optimistic movement
@@ -359,7 +363,7 @@ visually.
 
 **Spectating leaks nothing.** A watching author sees their own maze, which they
 already know, plus the runner's position within it. They learn nothing about
-the maze *they* still have to solve, because that is the other player's
+the maze _they_ still have to solve, because that is the other player's
 creation. Watching is therefore unrestricted and needs no gating on the
 watcher's own run state.
 
@@ -390,14 +394,14 @@ awaiting_opponent → drawing → running → complete
 
 ### 9.1 Deadlines
 
-| Situation | Deadline | Outcome |
-|---|---|---|
-| Nobody has joined | 24h from creation | `abandoned`, no winner |
-| Both joined, neither has submitted a maze | 48h with no activity from either | `abandoned`, no winner |
-| One submitted a maze, the other has not | 24h from that submission | `abandoned`, no winner; recorded against the player who did not draw |
-| Both submitted, neither has made a single move | 24h from the runs unlocking | `abandoned`, no winner |
-| Both have moved, neither has finished | 48h since the last move by either | `abandoned`, no winner |
-| One found the treasure, the other has not | 24h from that finish | `complete`; the non-finisher loses, the finisher wins |
+| Situation                                      | Deadline                          | Outcome                                                              |
+| ---------------------------------------------- | --------------------------------- | -------------------------------------------------------------------- |
+| Nobody has joined                              | 24h from creation                 | `abandoned`, no winner                                               |
+| Both joined, neither has submitted a maze      | 48h with no activity from either  | `abandoned`, no winner                                               |
+| One submitted a maze, the other has not        | 24h from that submission          | `abandoned`, no winner; recorded against the player who did not draw |
+| Both submitted, neither has made a single move | 24h from the runs unlocking       | `abandoned`, no winner                                               |
+| Both have moved, neither has finished          | 48h since the last move by either | `abandoned`, no winner                                               |
+| One found the treasure, the other has not      | 24h from that finish              | `complete`; the non-finisher loses, the finisher wins                |
 
 Two principles hold this together, and they resolve every case above.
 
@@ -553,7 +557,7 @@ who did not reach the treasure — is asserted directly rather than inferred.
 Two disciplines keep that suite survivable:
 
 - Authentication is seeded via `storageState` through the API, not by driving
-  the login form — except in the one test whose subject *is* the login form.
+  the login form — except in the one test whose subject _is_ the login form.
 - Mazes are seeded through a test-only procedure behind an env flag. A test that
   clicks sixty wall segments is a test that fails for reasons unrelated to what
   it is checking.
@@ -598,15 +602,15 @@ Nightly: the single Pusher smoke test against the real service.
 
 ## 15. Phases
 
-| Phase | Deliverable |
-|---|---|
-| 0 — Foundations | Scaffold, Neon + Drizzle, Better Auth email/password, en/sk i18n, theming, app shell, CI, `AGENTS.md`. Sign up, sign in, switch language and theme. |
-| 1 — Maze domain | Format schema, validator, solver, reducer. Headless, fully unit- and property-tested. |
-| 2 — Editor | SVG board, shape mode, detail palette, undo/redo, draft autosave, live validation panel, "my labyrinths" list. Draw and save a labyrinth. |
-| 3 — Match lifecycle | Create with settings, join by code, submit mazes, state machine, expiry. Two accounts reach `running`. |
-| 4 — The run | Move procedure, fog rendering, penalties, keys and gates, finish, withheld reveal. **First phase where the product exists.** |
-| 5 — Spectate and replay | Publisher abstraction, Pusher, presence badge, viewer with scrubber. |
-| 6 — Polish | Responsive passes, accessibility, empty and error states, history pages, e2e suite completed. |
+| Phase                   | Deliverable                                                                                                                                         |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0 — Foundations         | Scaffold, Neon + Drizzle, Better Auth email/password, en/sk i18n, theming, app shell, CI, `AGENTS.md`. Sign up, sign in, switch language and theme. |
+| 1 — Maze domain         | Format schema, validator, solver, reducer. Headless, fully unit- and property-tested.                                                               |
+| 2 — Editor              | SVG board, shape mode, detail palette, undo/redo, draft autosave, live validation panel, "my labyrinths" list. Draw and save a labyrinth.           |
+| 3 — Match lifecycle     | Create with settings, join by code, submit mazes, state machine, expiry. Two accounts reach `running`.                                              |
+| 4 — The run             | Move procedure, fog rendering, penalties, keys and gates, finish, withheld reveal. **First phase where the product exists.**                        |
+| 5 — Spectate and replay | Publisher abstraction, Pusher, presence badge, viewer with scrubber.                                                                                |
+| 6 — Polish              | Responsive passes, accessibility, empty and error states, history pages, e2e suite completed.                                                       |
 
 Phase 1 precedes Phase 2, which means a stretch with nothing visible on screen.
 That is uncomfortable and correct: the editor, the run and the replay all trust
@@ -631,27 +635,27 @@ does not need to change to add a lobby later.
 
 ## 17. Decisions log
 
-| Question | Decision |
-|---|---|
-| Who solves whose maze, and when? | Swapped mazes, asynchronous runs. "Turn" is a penalty counter, not an alternating turn order. |
-| What does the runner learn, and when? | Bump-to-learn. Walls are invisible until walked into. |
-| How strictly is "one path to the treasure" read? | At least one solution must exist, via the key-aware search. Loops and alternate routes allowed. |
-| How do keys map to gates? | Matched pairs, colour-coded, one key per gate. |
-| How do players meet? | Invite code and link. Creator sets the settings. |
-| How is the winner decided? | Raw penalty count, fewest wins. Asymmetry is part of the game — you drew the maze. |
-| Where does the runner start? | The author places a start marker. |
-| Is there an in-run drawing tool? | No. The editor is drawing-phase only; the discovered map draws itself. |
-| Locales | English and Slovak. |
-| Realtime transport | Managed vendor (Pusher), behind a `RealtimePublisher` interface. |
-| Replay in v1? | Yes, and it is the primary use — the author is usually offline during the run. |
-| Maze footprint | A cell budget, any connected shape, not a rectangle. Void squares cost nothing. |
-| Shape size limits | Bounding box at most 16 × 16, sized by what fits comfortably on a desktop board. No minimum — corridors may be one square wide. The cap is what makes a long thin maze impossible. |
-| Difficulty feedback to the author | None. No difficulty score, no gate-placement advice, no "too easy" warning. The only judgement made about a maze is whether the treasure is reachable. |
-| Decorative gates | Legal, including a gate whose key is unreachable. Misdirection is a design tool, not an error. |
-| Enclosure | The labyrinth is always closed; a runner can never leave it. Guaranteed by construction, stated as a rule. |
-| Editing a submitted maze | Not possible, and no duplicate-to-edit either. Reuse it exactly as drawn, or draw a new one. Drafts stay editable. |
-| Forfeits | Missing a deadline never hands the opponent a win unless that opponent reached the treasure. Every deadline except the last closes the match with no winner. |
-| Spectating layout | Two boards side by side — the runner's fogged view and the author's full maze — because authors do not remember their own walls. |
-| Connectivity rule | Shape must be orthogonally connected and the treasure must be reachable. Sealed pockets allowed. |
-| ORM | Drizzle. |
-| Auth library | Better Auth (deviation from stock T3, accepted). |
+| Question                                         | Decision                                                                                                                                                                           |
+| ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Who solves whose maze, and when?                 | Swapped mazes, asynchronous runs. "Turn" is a penalty counter, not an alternating turn order.                                                                                      |
+| What does the runner learn, and when?            | Bump-to-learn. Walls are invisible until walked into.                                                                                                                              |
+| How strictly is "one path to the treasure" read? | At least one solution must exist, via the key-aware search. Loops and alternate routes allowed.                                                                                    |
+| How do keys map to gates?                        | Matched pairs, colour-coded, one key per gate.                                                                                                                                     |
+| How do players meet?                             | Invite code and link. Creator sets the settings.                                                                                                                                   |
+| How is the winner decided?                       | Raw penalty count, fewest wins. Asymmetry is part of the game — you drew the maze.                                                                                                 |
+| Where does the runner start?                     | The author places a start marker.                                                                                                                                                  |
+| Is there an in-run drawing tool?                 | No. The editor is drawing-phase only; the discovered map draws itself.                                                                                                             |
+| Locales                                          | English and Slovak.                                                                                                                                                                |
+| Realtime transport                               | Managed vendor (Pusher), behind a `RealtimePublisher` interface.                                                                                                                   |
+| Replay in v1?                                    | Yes, and it is the primary use — the author is usually offline during the run.                                                                                                     |
+| Maze footprint                                   | A cell budget, any connected shape, not a rectangle. Void squares cost nothing.                                                                                                    |
+| Shape size limits                                | Bounding box at most 16 × 16, sized by what fits comfortably on a desktop board. No minimum — corridors may be one square wide. The cap is what makes a long thin maze impossible. |
+| Difficulty feedback to the author                | None. No difficulty score, no gate-placement advice, no "too easy" warning. The only judgement made about a maze is whether the treasure is reachable.                             |
+| Decorative gates                                 | Legal, including a gate whose key is unreachable. Misdirection is a design tool, not an error.                                                                                     |
+| Enclosure                                        | The labyrinth is always closed; a runner can never leave it. Guaranteed by construction, stated as a rule.                                                                         |
+| Editing a submitted maze                         | Not possible, and no duplicate-to-edit either. Reuse it exactly as drawn, or draw a new one. Drafts stay editable.                                                                 |
+| Forfeits                                         | Missing a deadline never hands the opponent a win unless that opponent reached the treasure. Every deadline except the last closes the match with no winner.                       |
+| Spectating layout                                | Two boards side by side — the runner's fogged view and the author's full maze — because authors do not remember their own walls.                                                   |
+| Connectivity rule                                | Shape must be orthogonally connected and the treasure must be reachable. Sealed pockets allowed.                                                                                   |
+| ORM                                              | Drizzle.                                                                                                                                                                           |
+| Auth library                                     | Better Auth (deviation from stock T3, accepted).                                                                                                                                   |
