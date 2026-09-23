@@ -1,0 +1,22 @@
+{
+  "app": {
+    "name": "Labyrint",
+    "tagline": "Nakresli bludisko. Vyrieš súperovo. Vyhráva najmenej nárazov."
+  },
+  "nav": {
+    "signIn": "Prihlásiť sa",
+    "signUp": "Registrovať sa",
+    "signOut": "Odhlásiť sa"
+  },
+  "theme": {
+    "label": "Vzhľad",
+    "system": "Systémový",
+    "light": "Svetlý",
+    "dark": "Tmavý"
+  },
+  "locale": {
+    "label": "Jazyk",
+    "en": "English",
+    "sk": "Slovenčina"
+  }
+}

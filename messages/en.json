@@ -1,0 +1,22 @@
+{
+  "app": {
+    "name": "Labyrinth",
+    "tagline": "Draw a maze. Solve theirs. Fewest walls hit wins."
+  },
+  "nav": {
+    "signIn": "Sign in",
+    "signUp": "Sign up",
+    "signOut": "Sign out"
+  },
+  "theme": {
+    "label": "Theme",
+    "system": "System",
+    "light": "Light",
+    "dark": "Dark"
+  },
+  "locale": {
+    "label": "Language",
+    "en": "English",
+    "sk": "Slovenčina"
+  }
+}
