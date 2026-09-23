@@ -205,10 +205,17 @@ the treasure can be reached.
 `create-t3-app` baseline — Next.js App Router, TypeScript strict, tRPC,
 Tailwind v4 — with two deliberate choices:
 
-- **Drizzle**, not Prisma, with the `@neondatabase/serverless` HTTP driver.
-  Neon plus serverless functions is exactly the case where Prisma's engine and
-  connection handling cost cold-start time, and Drizzle's migrations are plain
-  reviewable SQL.
+- **Drizzle**, not Prisma. Neon plus serverless functions is exactly the case
+  where Prisma's engine and connection handling cost cold-start time, and
+  Drizzle's migrations are plain reviewable SQL.
+
+  Use the **WebSocket pool** from `@neondatabase/serverless` — that is
+  `drizzle-orm/neon-serverless` with `Pool`, not `drizzle-orm/neon-http`. The
+  HTTP driver cannot open an interactive transaction, and §7 requires the move
+  row and the updated `runState` to be written as one atomic unit. Getting this
+  wrong does not fail loudly: it fails as a rare double-counted or lost penalty
+  under a retry, which is the score. The WebSocket pool costs a little more on a
+  cold connection and that is the right trade.
 - **Better Auth**, not NextAuth. A deviation from stock T3, taken because the
   requirement is email and password. Auth.js's Credentials provider forces JWT
   sessions — so no server-side revocation — and deliberately leaves hashing,
