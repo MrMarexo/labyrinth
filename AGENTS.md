@@ -65,6 +65,10 @@ quietly rather than loudly.
    — a unit test fails the build if `sk` drifts from `en`.
 10. **Colours come from the tokens in `src/styles/globals.css`.** A raw hex
     value in a component will not follow the theme.
+11. **Pages and components never import the database client.** `~/server/db` is
+    reachable only from `src/server/**`. Everything under `src/app/` and
+    `src/components/` goes through a tRPC procedure. Layouts are exempt because
+    they read the session directly via `~/server/auth`.
 
 ## Testing
 

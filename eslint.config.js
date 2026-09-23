@@ -77,9 +77,17 @@ export default tseslint.config(
                 "drizzle-orm/*",
                 "better-auth",
                 "better-auth/*",
+                "next-intl",
+                "next-intl/*",
+                "@t3-oss/*",
+                "@neondatabase/*",
                 "~/server/*",
                 "~/app/*",
                 "~/components/*",
+                "~/trpc/*",
+                "~/i18n/*",
+                "~/env",
+                "~/styles/*",
               ],
               message:
                 "src/maze must stay pure — it is shared with the client and a future mobile app. See AGENTS.md invariant 2.",
@@ -90,7 +98,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ["src/app/**/*.tsx", "src/components/**/*.tsx"],
+    files: ["src/app/**/*.{ts,tsx}", "src/components/**/*.{ts,tsx}"],
     ignores: ["src/app/**/layout.tsx", "src/app/api/**"],
     rules: {
       "no-restricted-imports": [
@@ -100,7 +108,7 @@ export default tseslint.config(
             {
               group: ["~/server/db", "~/server/db/*"],
               message:
-                "Components must not query the database directly. Go through a tRPC procedure.",
+                "Components must not query the database directly. Go through a tRPC procedure. See AGENTS.md invariant 11.",
             },
           ],
         },
