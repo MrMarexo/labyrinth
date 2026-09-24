@@ -1,0 +1,51 @@
+import { describe, expect, it } from "vitest";
+
+import { auth } from "~/server/auth";
+
+function uniqueEmail() {
+  return `test-${crypto.randomUUID()}@example.test`;
+}
+
+describe("email and password authentication", () => {
+  it("registers a user and issues a session", async () => {
+    const email = uniqueEmail();
+
+    const result = await auth.api.signUpEmail({
+      body: { email, password: "correct-horse-battery", name: "Test Person" },
+      asResponse: true,
+    });
+
+    expect(result.status).toBe(200);
+    expect(result.headers.get("set-cookie")).toContain("better-auth");
+  });
+
+  it("rejects a password below the minimum length", async () => {
+    await expect(
+      auth.api.signUpEmail({
+        body: { email: uniqueEmail(), password: "short", name: "Test Person" },
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("rejects a wrong password for an existing account", async () => {
+    const email = uniqueEmail();
+    await auth.api.signUpEmail({
+      body: { email, password: "correct-horse-battery", name: "Test Person" },
+    });
+
+    await expect(
+      auth.api.signInEmail({
+        body: { email, password: "wrong-password-here" },
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("defaults a new user's locale to en", async () => {
+    const email = uniqueEmail();
+    const signUp = await auth.api.signUpEmail({
+      body: { email, password: "correct-horse-battery", name: "Test Person" },
+    });
+
+    expect((signUp.user as { locale?: string }).locale).toBe("en");
+  });
+});
