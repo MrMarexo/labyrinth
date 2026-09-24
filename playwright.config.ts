@@ -15,7 +15,10 @@ export default defineConfig({
     { name: "mobile", use: { ...devices["iPhone 14"] } },
   ],
   webServer: {
-    command: "pnpm build && pnpm start",
+    // TEST=1 turns off Better Auth's production rate limiter: desktop and
+    // mobile projects both hit /sign-up and /sign-in from 127.0.0.1, which
+    // trips its default 3-requests-per-10s-per-IP cap. See src/server/auth.
+    command: "pnpm build && TEST=1 pnpm start",
     url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,

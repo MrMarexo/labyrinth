@@ -18,5 +18,23 @@
     "label": "Language",
     "en": "English",
     "sk": "Slovenčina"
+  },
+  "auth": {
+    "name": "Name",
+    "email": "Email",
+    "password": "Password",
+    "signUpTitle": "Create an account",
+    "signInTitle": "Sign in",
+    "signUpSubmit": "Sign up",
+    "signInSubmit": "Sign in",
+    "haveAccount": "Already have an account?",
+    "needAccount": "Need an account?"
+  },
+  "errors": {
+    "notSignedIn": "You need to sign in to do that.",
+    "invalidCredentials": "Wrong email or password.",
+    "emailTaken": "That email is already registered.",
+    "passwordTooShort": "Password must be at least {min} characters.",
+    "unknown": "Something went wrong. Please try again."
   }
 }
