@@ -13,14 +13,26 @@ export const auth = betterAuth({
   database: drizzleAdapter(db, { provider: "pg" }),
   // The dynamic origin inference above resolves to Next's own bound
   // hostname, not the alias a client actually connected through — so
-  // "localhost" and "127.0.0.1" need trusting explicitly for local dev
-  // and Playwright (which targets 127.0.0.1) to both work.
-  trustedOrigins: ["http://localhost:3000", "http://127.0.0.1:3000"],
-  // Better Auth's production rate limiter caps /sign-up and /sign-in at 3
-  // requests per 10s per IP. Playwright's desktop and mobile projects both
-  // hit those routes from the same loopback address, so the e2e webServer
-  // (see playwright.config.ts) sets TEST=1 to turn it off for that run only.
-  ...(process.env.TEST === "1" ? { rateLimit: { enabled: false } } : {}),
+  // "localhost" and "127.0.0.1" need trusting explicitly for local dev and
+  // Playwright (which targets 127.0.0.1). Not trusted on Vercel, which has
+  // no loopback traffic and gets its own deployment URLs trusted instead.
+  trustedOrigins: [
+    ...(process.env.VERCEL_URL ? [`https://${process.env.VERCEL_URL}`] : []),
+    ...(process.env.VERCEL_PROJECT_PRODUCTION_URL
+      ? [`https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`]
+      : []),
+    ...(process.env.VERCEL
+      ? []
+      : ["http://localhost:3000", "http://127.0.0.1:3000"]),
+  ],
+  // Better Auth's rate limiter caps /sign-up and /sign-in at 3 requests per
+  // 10s per IP. Playwright's desktop and mobile projects share a loopback
+  // address and trip it. Disabling it is therefore an end-to-end-test
+  // affordance only: the VERCEL guard means that even if this variable were
+  // ever set on a deployment, the limiter stays on.
+  ...(env.E2E_DISABLE_RATE_LIMIT === "true" && !process.env.VERCEL
+    ? { rateLimit: { enabled: false } }
+    : {}),
   emailAndPassword: {
     enabled: true,
     minPasswordLength: 10,

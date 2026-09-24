@@ -14,6 +14,10 @@ export const env = createEnv({
     // hostname on every deploy — there is no single correct value there.
     // Left unset, Better Auth infers the origin from the incoming request.
     BETTER_AUTH_URL: z.string().url().optional(),
+    // Playwright-only: lets the e2e webServer turn off Better Auth's
+    // production rate limiter, which a full desktop+mobile run trips from a
+    // shared loopback IP. Guarded again at the call site by `!process.env.VERCEL`.
+    E2E_DISABLE_RATE_LIMIT: z.enum(["true", "false"]).default("false"),
     NODE_ENV: z
       .enum(["development", "test", "production"])
       .default("development"),
@@ -37,6 +41,7 @@ export const env = createEnv({
     DATABASE_URL_UNPOOLED: process.env.DATABASE_URL_UNPOOLED,
     BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET,
     BETTER_AUTH_URL: process.env.BETTER_AUTH_URL,
+    E2E_DISABLE_RATE_LIMIT: process.env.E2E_DISABLE_RATE_LIMIT,
     NODE_ENV: process.env.NODE_ENV,
     // NEXT_PUBLIC_CLIENTVAR: process.env.NEXT_PUBLIC_CLIENTVAR,
   },
