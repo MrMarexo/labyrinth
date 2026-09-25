@@ -4,6 +4,26 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { env } from "~/env";
 import { db } from "~/server/db";
 
+// The rate limiter may only be switched off for a local end-to-end run.
+// Three independent conditions must all hold: the flag is explicitly set,
+// we are not on Vercel (platform-injected, not attacker-controlled), and
+// the configured base URL is loopback. A deployed host fails the third
+// even if someone copies the flag into its environment.
+const servingLoopback =
+  env.BETTER_AUTH_URL !== undefined &&
+  /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/?$/.test(env.BETTER_AUTH_URL);
+
+const disableRateLimit =
+  env.E2E_DISABLE_RATE_LIMIT === "true" &&
+  !process.env.VERCEL &&
+  servingLoopback;
+
+if (disableRateLimit) {
+  console.warn(
+    "[auth] Rate limiting is DISABLED via E2E_DISABLE_RATE_LIMIT. This must only ever happen in a local end-to-end test run.",
+  );
+}
+
 export const auth = betterAuth({
   // Omitted when unset: preview deployments get a different hostname on
   // every deploy, so Better Auth infers the origin from the incoming
@@ -27,12 +47,8 @@ export const auth = betterAuth({
   ],
   // Better Auth's rate limiter caps /sign-up and /sign-in at 3 requests per
   // 10s per IP. Playwright's desktop and mobile projects share a loopback
-  // address and trip it. Disabling it is therefore an end-to-end-test
-  // affordance only: the VERCEL guard means that even if this variable were
-  // ever set on a deployment, the limiter stays on.
-  ...(env.E2E_DISABLE_RATE_LIMIT === "true" && !process.env.VERCEL
-    ? { rateLimit: { enabled: false } }
-    : {}),
+  // address and trip it. See `disableRateLimit` above for the guard.
+  ...(disableRateLimit ? { rateLimit: { enabled: false } } : {}),
   emailAndPassword: {
     enabled: true,
     minPasswordLength: 10,

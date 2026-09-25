@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 
-import { useRouter } from "~/i18n/navigation";
+import { Link, useRouter } from "~/i18n/navigation";
 import { signIn, signUp } from "~/lib/auth-client";
 
 const MIN_PASSWORD_LENGTH = 10;
@@ -120,10 +120,17 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
       <button
         type="submit"
         disabled={pending}
-        className="bg-accent w-full rounded px-3 py-2 text-white disabled:opacity-50"
+        className="bg-accent text-on-accent w-full rounded px-3 py-2 disabled:opacity-50"
       >
         {mode === "sign-up" ? t("signUpSubmit") : t("signInSubmit")}
       </button>
+
+      <Link
+        href={mode === "sign-up" ? "/sign-in" : "/sign-up"}
+        className="block text-sm underline"
+      >
+        {mode === "sign-up" ? t("haveAccount") : t("needAccount")}
+      </Link>
     </form>
   );
 }

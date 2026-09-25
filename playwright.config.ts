@@ -18,7 +18,8 @@ export default defineConfig({
     // E2E_DISABLE_RATE_LIMIT=true turns off Better Auth's rate limiter:
     // desktop and mobile projects both hit /sign-up and /sign-in from
     // 127.0.0.1, which trips its default 3-requests-per-10s-per-IP cap.
-    // See src/server/auth — the effect is also disabled whenever VERCEL is set.
+    // See src/server/auth — this flag is ignored (rate limiting stays on)
+    // whenever VERCEL is set or the base URL isn't loopback.
     command: "pnpm build && E2E_DISABLE_RATE_LIMIT=true pnpm start",
     url: baseURL,
     reuseExistingServer: !process.env.CI,
