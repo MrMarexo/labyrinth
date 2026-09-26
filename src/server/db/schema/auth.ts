@@ -12,7 +12,7 @@ export const user = pgTable("user", {
     .defaultNow()
     .$onUpdate(() => /* @__PURE__ */ new Date())
     .notNull(),
-  locale: text("locale").default("en"),
+  locale: text("locale"),
 });
 
 export const session = pgTable(

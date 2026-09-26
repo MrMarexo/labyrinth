@@ -61,7 +61,6 @@ export const auth = betterAuth({
     additionalFields: {
       locale: {
         type: "string",
-        defaultValue: "en",
         required: false,
         input: false,
       },

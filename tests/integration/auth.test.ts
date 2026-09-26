@@ -40,12 +40,15 @@ describe("email and password authentication", () => {
     ).rejects.toThrow();
   });
 
-  it("defaults a new user's locale to en", async () => {
+  it("leaves a new user's locale unset until they choose one", async () => {
+    // No defaultValue on the `locale` additional field: a fresh sign-up must
+    // be distinguishable from someone who has actually chosen a language,
+    // or the app cannot tell "never chosen" apart from "chose English".
     const email = uniqueEmail();
     const signUp = await auth.api.signUpEmail({
       body: { email, password: "correct-horse-battery", name: "Test Person" },
     });
 
-    expect((signUp.user as { locale?: string }).locale).toBe("en");
+    expect((signUp.user as { locale?: string | null }).locale).toBeNull();
   });
 });

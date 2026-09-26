@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Link, useRouter } from "~/i18n/navigation";
 import { locales } from "~/i18n/routing";
 import { signIn, signUp } from "~/lib/auth-client";
+import { api } from "~/trpc/react";
 
 const MIN_PASSWORD_LENGTH = 10;
 
@@ -37,6 +38,7 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
   const tError = useTranslations("errors");
   const router = useRouter();
   const locale = useLocale();
+  const setLocale = api.profile.setLocale.useMutation();
 
   const [errorKey, setErrorKey] = useState<ErrorMessageKey | null>(null);
   const [pending, setPending] = useState(false);
@@ -66,8 +68,19 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
       return;
     }
 
-    const stored = (result.data?.user as { locale?: string } | undefined)
-      ?.locale;
+    if (mode === "sign-up") {
+      // Signing up in a given locale is a real preference: record it. A
+      // failed save must never block registration, so this is
+      // fire-and-forget, same as the language switcher.
+      void setLocale.mutateAsync({ locale }).catch(() => {
+        // A failed preference save must not block registration.
+      });
+      router.replace("/");
+      router.refresh();
+      return;
+    }
+
+    const stored = result.data?.user.locale;
 
     if (stored && stored !== locale && hasLocale(locales, stored)) {
       // Signing in on a new browser: adopt the language saved on the

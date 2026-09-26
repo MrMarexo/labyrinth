@@ -8,6 +8,13 @@
       "when": 1790288201490,
       "tag": "0000_omniscient_titanium_man",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790418744973,
+      "tag": "0001_chubby_thing",
+      "breakpoints": true
     }
   ]
 }
