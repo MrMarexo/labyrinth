@@ -99,3 +99,13 @@ There is deliberately no jsdom and no React Testing Library. UI behaviour is
 proved in a real browser or not at all.
 
 Write the failing test first. Run it and watch it fail before implementing.
+
+## CI
+
+Every pull request runs types, lint, formatting and unit tests, then
+integration and end-to-end tests against a Neon branch created for that run and
+deleted afterwards. Migrations are applied to the branch first, so a broken
+migration fails the pull request.
+
+Requires the repository secrets `NEON_API_KEY`, `NEON_PROJECT_ID` and
+`BETTER_AUTH_SECRET`.
