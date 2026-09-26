@@ -70,6 +70,21 @@ quietly rather than loudly.
     `src/components/` goes through a tRPC procedure. Layouts are exempt because
     they read the session directly via `~/server/auth`.
 
+## Local environment
+
+**Never run `vercel env pull` in this project.** It writes `.env.local`, which
+Next.js prefers over `.env`, but the Vitest integration setup reads `.env`
+specifically. Vercel's Development-scoped `DATABASE_URL` is managed by the Neon
+integration and points at the production branch, so pulling it leaves the app
+talking to production while the integration tests talk to `dev` — in one
+checkout, with no error and no warning.
+
+Keep `.env` hand-maintained, pointing at your own Neon `dev` branch. Both
+`DATABASE_URL` (pooled) and `DATABASE_URL_UNPOOLED` (direct, used by
+drizzle-kit for migrations) must name the same branch; one of each is worse
+than both wrong, because migrations would then run against a different
+database than the app reads.
+
 ## Testing
 
 Three layers, chosen by what each can actually prove:

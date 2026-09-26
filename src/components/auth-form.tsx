@@ -1,9 +1,10 @@
 "use client";
 
-import { useTranslations } from "next-intl";
+import { hasLocale, useLocale, useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { Link, useRouter } from "~/i18n/navigation";
+import { locales } from "~/i18n/routing";
 import { signIn, signUp } from "~/lib/auth-client";
 
 const MIN_PASSWORD_LENGTH = 10;
@@ -35,6 +36,7 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
   const t = useTranslations("auth");
   const tError = useTranslations("errors");
   const router = useRouter();
+  const locale = useLocale();
 
   const [errorKey, setErrorKey] = useState<ErrorMessageKey | null>(null);
   const [pending, setPending] = useState(false);
@@ -64,7 +66,18 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
       return;
     }
 
-    router.replace("/");
+    const stored = (result.data?.user as { locale?: string } | undefined)
+      ?.locale;
+
+    if (stored && stored !== locale && hasLocale(locales, stored)) {
+      // Signing in on a new browser: adopt the language saved on the
+      // account. router.replace also writes the NEXT_LOCALE cookie, so it
+      // sticks.
+      router.replace("/", { locale: stored });
+    } else {
+      router.replace("/");
+    }
+
     router.refresh();
   }
 

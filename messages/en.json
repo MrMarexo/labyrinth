@@ -36,5 +36,9 @@
     "emailTaken": "That email is already registered.",
     "passwordTooShort": "Password must be at least {min} characters.",
     "unknown": "Something went wrong. Please try again."
+  },
+  "play": {
+    "title": "Your games",
+    "empty": "No games yet."
   }
 }
