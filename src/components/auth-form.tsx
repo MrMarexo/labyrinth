@@ -113,7 +113,7 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
             name="name"
             required
             autoComplete="name"
-            className="border-border bg-bg w-full rounded border px-3 py-2"
+            className="border-border-strong bg-bg w-full rounded border px-3 py-2"
           />
         </label>
       )}
@@ -125,7 +125,7 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
           type="email"
           required
           autoComplete="email"
-          className="border-border bg-bg w-full rounded border px-3 py-2"
+          className="border-border-strong bg-bg w-full rounded border px-3 py-2"
         />
       </label>
 
@@ -139,7 +139,7 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
           autoComplete={
             mode === "sign-up" ? "new-password" : "current-password"
           }
-          className="border-border bg-bg w-full rounded border px-3 py-2"
+          className="border-border-strong bg-bg w-full rounded border px-3 py-2"
         />
       </label>
 

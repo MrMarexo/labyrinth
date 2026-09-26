@@ -40,6 +40,10 @@ test.describe("authentication", () => {
     await page.getByLabel("Password").fill(PASSWORD);
     await page.getByRole("button", { name: "Sign up" }).click();
     await page.getByRole("button", { name: "Sign out" }).click();
+    // Wait for the sign-out to land. The (auth) layout now bounces a
+    // signed-in visitor to the home page, so navigating while the session
+    // cookie is still alive never reaches the form.
+    await expect(page.getByRole("link", { name: "Sign in" })).toBeVisible();
 
     await page.goto("/sk/sign-in");
     await page.getByLabel("E-mail").fill(email);

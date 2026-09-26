@@ -70,6 +70,25 @@ quietly rather than loudly.
     `src/components/` goes through a tRPC procedure. Layouts are exempt because
     they read the session directly via `~/server/auth`.
 
+## Schema notes
+
+Two decisions that look like oversights and are not.
+
+- **`user.email` is plain `text`, where spec §6 says `citext`.** The
+  case-insensitivity comes from Better Auth 1.7.5, which lowercases the
+  address on both the sign-up and the sign-in path, not from the column. The
+  behaviour is equivalent _only through the library_. A raw query — a
+  Drizzle `eq(user.email, …)`, an admin script, a future magic-link lookup —
+  is case-sensitive and will miss. Lowercase the input yourself, or move the
+  column to `citext` first.
+- **`user.locale` is nullable, and in practice never null.** Null means
+  "never chosen", which has to be representable so the app can tell it apart
+  from "chose English". Sign-up then immediately writes the locale the form
+  was in, because signing up in a language _is_ a choice — so no user created
+  through the UI has a null. That is intentional, not a bug in the sign-up
+  path: the null case is there for users created by other means later
+  (seeds, an invite flow, an admin tool).
+
 ## Local environment
 
 **Never run `vercel env pull` in this project.** It writes `.env.local`, which
@@ -109,3 +128,30 @@ migration fails the pull request.
 
 Requires the repository secrets `NEON_API_KEY`, `NEON_PROJECT_ID` and
 `BETTER_AUTH_SECRET`.
+
+### Migrations on deploy
+
+Vercel runs the `vercel-build` script in preference to `build` when one
+exists, so migrations are part of every deployment:
+
+```
+"vercel-build": "drizzle-kit migrate && next build"
+```
+
+This is how migrations reach production at all — `db:migrate` is a manual
+local command, and CI only ever migrates the throwaway branch it created for
+that run. It also covers preview deployments, whose Neon branches are cloned
+from production and therefore need the pull request's own migrations before
+the app on them will work.
+
+`drizzle.config.ts` connects with `DATABASE_URL_UNPOOLED`, so
+**`DATABASE_URL_UNPOOLED` must be present in every Vercel environment scope**
+— Production, Preview and Development. It is not optional there the way it
+looks locally: a scope missing it fails the build in `drizzle-kit migrate`,
+before `next build` runs. Importing `env` also means `DATABASE_URL` and
+`BETTER_AUTH_SECRET` must be set in the same scope.
+
+A failed migration fails the deploy and the previous deployment keeps
+serving. The migration is not rolled back, so migrations must stay backwards
+compatible with the code already running — expand first, contract in a later
+deploy.

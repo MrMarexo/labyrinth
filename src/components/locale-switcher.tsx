@@ -5,7 +5,6 @@ import { useTransition } from "react";
 
 import { usePathname, useRouter } from "~/i18n/navigation";
 import { locales, type Locale } from "~/i18n/routing";
-import { useSession } from "~/lib/auth-client";
 import { api } from "~/trpc/react";
 
 export function LocaleSwitcher() {
@@ -14,7 +13,6 @@ export function LocaleSwitcher() {
   const router = useRouter();
   const pathname = usePathname();
   const [pending, startTransition] = useTransition();
-  const session = useSession();
   const setLocale = api.profile.setLocale.useMutation();
 
   return (
@@ -22,16 +20,19 @@ export function LocaleSwitcher() {
       <span className="sr-only">{t("label")}</span>
       <select
         aria-label={t("label")}
-        className="border-border bg-bg rounded border px-2 py-1"
+        className="border-border-strong bg-bg rounded border px-2 py-1"
         disabled={pending}
         value={locale}
         onChange={(event) => {
           const next = event.target.value as Locale;
-          if (session.data) {
-            void setLocale.mutateAsync({ locale: next }).catch(() => {
-              // A failed preference save must not block the language change.
-            });
-          }
+          // Fired unconditionally. Gating on a client useSession() would cost
+          // a session request on every page and silently drop the preference
+          // when the language is switched before that fetch resolves; a
+          // signed-out visitor just gets UNAUTHORIZED, which is not an error
+          // worth showing.
+          void setLocale.mutateAsync({ locale: next }).catch(() => {
+            // A failed preference save must not block the language change.
+          });
           startTransition(() => {
             router.replace(pathname, { locale: next });
           });

@@ -37,7 +37,7 @@ export function ThemeToggle() {
       <span className="sr-only">{t("label")}</span>
       <select
         aria-label={t("label")}
-        className="border-border bg-bg rounded border px-2 py-1"
+        className="border-border-strong bg-bg rounded border px-2 py-1"
         value={choice}
         onChange={(event) => {
           const next = event.target.value as Choice;

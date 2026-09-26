@@ -1,6 +1,6 @@
 import { FlatCompat } from "@eslint/eslintrc";
 import tseslint from "typescript-eslint";
-// @ts-ignore -- no types for this plugin
+// @ts-expect-error -- no types for this plugin
 import drizzle from "eslint-plugin-drizzle";
 
 const compat = new FlatCompat({
@@ -9,7 +9,9 @@ const compat = new FlatCompat({
 
 export default tseslint.config(
   {
-    ignores: [".next"],
+    // Generated, and not ours to fix: next-env.d.ts is rewritten by every
+    // `next build`; the other two are test output.
+    ignores: [".next", "next-env.d.ts", "playwright-report", "test-results"],
   },
   ...compat.extends("next/core-web-vitals"),
   {
@@ -59,8 +61,10 @@ export default tseslint.config(
     },
   },
   {
-    files: ["src/maze/**/*.ts"],
+    files: ["src/maze/**/*.{ts,tsx}"],
     rules: {
+      // Static imports only: ESLint 9's no-restricted-imports has no
+      // ImportExpression visitor, so a dynamic import() here is not caught.
       "no-restricted-imports": [
         "error",
         {
@@ -81,6 +85,12 @@ export default tseslint.config(
                 "next-intl/*",
                 "@t3-oss/*",
                 "@neondatabase/*",
+                // Node builtins: any of these breaks the browser bundle and
+                // the future mobile client just as surely as importing Next.
+                "node:*",
+                "fs",
+                "path",
+                "crypto",
                 "~/server/*",
                 "~/app/*",
                 "~/components/*",

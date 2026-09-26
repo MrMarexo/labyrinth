@@ -1,3 +1,4 @@
+import { TRPCError } from "@trpc/server";
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 
@@ -6,6 +7,21 @@ import { createTRPCContext } from "~/server/api/trpc";
 import { db } from "~/server/db";
 import { user } from "~/server/db/schema";
 import { auth } from "~/server/auth";
+
+/**
+ * tRPC rejects with a `TRPCError`. A bare `rejects.toThrow()` would also
+ * pass on a connection failure, so match the code the procedure actually
+ * threw.
+ */
+async function rejection(call: Promise<unknown>) {
+  try {
+    await call;
+  } catch (error) {
+    if (!(error instanceof TRPCError)) throw error;
+    return { code: error.code, message: error.message };
+  }
+  throw new Error("expected the call to reject, but it resolved");
+}
 
 async function signedInContext() {
   const email = `test-${crypto.randomUUID()}@example.test`;
@@ -37,16 +53,19 @@ describe("profile.setLocale", () => {
     const caller = createCaller(ctx);
 
     await expect(
-      caller.profile.setLocale({ locale: "de" as "en" }),
-    ).rejects.toThrow();
+      rejection(caller.profile.setLocale({ locale: "de" as "en" })),
+    ).resolves.toMatchObject({ code: "BAD_REQUEST" });
   });
 
   it("refuses an anonymous caller with a message key", async () => {
     const ctx = await createTRPCContext({ headers: new Headers() });
     const caller = createCaller(ctx);
 
-    await expect(caller.profile.setLocale({ locale: "sk" })).rejects.toThrow(
-      "errors.notSignedIn",
-    );
+    await expect(
+      rejection(caller.profile.setLocale({ locale: "sk" })),
+    ).resolves.toEqual({
+      code: "UNAUTHORIZED",
+      message: "errors.notSignedIn",
+    });
   });
 });

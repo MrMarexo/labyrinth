@@ -5,11 +5,11 @@ import { LocaleSwitcher } from "~/components/locale-switcher";
 import { SignOutButton } from "~/components/sign-out-button";
 import { ThemeToggle } from "~/components/theme-toggle";
 import { Link } from "~/i18n/navigation";
-import { auth } from "~/server/auth";
+import { getSession } from "~/server/auth";
 
 export async function SiteHeader() {
   const t = await getTranslations();
-  const session = await auth.api.getSession({ headers: await headers() });
+  const session = await getSession(await headers());
 
   return (
     <header className="border-border flex items-center justify-between border-b px-4 py-3">

@@ -37,7 +37,9 @@ test.describe("protected area", () => {
       page.getByRole("heading", { level: 1, name: "Vaše hry" }),
     ).toBeVisible();
 
-    // A fresh visit to the unprefixed root should land on the stored locale.
+    // Cookies are intact here, so this only proves the NEXT_LOCALE cookie
+    // the switch wrote — not the preference stored on the account. The
+    // database path is proved by the last test in this file.
     await page.goto("/");
     await expect(page).toHaveURL(/\/sk$/);
   });
@@ -56,6 +58,48 @@ test.describe("language preference", () => {
     await expect(
       page.getByRole("button", { name: "Odhlásiť sa" }),
     ).toBeVisible();
+    await expect(page).toHaveURL(/\/sk$/);
+  });
+
+  test("a Slovak sign-up alone is enough to be remembered", async ({
+    page,
+    context,
+  }) => {
+    // The third leg of the feature: sign-up writes the current locale
+    // fire-and-forget, with no switcher involved. Its failure would only
+    // ever surface on a second device, so prove it the same way — by
+    // throwing the cookies away.
+    const email = uniqueEmail();
+
+    const localeSaved = page.waitForResponse(
+      (response) =>
+        response.url().includes("/api/trpc/profile.setLocale") &&
+        response.status() === 200,
+    );
+
+    await page.goto("/sk/sign-up");
+    await page.getByLabel("Meno").fill("Test Person");
+    await page.getByLabel("E-mail").fill(email);
+    await page.getByLabel("Heslo").fill(PASSWORD);
+    await page.getByRole("button", { name: "Registrovať sa" }).click();
+
+    await expect(
+      page.getByRole("button", { name: "Odhlásiť sa" }),
+    ).toBeVisible();
+    await localeSaved;
+
+    await page.getByRole("button", { name: "Odhlásiť sa" }).click();
+    await expect(
+      page.getByRole("link", { name: "Prihlásiť sa" }),
+    ).toBeVisible();
+
+    await context.clearCookies();
+
+    await page.goto("/en/sign-in");
+    await page.getByLabel("Email").fill(email);
+    await page.getByLabel("Password").fill(PASSWORD);
+    await page.getByRole("button", { name: "Sign in" }).click();
+
     await expect(page).toHaveURL(/\/sk$/);
   });
 

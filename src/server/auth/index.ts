@@ -1,5 +1,6 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { cache } from "react";
 
 import { env } from "~/env";
 import { db } from "~/server/db";
@@ -69,3 +70,38 @@ export const auth = betterAuth({
 });
 
 export type Session = typeof auth.$Infer.Session;
+
+/**
+ * The only way anything should read the session on the server.
+ *
+ * A protected page render asks three times — the site header, the (app) or
+ * (auth) layout, and the tRPC context — and each ask is a real database
+ * query. This collapses them into one per request.
+ *
+ * The cache is keyed on the cookie header rather than on the `Headers`
+ * object, because the three callers do not all hold the same instance:
+ * `src/trpc/server.ts` clones the request headers so it can stamp
+ * `x-trpc-source`, and a clone would miss an identity-keyed cache. Whoever
+ * asks first still hands Better Auth its own full `Headers`.
+ *
+ * `cache()` only spans one request, and outside a React request (the
+ * integration tests, for instance) it has no store and simply calls
+ * through — so this degrades to an uncached call rather than leaking a
+ * session between requests.
+ */
+const sessionCache = cache(
+  () => new Map<string, ReturnType<typeof auth.api.getSession>>(),
+);
+
+export function getSession(headers: Headers) {
+  const perRequest = sessionCache();
+  const key = headers.get("cookie") ?? "";
+
+  let pending = perRequest.get(key);
+  if (!pending) {
+    pending = auth.api.getSession({ headers });
+    perRequest.set(key, pending);
+  }
+
+  return pending;
+}
