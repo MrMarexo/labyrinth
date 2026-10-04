@@ -14,10 +14,11 @@ jobs:
     name: Types, lint and unit tests
     runs-on: ubuntu-latest
     env:
-      # next.config.js unconditionally imports src/env.js, and `next lint`
-      # loads next.config.js to read its settings. This job never touches a
-      # database, so there is nothing valid to give DATABASE_URL,
-      # DATABASE_URL_UNPOOLED or BETTER_AUTH_SECRET — skip the check instead.
+      # Several files this job type-checks and lints import ~/env
+      # (next.config.js, src/server/db, src/server/auth, the tRPC route
+      # handler). This job never touches a database, so there is nothing
+      # valid to give DATABASE_URL, DATABASE_URL_UNPOOLED or
+      # BETTER_AUTH_SECRET — skip the check instead.
       SKIP_ENV_VALIDATION: "true"
     steps:
       - uses: actions/checkout@v4

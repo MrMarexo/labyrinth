@@ -144,14 +144,21 @@ that run. It also covers preview deployments, whose Neon branches are cloned
 from production and therefore need the pull request's own migrations before
 the app on them will work.
 
-`drizzle.config.ts` connects with `DATABASE_URL_UNPOOLED`, so
-**`DATABASE_URL_UNPOOLED` must be present in every Vercel environment scope**
-— Production, Preview and Development. It is not optional there the way it
-looks locally: a scope missing it fails the build in `drizzle-kit migrate`,
-before `next build` runs. Importing `env` also means `DATABASE_URL` and
-`BETTER_AUTH_SECRET` must be set in the same scope.
+`src/env.js` already requires `DATABASE_URL_UNPOOLED` everywhere — it is not a
+new requirement of `vercel-build`. What `vercel-build` changes is _when_ a
+missing value fails: `drizzle.config.ts` connects with it directly, so a scope
+missing it fails the build in `drizzle-kit migrate`, before `next build` even
+runs. Importing `env` also means `DATABASE_URL` and `BETTER_AUTH_SECRET` must
+be set in the same scope.
 
 A failed migration fails the deploy and the previous deployment keeps
 serving. The migration is not rolled back, so migrations must stay backwards
 compatible with the code already running — expand first, contract in a later
 deploy.
+
+Concurrent `vercel-build` runs against one database are not locked, so two
+overlapping deploys can race: one's migration commits while the other rolls
+back and fails. And Vercel's instant rollback does not re-run `vercel-build`,
+so rolling back serves old code against the new schema. Both are survivable
+only because of the expand-then-contract rule above — the old code still
+works against the expanded schema either way.
