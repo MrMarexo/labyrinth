@@ -14,11 +14,11 @@ jobs:
     name: Types, lint and unit tests
     runs-on: ubuntu-latest
     env:
-      # Several files this job type-checks and lints import ~/env
-      # (next.config.js, src/server/db, src/server/auth, the tRPC route
-      # handler). This job never touches a database, so there is nothing
-      # valid to give DATABASE_URL, DATABASE_URL_UNPOOLED or
-      # BETTER_AUTH_SECRET — skip the check instead.
+      # No step in this job currently triggers env validation: tsc and eslint do
+      # not execute module code, and no unit test imports ~/env transitively.
+      # The flag is a forward-looking guard — the moment a unit test reaches for
+      # ~/server/db or ~/server/auth, `pnpm test` would load src/env.js and fail
+      # here for want of a database URL that this job has no reason to hold.
       SKIP_ENV_VALIDATION: "true"
     steps:
       - uses: actions/checkout@v4

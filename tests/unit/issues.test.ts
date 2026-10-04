@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { toTranslatableIssues } from "~/lib/issues";
@@ -32,6 +32,47 @@ describe("toTranslatableIssues", () => {
     expect(toTranslatableIssues(result.error)).toEqual([
       { key: "maze.format.tooSmall", params: { min: 10 }, path: [] },
     ]);
+  });
+
+  it("passes through all-primitive custom params unchanged", () => {
+    const schema = z.number().superRefine((value, ctx) => {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "maze.format.outOfRange",
+        params: { min: 1, label: "width" },
+      });
+    });
+    const result = schema.safeParse(0);
+    expect(result.success).toBe(false);
+
+    expect(toTranslatableIssues(result.error)).toEqual([
+      {
+        key: "maze.format.outOfRange",
+        params: { min: 1, label: "width" },
+        path: [],
+      },
+    ]);
+  });
+
+  it("drops a non-primitive param while keeping primitive ones", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    const schema = z.number().superRefine((value, ctx) => {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "maze.format.outOfRange",
+        params: { min: 1, at: new Date() },
+      });
+    });
+    const result = schema.safeParse(0);
+    expect(result.success).toBe(false);
+
+    expect(toTranslatableIssues(result.error)).toEqual([
+      { key: "maze.format.outOfRange", params: { min: 1 }, path: [] },
+    ]);
+    expect(warn).toHaveBeenCalledTimes(1);
+
+    warn.mockRestore();
   });
 
   it("replaces an English zod default with a generic key", () => {
