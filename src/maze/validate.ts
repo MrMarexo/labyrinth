@@ -5,6 +5,41 @@ import { cellKey, edgeKey, step } from "./geometry";
 export type MazeSettings = { cellCount: number; gateCount: number };
 
 /**
+ * Every message key the validation passes can emit: the seventeen keys the
+ * eleven structural rules below produce, plus `treasureUnreachable`, which
+ * `validateMaze` raises after the solvability search. `add()` is typed
+ * against this, so a typo is a compile error rather than a key that silently
+ * resolves to nothing.
+ *
+ * It is also the inventory Phase 2 needs when it writes the copy. The shape
+ * keys emitted by the zod schema are the separate `MAZE_FORMAT_ISSUE_KEYS`
+ * list in `format.ts`; together the two cover every `maze.*` key the domain
+ * can produce.
+ */
+export const MAZE_ISSUE_KEYS = [
+  "maze.validate.wrongCellCount",
+  "maze.validate.duplicateCell",
+  "maze.validate.boundingBoxTooLarge",
+  "maze.validate.disconnectedShape",
+  "maze.validate.startNotInShape",
+  "maze.validate.treasureNotInShape",
+  "maze.validate.startIsTreasure",
+  "maze.validate.keyOnStart",
+  "maze.validate.keyOutsideShape",
+  "maze.validate.cellHoldsTwoThings",
+  "maze.validate.segmentOutsideShape",
+  "maze.validate.duplicateSegment",
+  "maze.validate.gateIdReused",
+  "maze.validate.gateIdsNotContiguous",
+  "maze.validate.gateWithoutKey",
+  "maze.validate.gateWithTwoKeys",
+  "maze.validate.keyWithoutGate",
+  "maze.validate.treasureUnreachable",
+] as const;
+
+export type MazeIssueKey = (typeof MAZE_ISSUE_KEYS)[number];
+
+/**
  * The eleven structural rules from spec §4.1. Returns every issue it finds
  * rather than the first, because the editor shows them all at once.
  *
@@ -18,7 +53,7 @@ export function validateStructure(
   settings: MazeSettings,
 ): TranslatableIssue[] {
   const issues: TranslatableIssue[] = [];
-  const add = (key: string, params?: Record<string, string | number>) =>
+  const add = (key: MazeIssueKey, params?: Record<string, string | number>) =>
     issues.push(params ? { key, params } : { key });
 
   const painted = new Set(maze.cells.map(cellKey));
@@ -36,6 +71,12 @@ export function validateStructure(
   const ys = maze.cells.map((c) => c.y);
   const width = Math.max(...xs) - Math.min(...xs) + 1;
   const height = Math.max(...ys) - Math.min(...ys) + 1;
+  // Unreachable through `validateMaze`: the schema caps every coordinate at
+  // 0..MAX_BOUNDING_BOX-1, so no parsed maze can exceed a 16x16 box. That is
+  // by design — the editor board is a fixed 16x16 frame and coordinates are
+  // absolute within it (spec §3.3), not a window onto a larger canvas. The
+  // rule stays as defence for a caller that builds a `Maze` without going
+  // through `parseMaze`.
   if (width > MAX_BOUNDING_BOX || height > MAX_BOUNDING_BOX) {
     add("maze.validate.boundingBoxTooLarge", {
       max: MAX_BOUNDING_BOX,

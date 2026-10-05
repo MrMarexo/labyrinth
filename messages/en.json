@@ -35,7 +35,10 @@
     "invalidCredentials": "Wrong email or password.",
     "emailTaken": "That email is already registered.",
     "passwordTooShort": "Password must be at least {min} characters.",
-    "unknown": "Something went wrong. Please try again."
+    "unknown": "Something went wrong. Please try again.",
+    "validation": {
+      "invalid": "That value is not valid."
+    }
   },
   "play": {
     "title": "Your games",

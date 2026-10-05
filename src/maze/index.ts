@@ -2,7 +2,11 @@ import type { TranslatableIssue } from "~/lib/issues";
 import { parseMaze, type Maze } from "./format";
 import { contentHash, normalize } from "./normalize";
 import { solve } from "./solve";
-import { validateStructure, type MazeSettings } from "./validate";
+import {
+  validateStructure,
+  type MazeIssueKey,
+  type MazeSettings,
+} from "./validate";
 
 export * from "./format";
 export * from "./geometry";
@@ -35,16 +39,19 @@ export function validateMaze(
 
   const solution = solve(parsed.maze);
   if (!solution.solvable || solution.optimalMoves === null) {
-    return {
-      ok: false,
-      issues: [{ key: "maze.validate.treasureUnreachable" }],
-    };
+    const unreachable: MazeIssueKey = "maze.validate.treasureUnreachable";
+    return { ok: false, issues: [{ key: unreachable }] };
   }
+
+  // Normalized once and reused: `contentHash` is defined over the normalized
+  // form anyway, and normalizing the same input twice invites the two copies
+  // to drift apart under a future edit.
+  const normalized = normalize(parsed.maze);
 
   return {
     ok: true,
-    maze: normalize(parsed.maze),
-    contentHash: contentHash(parsed.maze),
+    maze: normalized,
+    contentHash: contentHash(normalized),
     optimalMoves: solution.optimalMoves,
   };
 }

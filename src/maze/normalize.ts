@@ -28,7 +28,11 @@ function bySegment(a: Segment, b: Segment): number {
 }
 
 function byKey(a: MazeKey, b: MazeKey): number {
-  return a.gate - b.gate;
+  // The position tiebreak, like `bySegment`'s kind tiebreak, only matters for
+  // input that hasn't passed structural validation — a valid maze has exactly
+  // one key per gate. Without it this is not a total order, so two keys
+  // sharing a gate would sort by input order and hash differently.
+  return a.gate - b.gate || a.x - b.x || a.y - b.y;
 }
 
 /**

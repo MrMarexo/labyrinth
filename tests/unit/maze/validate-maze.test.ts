@@ -105,3 +105,53 @@ describe("contentHash", () => {
     expect(contentHash(reordered)).toBe(contentHash(base));
   });
 });
+
+describe("contentHash, key order", () => {
+  // `byKey` had the identical hole Task 3's review found in `bySegment`: every
+  // fixture that reached `normalize` carried zero or one key, and
+  // Array.prototype.sort never calls a comparator on an array of length <= 1,
+  // so `byKey` had never executed. It was also not a total order — it compared
+  // `gate` with no tiebreak, unlike `bySegment`.
+  const base: Maze = {
+    version: 1,
+    cells: [
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+      { x: 2, y: 0 },
+    ],
+    start: { x: 0, y: 0 },
+    treasure: { x: 2, y: 0 },
+    segments: [
+      { o: "V", x: 0, y: 0, kind: "gate", gate: 2 },
+      { o: "V", x: 1, y: 0, kind: "gate", gate: 1 },
+    ],
+    keys: [
+      { gate: 2, x: 1, y: 0 },
+      { gate: 1, x: 2, y: 0 },
+    ],
+  };
+
+  it("is identical for mazes differing only in key order", () => {
+    const reordered: Maze = { ...base, keys: [base.keys[1]!, base.keys[0]!] };
+    expect(contentHash(reordered)).toBe(contentHash(base));
+  });
+
+  it("is identical for two keys on one gate differing only in position", () => {
+    // Two keys for one gate is invalid, and `normalize` does not validate —
+    // the same reason `bySegment` carries a kind tiebreak. Without the
+    // position tiebreak the comparator returns 0 for this pair, the stable
+    // sort leaves them in arrival order, and the two hashes disagree.
+    const shared: Maze = {
+      ...base,
+      keys: [
+        { gate: 1, x: 1, y: 0 },
+        { gate: 1, x: 2, y: 0 },
+      ],
+    };
+    const swapped: Maze = {
+      ...shared,
+      keys: [shared.keys[1]!, shared.keys[0]!],
+    };
+    expect(contentHash(swapped)).toBe(contentHash(shared));
+  });
+});

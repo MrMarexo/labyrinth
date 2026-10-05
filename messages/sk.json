@@ -35,7 +35,10 @@
     "invalidCredentials": "Nesprávny e-mail alebo heslo.",
     "emailTaken": "Tento e-mail je už zaregistrovaný.",
     "passwordTooShort": "Heslo musí mať aspoň {min} znakov.",
-    "unknown": "Niečo sa pokazilo. Skúste to znova."
+    "unknown": "Niečo sa pokazilo. Skúste to znova.",
+    "validation": {
+      "invalid": "Táto hodnota nie je platná."
+    }
   },
   "play": {
     "title": "Vaše hry",

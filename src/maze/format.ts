@@ -18,20 +18,43 @@ export type Orientation = (typeof ORIENTATIONS)[number];
 export const DIRECTIONS = ["N", "E", "S", "W"] as const;
 export type Direction = (typeof DIRECTIONS)[number];
 
+/**
+ * Every message key the shape pass can emit. Paired with `MAZE_ISSUE_KEYS` in
+ * `validate.ts`, this is the full inventory of `maze.*` keys the domain
+ * produces — the list Phase 2 writes copy against. A schema that sets no
+ * message falls through to `errors.validation.invalid` instead (see
+ * `~/lib/issues`), which is why that key is not here.
+ */
+export const MAZE_FORMAT_ISSUE_KEYS = [
+  "maze.format.unknownVersion",
+  "maze.format.noCells",
+  "maze.format.coordinateNotAnInteger",
+  "maze.format.coordinateOutOfRange",
+  "maze.format.gateIdNotAnInteger",
+  "maze.format.gateIdOutOfRange",
+] as const;
+
+export type MazeFormatIssueKey = (typeof MAZE_FORMAT_ISSUE_KEYS)[number];
+
+/** Identity, but it makes a mistyped schema message a compile error. */
+const fmt = (key: MazeFormatIssueKey): string => key;
+
 const coordinate = z
   .number()
-  .int({ message: "maze.format.coordinateNotAnInteger" })
-  .min(0, { message: "maze.format.coordinateOutOfRange" })
-  .max(MAX_BOUNDING_BOX - 1, { message: "maze.format.coordinateOutOfRange" });
+  .int({ message: fmt("maze.format.coordinateNotAnInteger") })
+  .min(0, { message: fmt("maze.format.coordinateOutOfRange") })
+  .max(MAX_BOUNDING_BOX - 1, {
+    message: fmt("maze.format.coordinateOutOfRange"),
+  });
 
 const pointSchema = z.object({ x: coordinate, y: coordinate });
 export type Point = z.infer<typeof pointSchema>;
 
 const gateId = z
   .number()
-  .int({ message: "maze.format.gateIdNotAnInteger" })
-  .min(1, { message: "maze.format.gateIdOutOfRange" })
-  .max(MAX_GATES, { message: "maze.format.gateIdOutOfRange" });
+  .int({ message: fmt("maze.format.gateIdNotAnInteger") })
+  .min(1, { message: fmt("maze.format.gateIdOutOfRange") })
+  .max(MAX_GATES, { message: fmt("maze.format.gateIdOutOfRange") });
 
 // Plain z.enum: an invalid orientation falls through to the generic
 // `errors.validation.invalid` key, which is acceptable because the editor
@@ -62,9 +85,9 @@ export const mazeSchema = z.object({
   // z.literal's `message` option is dropped for `invalid_literal` issues;
   // `errorMap` is the form zod actually honors here.
   version: z.literal(1, {
-    errorMap: () => ({ message: "maze.format.unknownVersion" }),
+    errorMap: () => ({ message: fmt("maze.format.unknownVersion") }),
   }),
-  cells: z.array(pointSchema).min(1, { message: "maze.format.noCells" }),
+  cells: z.array(pointSchema).min(1, { message: fmt("maze.format.noCells") }),
   start: pointSchema,
   treasure: pointSchema,
   segments: z.array(segmentSchema),

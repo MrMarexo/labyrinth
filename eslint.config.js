@@ -61,7 +61,10 @@ export default tseslint.config(
     },
   },
   {
-    files: ["src/maze/**/*.{ts,tsx}"],
+    // `src/lib/issues.ts` is covered too: `src/maze` imports it, so a Next or
+    // React import added there would break maze purity just as surely as one
+    // added to `src/maze` itself.
+    files: ["src/maze/**/*.{ts,tsx}", "src/lib/issues.ts"],
     rules: {
       // Static imports only: ESLint 9's no-restricted-imports has no
       // ImportExpression visitor, so a dynamic import() here is not caught.
@@ -108,7 +111,7 @@ export default tseslint.config(
                 "~/styles/*",
               ],
               message:
-                "src/maze must stay pure — it is shared with the client and a future mobile app. See AGENTS.md invariant 2.",
+                "src/maze and src/lib/issues.ts must stay pure — they are shared with the client and a future mobile app. See AGENTS.md invariant 2.",
             },
           ],
         },

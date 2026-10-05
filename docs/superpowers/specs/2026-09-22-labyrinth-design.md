@@ -141,6 +141,10 @@ The 16 × 16 cap is set by the desktop board, not by storage. Wall edges need a
 1280 px laptop without cramping. At 20 cells the squares drop to ~35 px and the
 edges get fiddly.
 
+Coordinates are absolute within that fixed 16 × 16 frame: the board *is* the
+frame, not a viewport onto a larger canvas, so the editor needs no panning,
+zooming or scrolling and every stored coordinate is in `0..15`.
+
 The cap is also what prevents degenerate shapes. There is deliberately **no
 minimum** — a corridor may be one square wide anywhere it likes — but a maze
 that is one square tall and sixty-four wide cannot exist, because 64 exceeds

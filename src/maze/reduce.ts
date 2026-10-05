@@ -37,9 +37,39 @@ export type RevealedCell = {
 /**
  * Everything the runner learns from one move, and nothing else. If a field is
  * here, the runner knows it; the maze itself never crosses this boundary.
+ *
+ * **Every coordinate in this type — `from`, `at`, `revealedCell` and
+ * `revealedSegment` — is relative to the start cell**, which is therefore
+ * `{ x: 0, y: 0 }` by construction. Negative values are ordinary.
+ *
+ * Absolute coordinates would disclose the maze's bounding box. `validateMaze`
+ * stores `normalize(maze)`, so a stored maze's coordinates always begin at the
+ * origin; an absolute `at: { x: 4, y: 0 }` therefore tells a runner who has
+ * made no informed move that no cell lies north of their row and that the
+ * shape spans at least five columns — the shape they are specifically not
+ * supposed to know (spec §2.4). Phase 4 writes an immutable move log, so a
+ * leak recorded there is permanent.
+ *
+ * A spectator or replay converts back to maze coordinates by adding the start
+ * cell, which the server knows and the runner does not.
+ *
+ * The reducer works in absolute maze coordinates throughout; the translation
+ * happens once, at the point the delta is built.
+ *
+ * With `from` present the delta is self-sufficient for replay (spec §8): the
+ * edge crossed by a successful move is derivable from `from` → `at` alone, and
+ * the start cell is `{ x: 0, y: 0 }` by construction rather than absent. Before
+ * `from` existed, replay worked only by reading the `dir` column off the move
+ * row and inverting it.
  */
 export type RunnerDelta = {
   outcome: RunnerOutcome;
+  /**
+   * The cell the move started from. Leaks nothing — the runner knows where
+   * they just were — and it is what makes the crossed edge derivable.
+   */
+  from: Point;
+  /** Where the runner ended up. Equal to `from` on a blocked move. */
   at: Point;
   penalties: number;
   moves: number;
@@ -50,7 +80,9 @@ export type RunnerDelta = {
 
 export function initialRunState(maze: Maze): RunState {
   return {
-    at: maze.start,
+    // A copy: returning `maze.start` by identity would let a caller mutating
+    // `state.at` corrupt the loaded maze.
+    at: { ...maze.start },
     keys: 0,
     openedGates: 0,
     penalties: 0,
@@ -59,17 +91,35 @@ export function initialRunState(maze: Maze): RunState {
   };
 }
 
+/**
+ * Translates an absolute maze coordinate — a cell or an edge address, since
+ * both shift alike — into the start-relative frame the runner sees. See
+ * RunnerDelta for why the delta is expressed that way.
+ */
+type Relative = <T extends { x: number; y: number }>(p: T) => T;
+
+function relativeTo(origin: Point): Relative {
+  return (p) => ({ ...p, x: p.x - origin.x, y: p.y - origin.y });
+}
+
 export function applyMove(
   maze: Maze,
   state: RunState,
   dir: Direction,
 ): { state: RunState; delta: RunnerDelta; outcome: ServerOutcome } {
+  const rel = relativeTo(maze.start);
+
   if (state.finished) {
-    // A finished run accepts no further moves. Reported as a plain block so a
-    // replayed or duplicated request cannot be distinguished from a wall.
+    // A defensive floor, not the guard that matters: per spec §11 the move
+    // handler rejects a post-finish move with `RunAlreadyFinished` before it
+    // ever reaches the reducer. The runner can of course tell this apart from
+    // a wall — they know they finished — and should. The hazard is on the
+    // server: this branch reports `blocked_wall`, so a handler that wrote a
+    // move row per reducer result would persist a wall bump that never
+    // happened.
     return {
       state,
-      delta: blockDelta(state, "blocked_wall"),
+      delta: blockDelta(rel, state, "blocked_wall"),
       outcome: "blocked_wall",
     };
   }
@@ -79,17 +129,17 @@ export function applyMove(
   const edge = edgeBetween(state.at, dir);
 
   if (!painted.has(cellKey(destination))) {
-    return blocked(state, "blocked_boundary", { ...edge, kind: "wall" });
+    return blocked(rel, state, "blocked_boundary", { ...edge, kind: "wall" });
   }
 
   const segment = maze.segments.find((s) => edgeKey(s) === edgeKey(edge));
 
   if (segment?.kind === "wall") {
-    return blocked(state, "blocked_wall", { ...edge, kind: "wall" });
+    return blocked(rel, state, "blocked_wall", { ...edge, kind: "wall" });
   }
 
   if (segment?.kind === "gate" && !holds(state.keys, segment.gate)) {
-    return blocked(state, "blocked_gate", {
+    return blocked(rel, state, "blocked_gate", {
       ...edge,
       kind: "gate",
       gate: segment.gate,
@@ -126,7 +176,10 @@ export function applyMove(
         ? "moved_through_gate"
         : "moved";
 
-  const revealedCell: RevealedCell = { x: destination.x, y: destination.y };
+  const revealedCell: RevealedCell = rel({
+    x: destination.x,
+    y: destination.y,
+  });
   // Independent by design, unlike outcome: a cell can carry both flags (a
   // configuration validateStructure forbids, but the reducer does not
   // validate), and each flag simply states a fact that is true regardless of
@@ -141,14 +194,15 @@ export function applyMove(
   // and the gate's id — which the runner never learned by bumping it either
   // — is unrecoverable. The runner already earned this fact by crossing.
   const revealedSegment: RevealedSegment | undefined = throughGate
-    ? { ...edge, kind: "gate", gate: segment.gate }
+    ? rel<RevealedSegment>({ ...edge, kind: "gate", gate: segment.gate })
     : undefined;
 
   return {
     state: next,
     delta: {
       outcome,
-      at: next.at,
+      from: rel(state.at),
+      at: rel(next.at),
       penalties: next.penalties,
       moves: next.moves,
       finished: next.finished,
@@ -166,6 +220,7 @@ export function applyMove(
  * walled one could map the shape by bumping, which is the whole secret.
  */
 function blocked(
+  rel: Relative,
   state: RunState,
   outcome: ServerOutcome,
   revealedSegment: RevealedSegment,
@@ -183,20 +238,26 @@ function blocked(
     state: next,
     delta: {
       outcome: runnerOutcome,
-      at: next.at,
+      from: rel(state.at),
+      at: rel(next.at),
       penalties: next.penalties,
       moves: next.moves,
       finished: next.finished,
-      revealedSegment,
+      revealedSegment: rel(revealedSegment),
     },
     outcome,
   };
 }
 
-function blockDelta(state: RunState, outcome: RunnerOutcome): RunnerDelta {
+function blockDelta(
+  rel: Relative,
+  state: RunState,
+  outcome: RunnerOutcome,
+): RunnerDelta {
   return {
     outcome,
-    at: state.at,
+    from: rel(state.at),
+    at: rel(state.at),
     penalties: state.penalties,
     moves: state.moves,
     finished: state.finished,
