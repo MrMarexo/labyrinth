@@ -77,5 +77,10 @@
       "treasureUnreachable": "Zo štartu sa k pokladu nedá dostať.",
       "incomplete": "Umiestnite štart a poklad a bude hotovo."
     }
+  },
+  "editor": {
+    "boardLabel": "Plocha bludiska",
+    "cellLabel": "Políčko {x}, {y}",
+    "edgeLabel": "Hrana {o} {x}, {y}"
   }
 }

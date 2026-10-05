@@ -77,5 +77,10 @@
       "treasureUnreachable": "There is no route from the start to the treasure.",
       "incomplete": "Place a start and a treasure to finish."
     }
+  },
+  "editor": {
+    "boardLabel": "Labyrinth board",
+    "cellLabel": "Square {x}, {y}",
+    "edgeLabel": "Edge {o} {x}, {y}"
   }
 }

@@ -21,6 +21,11 @@
   --accent: oklch(55% 0.18 260);
   --on-accent: oklch(99% 0 0);
   --danger: oklch(55% 0.19 25);
+
+  --cell-painted: oklch(93% 0 0);
+  --cell-void: oklch(97% 0 0);
+  --grid-line: oklch(88% 0 0);
+  --wall: oklch(25% 0 0);
 }
 
 :root[data-theme="dark"] {
@@ -36,6 +41,11 @@
   --accent: oklch(70% 0.16 260);
   --on-accent: oklch(18% 0 0);
   --danger: oklch(68% 0.17 25);
+
+  --cell-painted: oklch(30% 0 0);
+  --cell-void: oklch(21% 0 0);
+  --grid-line: oklch(27% 0 0);
+  --wall: oklch(88% 0 0);
 }
 
 @theme inline {
@@ -47,6 +57,10 @@
   --color-accent: var(--accent);
   --color-on-accent: var(--on-accent);
   --color-danger: var(--danger);
+  --color-cell-painted: var(--cell-painted);
+  --color-cell-void: var(--cell-void);
+  --color-grid-line: var(--grid-line);
+  --color-wall: var(--wall);
 }
 
 body {
