@@ -45,12 +45,12 @@ quietly rather than loudly.
 1. **No procedure reachable by a runner may select `maze.data`.** The maze is
    secret; a runner learning it ends the game. Author-facing and runner-facing
    reads are separate procedures with separate return types.
-2. **`src/maze/` imports nothing** from Next, React, tRPC or Drizzle. It is
-   pure functions over plain data, shared by the server, the live spectator
-   view, the replay view and eventually a mobile client. ESLint enforces this.
-   The same applies to `src/lib/issues.ts`: `src/maze/` imports it, so a
-   framework import there would break maze purity just as surely as one added
-   to `src/maze/` itself.
+2. **`src/maze/` and `src/match/` import nothing** from Next, React, tRPC or
+   Drizzle. They are pure functions over plain data, shared by the server, the
+   live spectator view, the replay view and eventually a mobile client. ESLint
+   enforces this. The same applies to `src/lib/issues.ts`: `src/maze/` imports
+   it, so a framework import there would break maze purity just as surely as
+   one added to `src/maze/` itself.
 3. **Validation failures travel as i18n message keys with parameters, never as
    English strings.** Applies to tRPC errors and to anything rendered.
 4. **The move log is the source of truth.** `match_player.runState` is a
