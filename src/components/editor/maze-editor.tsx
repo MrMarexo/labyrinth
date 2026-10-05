@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 
 import type { TranslatableIssue } from "~/lib/issues";
+import { resolveErrorKey } from "~/lib/resolve-error-key";
 import {
   INCOMPLETE_DRAFT_KEY,
   cellsUsed,
@@ -56,7 +57,7 @@ export function MazeEditor({
   // bookkeeping for the autosave pipeline below and lives in refs so that
   // updating it never itself triggers a render.
   const [locked, setLocked] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<TranslatableIssue | null>(null);
 
   // The draft last known to match what the server has. Updated only on a
   // *successful* save (never optimistically before the response), so a
@@ -80,16 +81,6 @@ export function MazeEditor({
   // rather than a value some earlier closure captured.
   const draftRef = useRef(state.draft);
   draftRef.current = state.draft;
-
-  function resolveErrorKey(message: string): string {
-    // Every key this app actually throws (`errors.notYourMaze`,
-    // `errors.mazeIsSubmitted`, ...) is a real catalogue entry, so render it
-    // for whatever specific meaning it carries. Anything else — a network
-    // failure, a stringified Zod error, a bare "Internal Server Error" — is
-    // not key-shaped or not in the catalogue, and must never reach the
-    // screen as raw English.
-    return t.has(message as never) ? message : "editor.saveFailed";
-  }
 
   function send(draft: DraftMaze) {
     savingRef.current = true;
@@ -119,14 +110,14 @@ export function MazeEditor({
         },
         onError: (error) => {
           if (!mountedRef.current) return;
-          const key = resolveErrorKey(error.message);
+          const resolved = resolveErrorKey(t, error, "editor.saveFailed");
           // A maze can only reach this state once Phase 3 adds submission —
           // nothing in this phase ever sets a maze's status to "submitted" —
           // but the rule ("mazes are never edited once finished") has to
           // hold the day that becomes reachable, not the day someone
           // remembers to add a check for it.
-          if (key === "errors.mazeIsSubmitted") setLocked(true);
-          setSaveError(key);
+          if (resolved.key === "errors.mazeIsSubmitted") setLocked(true);
+          setSaveError(resolved);
           // Deliberately no corrective send here: `lastSentRef` stays at its
           // old value on a failure, so a blind recheck would find the live
           // draft still "different" forever and retry the same rejected
@@ -270,7 +261,9 @@ export function MazeEditor({
             data-save-error
             className="flex flex-wrap items-center gap-2 text-sm"
           >
-            <p className="text-danger">{t(saveError as never)}</p>
+            <p className="text-danger">
+              {t(saveError.key as never, saveError.params as never)}
+            </p>
             {!locked && (
               <button
                 type="button"
