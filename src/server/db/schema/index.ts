@@ -2,3 +2,4 @@
 // file, so a table that is not re-exported here gets no migration.
 export * from "./auth";
 export * from "./maze";
+export * from "./match";

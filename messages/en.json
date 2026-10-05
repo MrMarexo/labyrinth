@@ -40,7 +40,13 @@
       "invalid": "That value is not valid."
     },
     "notYourMaze": "That labyrinth is not yours.",
-    "mazeIsSubmitted": "This labyrinth has been submitted and can no longer be changed."
+    "mazeIsSubmitted": "This labyrinth has been submitted and can no longer be changed.",
+    "notYourMatch": "That match is not yours.",
+    "matchCodeMalformed": "A join code is 6 letters and digits.",
+    "matchCodeUnknown": "No match has that code.",
+    "matchFull": "That match already has two players.",
+    "matchExpired": "That match has expired.",
+    "alreadyInMatch": "You are already in that match."
   },
   "play": {
     "title": "Your games",
