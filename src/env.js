@@ -24,6 +24,10 @@ export const env = createEnv({
     // ever on, because the only correct value outside a local e2e run is
     // "false".
     E2E_TEST_SUPPORT: z.enum(["true", "false"]).default("false"),
+    // Vercel Cron sends this as a bearer token. Optional so a local `pnpm
+    // dev` does not demand it; the route refuses every request when it is
+    // unset, which is the right default for a secret.
+    CRON_SECRET: z.string().min(32).optional(),
     NODE_ENV: z
       .enum(["development", "test", "production"])
       .default("development"),
@@ -49,6 +53,7 @@ export const env = createEnv({
     BETTER_AUTH_URL: process.env.BETTER_AUTH_URL,
     E2E_DISABLE_RATE_LIMIT: process.env.E2E_DISABLE_RATE_LIMIT,
     E2E_TEST_SUPPORT: process.env.E2E_TEST_SUPPORT,
+    CRON_SECRET: process.env.CRON_SECRET,
     NODE_ENV: process.env.NODE_ENV,
     // NEXT_PUBLIC_CLIENTVAR: process.env.NEXT_PUBLIC_CLIENTVAR,
   },
