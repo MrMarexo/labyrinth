@@ -10,25 +10,12 @@ import {
   type Edge,
   type Point,
 } from "~/maze";
+import { gateColour } from "./gate-colours";
 
 export const FRAME = 16;
 export const CELL_PX = 40;
 /** Invisible hit strip for an edge. A wall is one pixel; this is what you click. */
 const EDGE_HIT = 14;
-
-const GATE_HUES = [25, 70, 140, 190, 260, 300, 340, 10];
-
-/**
- * Gate colours reuse the accent and danger tokens — so they stay correct in
- * both themes — rotated to a per-gate hue. Odd gates read off the accent,
- * even gates off danger, which keeps adjacent gate numbers visually distinct
- * even before the hue difference registers.
- */
-function gateColour(gate: number): string {
-  const hue = GATE_HUES[(gate - 1) % GATE_HUES.length];
-  const base = gate % 2 === 0 ? "var(--color-danger)" : "var(--color-accent)";
-  return `oklch(from ${base} l c ${hue})`;
-}
 
 /** Every square of the frame. Fixed by `FRAME` alone, so built once. */
 const ALL_CELLS: Point[] = (() => {

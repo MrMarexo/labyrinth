@@ -47,7 +47,9 @@ test.describe("board keyboard navigation", () => {
 });
 
 test.describe("gate colours", () => {
-  test("gates render as distinct hues, in both themes", async ({ page }) => {
+  test("gates render as distinct hues, in both themes", async ({
+    page,
+  }, testInfo) => {
     await signUpAndOpenNewMaze(page);
 
     // Paint two full rows so the gates and wall placed below sit on a real
@@ -71,11 +73,20 @@ test.describe("gate colours", () => {
     await page.locator('[data-edge="H:3,0"]').click();
     await expect(page.locator('[data-segment^="H:"]')).toHaveCount(2);
 
+    // `testInfo.outputPath` scopes the filename under this test's own
+    // output directory, which Playwright keys by project (desktop, mobile)
+    // as well as test file and title -- without it, the desktop and mobile
+    // projects running this same spec in parallel would race to write the
+    // same two hardcoded paths.
     const board = page.locator("svg[data-board]");
-    await board.screenshot({ path: "test-results/gate-colours-light.png" });
+    await board.screenshot({
+      path: testInfo.outputPath("gate-colours-light.png"),
+    });
 
     await page.getByRole("combobox", { name: "Theme" }).selectOption("dark");
     await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
-    await board.screenshot({ path: "test-results/gate-colours-dark.png" });
+    await board.screenshot({
+      path: testInfo.outputPath("gate-colours-dark.png"),
+    });
   });
 });

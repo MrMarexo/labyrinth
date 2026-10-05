@@ -1,10 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-const PASSWORD = "correct-horse-battery";
-
-function uniqueEmail() {
-  return `e2e-${Date.now()}-${Math.random().toString(36).slice(2)}@example.test`;
-}
+import { PASSWORD, uniqueEmail } from "./support/auth";
 
 test.describe("protected area", () => {
   test("redirects an anonymous visitor to sign in", async ({ page }) => {

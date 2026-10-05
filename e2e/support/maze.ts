@@ -1,10 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 
-const PASSWORD = "correct-horse-battery";
-
-export function uniqueEmail(): string {
-  return `e2e-${Date.now()}-${Math.random().toString(36).slice(2)}@example.test`;
-}
+import { PASSWORD, uniqueEmail } from "./auth";
 
 export async function signUpAndOpenNewMaze(page: Page): Promise<void> {
   await page.goto("/en/sign-up");
