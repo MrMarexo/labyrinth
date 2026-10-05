@@ -15,6 +15,13 @@
       "when": 1790418744973,
       "tag": "0001_chubby_thing",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791200599356,
+      "tag": "0002_serious_human_cannonball",
+      "breakpoints": true
     }
   ]
 }

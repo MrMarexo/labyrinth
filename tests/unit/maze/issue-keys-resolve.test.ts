@@ -19,7 +19,13 @@ function lookup(catalogue: Catalogue, key: string): unknown {
     );
 }
 
-const allKeys = [...MAZE_ISSUE_KEYS, ...MAZE_FORMAT_ISSUE_KEYS];
+/** Keys emitted outside the unions — by the router, not the domain. */
+const ROUTER_KEYS = [
+  "maze.validate.incomplete",
+  "maze.format.cellCountNotAPreset",
+];
+
+const allKeys = [...MAZE_ISSUE_KEYS, ...MAZE_FORMAT_ISSUE_KEYS, ...ROUTER_KEYS];
 
 describe("every maze issue key resolves", () => {
   it("has at least one key to check", () => {

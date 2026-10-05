@@ -1,3 +1,4 @@
+import { mazeRouter } from "~/server/api/routers/maze";
 import { profileRouter } from "~/server/api/routers/profile";
 import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
 
@@ -8,6 +9,7 @@ import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
  */
 export const appRouter = createTRPCRouter({
   profile: profileRouter,
+  maze: mazeRouter,
 });
 
 // export type definition of API

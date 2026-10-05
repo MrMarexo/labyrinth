@@ -38,7 +38,9 @@
     "unknown": "Something went wrong. Please try again.",
     "validation": {
       "invalid": "That value is not valid."
-    }
+    },
+    "notYourMaze": "That labyrinth is not yours.",
+    "mazeIsSubmitted": "This labyrinth has been submitted and can no longer be changed."
   },
   "play": {
     "title": "Your games",
@@ -51,7 +53,8 @@
       "gateIdNotAnInteger": "A gate number must be a whole number.",
       "gateIdOutOfRange": "Gate numbers run from 1 to 8.",
       "unknownVersion": "This labyrinth was saved in a format we no longer read.",
-      "noCells": "Paint at least one square."
+      "noCells": "Paint at least one square.",
+      "cellCountNotAPreset": "That is not one of the available sizes."
     },
     "validate": {
       "wrongCellCount": "You have used {actual} of {expected} squares.",
@@ -71,7 +74,8 @@
       "gateWithoutKey": "Gate {gate} has no key.",
       "gateWithTwoKeys": "Gate {gate} has more than one key.",
       "keyWithoutGate": "There is a key for gate {gate}, but no such gate.",
-      "treasureUnreachable": "There is no route from the start to the treasure."
+      "treasureUnreachable": "There is no route from the start to the treasure.",
+      "incomplete": "Place a start and a treasure to finish."
     }
   }
 }

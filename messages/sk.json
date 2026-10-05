@@ -38,7 +38,9 @@
     "unknown": "Niečo sa pokazilo. Skúste to znova.",
     "validation": {
       "invalid": "Táto hodnota nie je platná."
-    }
+    },
+    "notYourMaze": "Toto bludisko nie je vaše.",
+    "mazeIsSubmitted": "Toto bludisko je odoslané a už sa nedá meniť."
   },
   "play": {
     "title": "Vaše hry",
@@ -51,7 +53,8 @@
       "gateIdNotAnInteger": "Číslo brány musí byť celé číslo.",
       "gateIdOutOfRange": "Brány sú číslované od 1 do 8.",
       "unknownVersion": "Toto bludisko bolo uložené vo formáte, ktorý už nečítame.",
-      "noCells": "Nakreslite aspoň jedno políčko."
+      "noCells": "Nakreslite aspoň jedno políčko.",
+      "cellCountNotAPreset": "Toto nie je jedna z dostupných veľkostí."
     },
     "validate": {
       "wrongCellCount": "Použili ste {actual} z {expected} políčok.",
@@ -71,7 +74,8 @@
       "gateWithoutKey": "Brána {gate} nemá kľúč.",
       "gateWithTwoKeys": "Brána {gate} má viac než jeden kľúč.",
       "keyWithoutGate": "Existuje kľúč od brány {gate}, ale taká brána neexistuje.",
-      "treasureUnreachable": "Zo štartu sa k pokladu nedá dostať."
+      "treasureUnreachable": "Zo štartu sa k pokladu nedá dostať.",
+      "incomplete": "Umiestnite štart a poklad a bude hotovo."
     }
   }
 }
