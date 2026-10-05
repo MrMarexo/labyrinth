@@ -43,5 +43,35 @@
   "play": {
     "title": "Vaše hry",
     "empty": "Zatiaľ žiadne hry."
+  },
+  "maze": {
+    "format": {
+      "coordinateNotAnInteger": "Súradnica musí byť celé číslo.",
+      "coordinateOutOfRange": "Toto políčko je mimo hracej plochy.",
+      "gateIdNotAnInteger": "Číslo brány musí byť celé číslo.",
+      "gateIdOutOfRange": "Brány sú číslované od 1 do 8.",
+      "unknownVersion": "Toto bludisko bolo uložené vo formáte, ktorý už nečítame.",
+      "noCells": "Nakreslite aspoň jedno políčko."
+    },
+    "validate": {
+      "wrongCellCount": "Použili ste {actual} z {expected} políčok.",
+      "duplicateCell": "Jedno políčko je nakreslené dvakrát.",
+      "boundingBoxTooLarge": "Bludisko sa musí zmestiť do {max} krát {max} políčok.",
+      "disconnectedShape": "Každé políčko musí susediť s ostatnými — žiadne ostrovy.",
+      "startNotInShape": "Štart musí byť na nakreslenom políčku.",
+      "treasureNotInShape": "Poklad musí byť na nakreslenom políčku.",
+      "startIsTreasure": "Štart a poklad nemôžu byť na tom istom políčku.",
+      "keyOnStart": "Kľúč nemôže ležať na štartovom políčku.",
+      "keyOutsideShape": "Kľúč od brány {gate} nie je na nakreslenom políčku.",
+      "cellHoldsTwoThings": "Na políčku {x}, {y} sú dve veci.",
+      "segmentOutsideShape": "Stena alebo brána na {o} {x}, {y} nemá na jednej strane nič.",
+      "duplicateSegment": "Na hrane {o} {x}, {y} sú dve veci naraz.",
+      "gateIdsNotContiguous": "Použite brány 1 až {expected}, každú práve raz.",
+      "gateIdReused": "Číslo brány je použité dvakrát.",
+      "gateWithoutKey": "Brána {gate} nemá kľúč.",
+      "gateWithTwoKeys": "Brána {gate} má viac než jeden kľúč.",
+      "keyWithoutGate": "Existuje kľúč od brány {gate}, ale taká brána neexistuje.",
+      "treasureUnreachable": "Zo štartu sa k pokladu nedá dostať."
+    }
   }
 }

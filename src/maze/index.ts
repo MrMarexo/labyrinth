@@ -8,6 +8,7 @@ import {
   type MazeSettings,
 } from "./validate";
 
+export * from "./draft";
 export * from "./format";
 export * from "./geometry";
 export * from "./normalize";

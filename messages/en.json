@@ -43,5 +43,35 @@
   "play": {
     "title": "Your games",
     "empty": "No games yet."
+  },
+  "maze": {
+    "format": {
+      "coordinateNotAnInteger": "A coordinate must be a whole number.",
+      "coordinateOutOfRange": "That square is outside the board.",
+      "gateIdNotAnInteger": "A gate number must be a whole number.",
+      "gateIdOutOfRange": "Gate numbers run from 1 to 8.",
+      "unknownVersion": "This labyrinth was saved in a format we no longer read.",
+      "noCells": "Paint at least one square."
+    },
+    "validate": {
+      "wrongCellCount": "You have used {actual} of {expected} squares.",
+      "duplicateCell": "A square has been painted twice.",
+      "boundingBoxTooLarge": "The labyrinth must fit in {max} by {max} squares.",
+      "disconnectedShape": "Every square must join the others — no floating islands.",
+      "startNotInShape": "The start must sit on a painted square.",
+      "treasureNotInShape": "The treasure must sit on a painted square.",
+      "startIsTreasure": "The start and the treasure cannot share a square.",
+      "keyOnStart": "A key cannot sit on the start square.",
+      "keyOutsideShape": "The key for gate {gate} is not on a painted square.",
+      "cellHoldsTwoThings": "The square at {x}, {y} holds two things.",
+      "segmentOutsideShape": "A wall or gate at {o} {x}, {y} has nothing on one side.",
+      "duplicateSegment": "Two things sit on the same edge at {o} {x}, {y}.",
+      "gateIdsNotContiguous": "Use gates 1 to {expected}, each exactly once.",
+      "gateIdReused": "A gate number has been used twice.",
+      "gateWithoutKey": "Gate {gate} has no key.",
+      "gateWithTwoKeys": "Gate {gate} has more than one key.",
+      "keyWithoutGate": "There is a key for gate {gate}, but no such gate.",
+      "treasureUnreachable": "There is no route from the start to the treasure."
+    }
   }
 }

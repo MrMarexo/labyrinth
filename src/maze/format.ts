@@ -47,7 +47,7 @@ const coordinate = z
     message: fmt("maze.format.coordinateOutOfRange"),
   });
 
-const pointSchema = z.object({ x: coordinate, y: coordinate });
+export const pointSchema = z.object({ x: coordinate, y: coordinate });
 export type Point = z.infer<typeof pointSchema>;
 
 const gateId = z
@@ -61,7 +61,7 @@ const gateId = z
 // cannot produce one — only hand-edited or corrupted input can.
 const orientation = z.enum(ORIENTATIONS);
 
-const segmentSchema = z.discriminatedUnion("kind", [
+export const segmentSchema = z.discriminatedUnion("kind", [
   z.object({
     o: orientation,
     x: coordinate,
@@ -78,8 +78,12 @@ const segmentSchema = z.discriminatedUnion("kind", [
 ]);
 export type Segment = z.infer<typeof segmentSchema>;
 
-const keySchema = z.object({ gate: gateId, x: coordinate, y: coordinate });
-export type MazeKey = z.infer<typeof keySchema>;
+export const mazeKeySchema = z.object({
+  gate: gateId,
+  x: coordinate,
+  y: coordinate,
+});
+export type MazeKey = z.infer<typeof mazeKeySchema>;
 
 export const mazeSchema = z.object({
   // z.literal's `message` option is dropped for `invalid_literal` issues;
@@ -91,7 +95,7 @@ export const mazeSchema = z.object({
   start: pointSchema,
   treasure: pointSchema,
   segments: z.array(segmentSchema),
-  keys: z.array(keySchema),
+  keys: z.array(mazeKeySchema),
 });
 
 export type Maze = z.infer<typeof mazeSchema>;
