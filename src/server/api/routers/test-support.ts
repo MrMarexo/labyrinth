@@ -3,17 +3,29 @@ import { z } from "zod";
 
 import { env } from "~/env";
 import { openMazeDraft } from "~/lib/open-maze";
-import { CELL_COUNT_PRESETS, MAX_GATES, validateMaze } from "~/maze";
+import { CELL_COUNT_PRESETS, validateMaze } from "~/maze";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { maze } from "~/server/db/schema";
+import { servingLoopback } from "~/server/env-guards";
 
 /**
- * Two independent conditions, because one of them is a string in an
- * environment file and the other is not. Vercel sets `VERCEL` on every
- * deployment, so even a misconfigured production env cannot open this.
+ * Three independent conditions, the same shape as `E2E_DISABLE_RATE_LIMIT`'s
+ * guard in `~/server/auth`: the flag is explicitly set, we are not on
+ * Vercel (platform-injected, not attacker-controlled), and the configured
+ * base URL is loopback (`~/server/env-guards`, shared with that other
+ * guard so the two definitions cannot drift apart). The third condition is
+ * what a Vercel-only check would miss: on any non-Vercel host — self-hosted,
+ * Docker, a staging box — `VERCEL` is never set, so a flag mistakenly
+ * copied from an e2e `.env` would otherwise leave this reachable there too.
  */
-const ENABLED = env.E2E_TEST_SUPPORT === "true" && !process.env.VERCEL;
+const ENABLED =
+  env.E2E_TEST_SUPPORT === "true" && !process.env.VERCEL && servingLoopback;
 
+// Module-level, so it fires once per server process when the flag is on —
+// `next start` (what Playwright and any real deployment run) loads this
+// module once. `next build`'s static-generation step logs it twice, once
+// per worker process it spawns to prerender pages; that is an artifact of
+// the build's worker pool, not a second boot, and is expected.
 if (env.E2E_TEST_SUPPORT === "true") {
   console.warn(
     "[test-support] E2E_TEST_SUPPORT is on. Seeding procedures are exposed. " +
@@ -46,7 +58,16 @@ export const testSupportRouter = createTRPCRouter({
               (CELL_COUNT_PRESETS as readonly number[]).includes(n),
             { message: "maze.format.cellCountNotAPreset" },
           ),
-        gateCount: z.number().int().min(0).max(MAX_GATES),
+        // openMazeDraft produces an open maze: no walls, no gates, no keys.
+        // Gated seeding is not supported — Task 8 only ever needs zero, and
+        // teaching the generator to place gates nobody has asked for is
+        // exactly the speculative work this project keeps out. A caller
+        // passing anything else gets zod's default "invalid literal"
+        // message, which falls through to the generic
+        // `errors.validation.invalid` key (see `~/lib/issues`) rather than a
+        // bespoke one — this procedure is test-only, so a precise message
+        // here buys nothing.
+        gateCount: z.literal(0),
       }),
     )
     .mutation(async ({ ctx, input }) => {

@@ -6,16 +6,14 @@ import { cache } from "react";
 
 import { env } from "~/env";
 import { db } from "~/server/db";
+import { servingLoopback } from "~/server/env-guards";
 
 // The rate limiter may only be switched off for a local end-to-end run.
 // Three independent conditions must all hold: the flag is explicitly set,
 // we are not on Vercel (platform-injected, not attacker-controlled), and
-// the configured base URL is loopback. A deployed host fails the third
-// even if someone copies the flag into its environment.
-const servingLoopback =
-  env.BETTER_AUTH_URL !== undefined &&
-  /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/?$/.test(env.BETTER_AUTH_URL);
-
+// the configured base URL is loopback (see `~/server/env-guards`). A
+// deployed host fails the third even if someone copies the flag into its
+// environment.
 const disableRateLimit =
   env.E2E_DISABLE_RATE_LIMIT === "true" &&
   !process.env.VERCEL &&
