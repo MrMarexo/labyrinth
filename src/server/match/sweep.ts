@@ -1,4 +1,4 @@
-import { and, eq, inArray, lte, notInArray } from "drizzle-orm";
+import { and, asc, eq, inArray, lte, notInArray } from "drizzle-orm";
 
 import { MATCH_STATUSES, isTerminal, resolveExpiry } from "~/match";
 import type { db as Database } from "~/server/db";
@@ -8,7 +8,25 @@ import { match, matchPlayer } from "~/server/db/schema";
 // sweep is its second consumer.
 import { situationFor } from "~/server/match/situation";
 
+// `resolveExpiry` already no-ops on a terminal status (`deadlineFor` returns
+// null the moment `isTerminal(situation.status)` is true), so this filter is
+// not what makes re-sweeping a closed match safe — that is the domain
+// layer's job, and it does it on its own. This filter exists so the
+// candidate set stays small: it is the other half of `match_sweep_idx`
+// alongside `deadlineAt`, keeping the query a cheap index lookup instead of
+// a scan that grows with every match the sweep has ever closed.
 const TERMINAL = MATCH_STATUSES.filter(isTerminal);
+
+// Measured against a real backlog (300 synthetic due matches, each closed in
+// its own transaction over a pooled websocket connection): ~93ms/row. A
+// Vercel cron invocation's wall-clock budget is as low as 10s on the
+// cheapest plan, so a batch of 50 (~4.7s at that rate) leaves comfortable
+// headroom for connection setup and the two bulk selects below, on top of
+// whatever the production network adds. Ordering by `deadlineAt` ascending
+// means the oldest expiries always drain first, so a steady trickle of new
+// ones can never starve a backlog from ever being cleared — the cron's
+// 15-minute cadence just takes more runs to catch up.
+const SWEEP_BATCH_LIMIT = 50;
 
 /**
  * Closes every match whose deadline has passed, so a stale match ends on its
@@ -16,7 +34,10 @@ const TERMINAL = MATCH_STATUSES.filter(isTerminal);
  *
  * One indexed query finds the candidates — which is the whole reason
  * `deadlineAt` is a single column rather than six rules evaluated in
- * application code.
+ * application code. It is capped at `SWEEP_BATCH_LIMIT` per call so one
+ * invocation can never blow past a cron platform's wall-clock limit; `capped`
+ * tells the caller whether this call drained every due match or whether more
+ * are waiting for the next one.
  *
  * Phase 3 note: `situationFor` reports `lastMoveAt` and `finishedAt` as null
  * because the columns that feed them are Phase 4's. So the `complete` branch
@@ -27,13 +48,15 @@ const TERMINAL = MATCH_STATUSES.filter(isTerminal);
 export async function sweepExpiredMatches(
   db: typeof Database,
   now: Date,
-): Promise<{ closed: number }> {
+): Promise<{ closed: number; capped: boolean }> {
   const due = await db
     .select()
     .from(match)
-    .where(and(notInArray(match.status, TERMINAL), lte(match.deadlineAt, now)));
+    .where(and(notInArray(match.status, TERMINAL), lte(match.deadlineAt, now)))
+    .orderBy(asc(match.deadlineAt))
+    .limit(SWEEP_BATCH_LIMIT);
 
-  if (due.length === 0) return { closed: 0 };
+  if (due.length === 0) return { closed: 0, capped: false };
 
   const players = await db
     .select()
@@ -88,5 +111,7 @@ export async function sweepExpiredMatches(
     closed += 1;
   }
 
-  return { closed };
+  // A full batch means there may be more due matches than this call fetched;
+  // the next invocation picks up where this one left off, oldest first.
+  return { closed, capped: due.length === SWEEP_BATCH_LIMIT };
 }

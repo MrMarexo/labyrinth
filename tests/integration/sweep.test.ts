@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 
 import { HOURS_24_MS, HOURS_48_MS } from "~/match";
@@ -157,12 +157,54 @@ describe("sweepExpiredMatches", () => {
     expect(second).toEqual(first);
   });
 
-  it("reports how many it closed", async () => {
+  it("closes each of several overdue matches it created, identified by id", async () => {
+    // `result.closed` is a count against the whole shared table, which other
+    // suites in the same run also populate — asserting a bound on it would
+    // pass even if the sweep closed every open match indiscriminately. What
+    // actually matters is that these two specific matches ended up closed.
     const caller = createCaller(await signedIn());
-    await caller.match.create(settings);
-    await caller.match.create(settings);
+    const a = await caller.match.create(settings);
+    const b = await caller.match.create(settings);
 
-    const result = await sweepExpiredMatches(db, later(HOURS_24_MS + 1000));
-    expect(result.closed).toBeGreaterThanOrEqual(2);
+    await sweepExpiredMatches(db, later(HOURS_24_MS + 1000));
+
+    const rows = await db
+      .select()
+      .from(match)
+      .where(inArray(match.id, [a.id, b.id]));
+    expect(rows).toHaveLength(2);
+    expect(rows.every((r) => r.status === "abandoned")).toBe(true);
+  });
+
+  it("closes only the match whose deadline has passed, leaving a not-yet-due one alone", async () => {
+    const caller = createCaller(await signedIn());
+    const overdue = await caller.match.create(settings);
+    const notYetDue = await caller.match.create(settings);
+
+    // Row 1 of §9.1 recomputes its deadline from createdAt + 24h inside
+    // resolveExpiry itself — it does not trust the stored deadlineAt column
+    // — so both have to be backdated together for the domain layer to agree
+    // this match is actually overdue, not just the column the SQL candidate
+    // query reads.
+    const createdAt = new Date(Date.now() - (HOURS_24_MS + 1000));
+    await db
+      .update(match)
+      .set({
+        createdAt,
+        lastActivityAt: createdAt,
+        deadlineAt: new Date(Date.now() - 1000),
+      })
+      .where(eq(match.id, overdue.id));
+
+    await sweepExpiredMatches(db, new Date());
+
+    const rows = await db
+      .select()
+      .from(match)
+      .where(inArray(match.id, [overdue.id, notYetDue.id]));
+    const overdueRow = rows.find((r) => r.id === overdue.id);
+    const notYetDueRow = rows.find((r) => r.id === notYetDue.id);
+    expect(overdueRow?.status).toBe("abandoned");
+    expect(notYetDueRow?.status).toBe("awaiting_opponent");
   });
 });
