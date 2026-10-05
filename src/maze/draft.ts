@@ -1,6 +1,18 @@
 import { z } from "zod";
 
-import { mazeKeySchema, pointSchema, segmentSchema, type Maze } from "./format";
+import {
+  MAX_BOUNDING_BOX,
+  MAX_GATES,
+  mazeKeySchema,
+  pointSchema,
+  segmentSchema,
+  type Maze,
+} from "./format";
+
+/** Every cell of the 16x16 frame, painted or not. */
+const MAX_CELLS = MAX_BOUNDING_BOX * MAX_BOUNDING_BOX;
+/** Every interior edge of the frame: FRAME*(FRAME-1) each for H and V. */
+const MAX_SEGMENTS = 2 * MAX_BOUNDING_BOX * (MAX_BOUNDING_BOX - 1);
 
 /**
  * A maze in progress. The only difference from `Maze` is that `start` and
@@ -13,11 +25,11 @@ import { mazeKeySchema, pointSchema, segmentSchema, type Maze } from "./format";
  */
 export const draftMazeSchema = z.object({
   version: z.literal(1),
-  cells: z.array(pointSchema),
+  cells: z.array(pointSchema).max(MAX_CELLS),
   start: pointSchema.nullable(),
   treasure: pointSchema.nullable(),
-  segments: z.array(segmentSchema),
-  keys: z.array(mazeKeySchema),
+  segments: z.array(segmentSchema).max(MAX_SEGMENTS),
+  keys: z.array(mazeKeySchema).max(MAX_GATES),
 });
 
 export type DraftMaze = z.infer<typeof draftMazeSchema>;
@@ -32,6 +44,10 @@ export function emptyDraft(): DraftMaze {
     keys: [],
   };
 }
+
+/** Emitted by the router and the editor when a draft has no start or
+ * treasure yet — kept here since `draftToMaze` is what decides completeness. */
+export const INCOMPLETE_DRAFT_KEY = "maze.validate.incomplete";
 
 /**
  * Upgrades a draft to a `Maze`, or returns null when it is not yet complete.

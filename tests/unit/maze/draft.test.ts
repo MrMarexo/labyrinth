@@ -35,6 +35,53 @@ describe("draftMazeSchema", () => {
   });
 });
 
+describe("draftMazeSchema bounds", () => {
+  // 16x16 frame: at most 256 cells, 2*16*15 = 480 interior edges, MAX_GATES
+  // (8) keys. Coordinates repeat on purpose — only the array length is under
+  // test here, not cell uniqueness (validateStructure's job).
+  it("accepts as many cells as the frame can hold", () => {
+    const cells = Array.from({ length: 256 }, () => ({ x: 0, y: 0 }));
+    const result = draftMazeSchema.safeParse({ ...emptyDraft(), cells });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects one more cell than the frame can hold", () => {
+    const cells = Array.from({ length: 257 }, () => ({ x: 0, y: 0 }));
+    const result = draftMazeSchema.safeParse({ ...emptyDraft(), cells });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts as many segments as the frame has interior edges", () => {
+    const segments = Array.from(
+      { length: 480 },
+      () => ({ o: "H", x: 0, y: 0, kind: "wall" }) as const,
+    );
+    const result = draftMazeSchema.safeParse({ ...emptyDraft(), segments });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects one more segment than the frame has interior edges", () => {
+    const segments = Array.from(
+      { length: 481 },
+      () => ({ o: "H", x: 0, y: 0, kind: "wall" }) as const,
+    );
+    const result = draftMazeSchema.safeParse({ ...emptyDraft(), segments });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts up to MAX_GATES keys", () => {
+    const keys = Array.from({ length: 8 }, () => ({ gate: 1, x: 0, y: 0 }));
+    const result = draftMazeSchema.safeParse({ ...emptyDraft(), keys });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects more than MAX_GATES keys", () => {
+    const keys = Array.from({ length: 9 }, () => ({ gate: 1, x: 0, y: 0 }));
+    const result = draftMazeSchema.safeParse({ ...emptyDraft(), keys });
+    expect(result.success).toBe(false);
+  });
+});
+
 describe("draftToMaze", () => {
   it("returns null while the start is missing", () => {
     expect(
