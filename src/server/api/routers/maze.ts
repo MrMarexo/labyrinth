@@ -118,14 +118,16 @@ export const mazeRouter = createTRPCRouter({
           })
         : null;
 
-      await ctx.db
+      const updated = await ctx.db
         .update(maze)
         .set({
           data: input.data,
           contentHash: validation?.ok ? validation.contentHash : null,
           optimalMoves: validation?.ok ? validation.optimalMoves : null,
         })
-        .where(eq(maze.id, input.id));
+        .where(ownedBy(input.id, ctx.session.user.id))
+        .returning({ id: maze.id });
+      assertOwned(updated[0]);
 
       if (validation?.ok) return { valid: true as const, issues: [] };
       return {
@@ -139,12 +141,11 @@ export const mazeRouter = createTRPCRouter({
   remove: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      const [found] = await ctx.db
-        .select({ id: maze.id })
-        .from(maze)
-        .where(ownedBy(input.id, ctx.session.user.id));
-      assertOwned(found);
-      await ctx.db.delete(maze).where(eq(maze.id, input.id));
+      const deleted = await ctx.db
+        .delete(maze)
+        .where(ownedBy(input.id, ctx.session.user.id))
+        .returning({ id: maze.id });
+      assertOwned(deleted[0]);
       return { id: input.id };
     }),
 });

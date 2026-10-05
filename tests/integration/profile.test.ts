@@ -1,4 +1,3 @@
-import { TRPCError } from "@trpc/server";
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 
@@ -8,20 +7,7 @@ import { db } from "~/server/db";
 import { user } from "~/server/db/schema";
 import { auth } from "~/server/auth";
 
-/**
- * tRPC rejects with a `TRPCError`. A bare `rejects.toThrow()` would also
- * pass on a connection failure, so match the code the procedure actually
- * threw.
- */
-async function rejection(call: Promise<unknown>) {
-  try {
-    await call;
-  } catch (error) {
-    if (!(error instanceof TRPCError)) throw error;
-    return { code: error.code, message: error.message };
-  }
-  throw new Error("expected the call to reject, but it resolved");
-}
+import { rejection } from "./support";
 
 async function signedInContext() {
   const email = `test-${crypto.randomUUID()}@example.test`;

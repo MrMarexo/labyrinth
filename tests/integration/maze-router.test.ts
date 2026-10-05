@@ -8,6 +8,8 @@ import { auth } from "~/server/auth";
 import { db } from "~/server/db";
 import { maze } from "~/server/db/schema";
 
+import { rejection } from "./support";
+
 async function signedIn() {
   const email = `test-${crypto.randomUUID()}@example.test`;
   const response = await auth.api.signUpEmail({
@@ -37,16 +39,16 @@ describe("maze.createDraft", () => {
   it("rejects a cell count that is not a preset", async () => {
     const caller = createCaller(await signedIn());
     await expect(
-      caller.maze.createDraft({ ...settings, cellCount: 37 }),
-    ).rejects.toThrow();
+      rejection(caller.maze.createDraft({ ...settings, cellCount: 37 })),
+    ).resolves.toMatchObject({ code: "BAD_REQUEST" });
   });
 
   it("rejects an anonymous caller with a message key", async () => {
     const caller = createCaller(
       await createTRPCContext({ headers: new Headers() }),
     );
-    await expect(caller.maze.createDraft(settings)).rejects.toThrow(
-      "errors.notSignedIn",
+    await expect(rejection(caller.maze.createDraft(settings))).resolves.toEqual(
+      { code: "UNAUTHORIZED", message: "errors.notSignedIn" },
     );
   });
 });
@@ -69,14 +71,28 @@ describe("maze.saveDraft", () => {
     expect(row?.optimalMoves).toBeNull();
   });
 
-  it("refuses to touch a maze belonging to someone else", async () => {
+  it("refuses someone else's maze, indistinguishably from a missing one", async () => {
     const owner = createCaller(await signedIn());
     const created = await owner.maze.createDraft(settings);
-
     const stranger = createCaller(await signedIn());
-    await expect(
+
+    const notMine = await rejection(
       stranger.maze.saveDraft({ id: created.id, data: emptyDraft() }),
-    ).rejects.toThrow("errors.notYourMaze");
+    );
+    const missing = await rejection(
+      stranger.maze.saveDraft({
+        id: crypto.randomUUID(),
+        data: emptyDraft(),
+      }),
+    );
+
+    expect(notMine).toEqual({
+      code: "FORBIDDEN",
+      message: "errors.notYourMaze",
+    });
+    // The invariant stated directly: a maze that belongs to someone else must
+    // be indistinguishable from one that does not exist at all.
+    expect(missing).toEqual(notMine);
   });
 });
 
@@ -113,12 +129,22 @@ describe("maze.get", () => {
     expect(fetched.data).toEqual(emptyDraft());
   });
 
-  it("refuses someone else's maze", async () => {
+  it("refuses someone else's maze, indistinguishably from a missing one", async () => {
     const owner = createCaller(await signedIn());
     const created = await owner.maze.createDraft(settings);
     const stranger = createCaller(await signedIn());
-    await expect(stranger.maze.get({ id: created.id })).rejects.toThrow(
-      "errors.notYourMaze",
+
+    const notMine = await rejection(stranger.maze.get({ id: created.id }));
+    const missing = await rejection(
+      stranger.maze.get({ id: crypto.randomUUID() }),
     );
+
+    expect(notMine).toEqual({
+      code: "FORBIDDEN",
+      message: "errors.notYourMaze",
+    });
+    // The invariant stated directly: a maze that belongs to someone else must
+    // be indistinguishable from one that does not exist at all.
+    expect(missing).toEqual(notMine);
   });
 });
