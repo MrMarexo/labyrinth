@@ -89,6 +89,10 @@
     "edgeLabel": "Edge {o} {x}, {y}, {status}",
     "edgeEmpty": "empty",
     "edgeWall": "wall",
-    "edgeGate": "gate {gate}"
+    "edgeGate": "gate {gate}",
+    "shapeToolsLabel": "Shape tool",
+    "paint": "Paint",
+    "eraseCell": "Erase square",
+    "budget": "{used} / {budget} squares"
   }
 }

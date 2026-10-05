@@ -89,6 +89,10 @@
     "edgeLabel": "Hrana {o} {x}, {y}, {status}",
     "edgeEmpty": "prázdna",
     "edgeWall": "stena",
-    "edgeGate": "brána {gate}"
+    "edgeGate": "brána {gate}",
+    "shapeToolsLabel": "Nástroj tvaru",
+    "paint": "Kresliť",
+    "eraseCell": "Zmazať políčko",
+    "budget": "{used} / {budget} políčok"
   }
 }
