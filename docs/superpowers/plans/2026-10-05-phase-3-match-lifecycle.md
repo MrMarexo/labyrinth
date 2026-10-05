@@ -2110,7 +2110,7 @@ git commit -m "feat: submit a labyrinth and unlock the runs"
   - `openMazeDraft(cellCount: number): DraftMaze` and `openMazeOptimalMoves(cellCount: number): number` from `~/lib/open-maze`
   - `api.testSupport.seedMaze({ name, cellCount, gateCount }) -> { id }`
   - `signUpViaApi(request, email?) -> { email, password, cookies }` from `e2e/support/auth`
-  - `signedInContext(browser, request) -> BrowserContext` from `e2e/support/auth`
+  - `signedInContext(browser, request, baseURL) -> BrowserContext` from `e2e/support/auth` (corrected during execution: the summary previously omitted `baseURL`, which the step's own code block takes and `browser.newContext()` needs — there is no ambient baseURL on a context created that way. Task 8's helper already calls it with three arguments.)
 
 ### Why this task exists
 
