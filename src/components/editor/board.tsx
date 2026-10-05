@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 
 import {
   cellKey,
@@ -29,6 +30,30 @@ function gateColour(gate: number): string {
   return `oklch(from ${base} l c ${hue})`;
 }
 
+/** Every square of the frame. Fixed by `FRAME` alone, so built once. */
+const ALL_CELLS: Point[] = (() => {
+  const cells: Point[] = [];
+  for (let y = 0; y < FRAME; y += 1) {
+    for (let x = 0; x < FRAME; x += 1) cells.push({ x, y });
+  }
+  return cells;
+})();
+
+/**
+ * Every interior edge of the frame, each with its one legal spelling. Fixed
+ * by `FRAME` alone, so built once rather than on every render.
+ */
+const ALL_EDGES: Edge[] = (() => {
+  const edges: Edge[] = [];
+  for (let y = 0; y < FRAME; y += 1) {
+    for (let x = 0; x < FRAME; x += 1) {
+      if (y < FRAME - 1) edges.push({ o: "H", x, y });
+      if (x < FRAME - 1) edges.push({ o: "V", x, y });
+    }
+  }
+  return edges;
+})();
+
 export type BoardProps = {
   draft: DraftMaze;
   onCell: (at: Point) => void;
@@ -40,10 +65,113 @@ export type BoardProps = {
 export function Board({ draft, onCell, onEdge, edgesActive }: BoardProps) {
   const t = useTranslations("editor");
   const painted = new Set(draft.cells.map(cellKey));
+  const keyGateAt = new Map(draft.keys.map((k) => [cellKey(k), k.gate]));
+  const segmentAt = new Map(draft.segments.map((s) => [edgeKey(s), s]));
 
-  const cells: Point[] = [];
-  for (let y = 0; y < FRAME; y += 1) {
-    for (let x = 0; x < FRAME; x += 1) cells.push({ x, y });
+  // Roving tabindex: cells and edges are each their own focus group, so Tab
+  // visits the grid once per group instead of once per square. Arrow keys
+  // move the live tab stop within a group; a group that is not in the DOM
+  // (edges when `edgesActive` is false) contributes no stops at all.
+  const [focusedCell, setFocusedCell] = useState<Point>({ x: 0, y: 0 });
+  const [focusedEdgeIndex, setFocusedEdgeIndex] = useState(0);
+  const cellRefs = useRef(new Map<string, SVGRectElement>());
+  const edgeRefs = useRef(new Map<string, SVGRectElement>());
+
+  // Edges mount and unmount with the active tool; start the group over at
+  // its first member each time it reappears, rather than keeping a stop that
+  // may not even render the same way (e.g. a wall placed while away).
+  useEffect(() => {
+    if (edgesActive) setFocusedEdgeIndex(0);
+  }, [edgesActive]);
+
+  function moveCellFocus(dx: number, dy: number, from: Point) {
+    const next = { x: from.x + dx, y: from.y + dy };
+    if (next.x < 0 || next.x >= FRAME || next.y < 0 || next.y >= FRAME) return;
+    setFocusedCell(next);
+    cellRefs.current.get(cellKey(next))?.focus();
+  }
+
+  function handleCellKeyDown(event: KeyboardEvent<SVGRectElement>, at: Point) {
+    switch (event.key) {
+      case "Enter":
+      case " ":
+        event.preventDefault();
+        onCell(at);
+        return;
+      case "ArrowUp":
+        event.preventDefault();
+        moveCellFocus(0, -1, at);
+        return;
+      case "ArrowDown":
+        event.preventDefault();
+        moveCellFocus(0, 1, at);
+        return;
+      case "ArrowLeft":
+        event.preventDefault();
+        moveCellFocus(-1, 0, at);
+        return;
+      case "ArrowRight":
+        event.preventDefault();
+        moveCellFocus(1, 0, at);
+        return;
+      default:
+        return;
+    }
+  }
+
+  function moveEdgeFocus(delta: number) {
+    const next = focusedEdgeIndex + delta;
+    if (next < 0 || next >= ALL_EDGES.length) return;
+    setFocusedEdgeIndex(next);
+    edgeRefs.current.get(edgeKey(ALL_EDGES[next]!))?.focus();
+  }
+
+  function handleEdgeKeyDown(event: KeyboardEvent<SVGRectElement>, edge: Edge) {
+    switch (event.key) {
+      case "Enter":
+      case " ":
+        event.preventDefault();
+        onEdge(edge);
+        return;
+      case "ArrowRight":
+      case "ArrowDown":
+        event.preventDefault();
+        moveEdgeFocus(1);
+        return;
+      case "ArrowLeft":
+      case "ArrowUp":
+        event.preventDefault();
+        moveEdgeFocus(-1);
+        return;
+      default:
+        return;
+    }
+  }
+
+  function cellLabel(at: Point): string {
+    const key = cellKey(at);
+    const status = painted.has(key) ? t("cellPainted") : t("cellVoid");
+    const label = t("cellLabel", { x: at.x, y: at.y, status });
+
+    if (draft.start && cellKey(draft.start) === key) {
+      return `${label}, ${t("cellStart")}`;
+    }
+    if (draft.treasure && cellKey(draft.treasure) === key) {
+      return `${label}, ${t("cellTreasure")}`;
+    }
+    const gate = keyGateAt.get(key);
+    if (gate !== undefined) return `${label}, ${t("cellKey", { gate })}`;
+    return label;
+  }
+
+  function edgeLabel(edge: Edge): string {
+    const segment = segmentAt.get(edgeKey(edge));
+    const status = !segment
+      ? t("edgeEmpty")
+      : segment.kind === "wall"
+        ? t("edgeWall")
+        : t("edgeGate", { gate: segment.gate });
+    return t("edgeLabel", { o: edge.o, x: edge.x, y: edge.y, status });
   }
 
   return (
@@ -54,31 +182,35 @@ export function Board({ draft, onCell, onEdge, edgesActive }: BoardProps) {
       viewBox={`0 0 ${FRAME * CELL_PX} ${FRAME * CELL_PX}`}
       className="border-border-strong h-auto w-full max-w-[700px] rounded border"
     >
-      {cells.map((at) => (
-        <rect
-          key={cellKey(at)}
-          data-cell={`${at.x},${at.y}`}
-          role="button"
-          tabIndex={0}
-          aria-label={t("cellLabel", { x: at.x, y: at.y })}
-          x={at.x * CELL_PX}
-          y={at.y * CELL_PX}
-          width={CELL_PX}
-          height={CELL_PX}
-          className={
-            painted.has(cellKey(at))
-              ? "fill-cell-painted stroke-grid-line"
-              : "fill-cell-void stroke-grid-line"
-          }
-          strokeWidth={1}
-          onClick={() => onCell(at)}
-          onKeyDown={(event) => {
-            if (event.key !== "Enter" && event.key !== " ") return;
-            event.preventDefault();
-            onCell(at);
-          }}
-        />
-      ))}
+      {ALL_CELLS.map((at) => {
+        const key = cellKey(at);
+        const focused = focusedCell.x === at.x && focusedCell.y === at.y;
+        return (
+          <rect
+            key={key}
+            ref={(el) => {
+              if (el) cellRefs.current.set(key, el);
+              else cellRefs.current.delete(key);
+            }}
+            data-cell={`${at.x},${at.y}`}
+            role="button"
+            tabIndex={focused ? 0 : -1}
+            aria-label={cellLabel(at)}
+            x={at.x * CELL_PX}
+            y={at.y * CELL_PX}
+            width={CELL_PX}
+            height={CELL_PX}
+            className={
+              painted.has(key)
+                ? "fill-cell-painted stroke-grid-line"
+                : "fill-cell-void stroke-grid-line"
+            }
+            strokeWidth={1}
+            onClick={() => onCell(at)}
+            onKeyDown={(event) => handleCellKeyDown(event, at)}
+          />
+        );
+      })}
 
       {draft.start && (
         <circle
@@ -149,45 +281,31 @@ export function Board({ draft, onCell, onEdge, edgesActive }: BoardProps) {
       })}
 
       {edgesActive &&
-        edgesOf().map((edge) => {
+        ALL_EDGES.map((edge, index) => {
           const horizontal = edge.o === "H";
+          const key = edgeKey(edge);
+          const focused = index === focusedEdgeIndex;
           return (
             <rect
-              key={`hit-${edgeKey(edge)}`}
-              data-edge={edgeKey(edge)}
+              key={`hit-${key}`}
+              ref={(el) => {
+                if (el) edgeRefs.current.set(key, el);
+                else edgeRefs.current.delete(key);
+              }}
+              data-edge={key}
               role="button"
-              tabIndex={0}
-              aria-label={t("edgeLabel", {
-                o: edge.o,
-                x: edge.x,
-                y: edge.y,
-              })}
+              tabIndex={focused ? 0 : -1}
+              aria-label={edgeLabel(edge)}
               x={edge.x * CELL_PX + (horizontal ? 0 : CELL_PX - EDGE_HIT / 2)}
               y={edge.y * CELL_PX + (horizontal ? CELL_PX - EDGE_HIT / 2 : 0)}
               width={horizontal ? CELL_PX : EDGE_HIT}
               height={horizontal ? EDGE_HIT : CELL_PX}
               fill="transparent"
               onClick={() => onEdge(edge)}
-              onKeyDown={(event) => {
-                if (event.key !== "Enter" && event.key !== " ") return;
-                event.preventDefault();
-                onEdge(edge);
-              }}
+              onKeyDown={(event) => handleEdgeKeyDown(event, edge)}
             />
           );
         })}
     </svg>
   );
-}
-
-/** Every interior edge of the frame, each with its one legal spelling. */
-function edgesOf(): Edge[] {
-  const edges: Edge[] = [];
-  for (let y = 0; y < FRAME; y += 1) {
-    for (let x = 0; x < FRAME; x += 1) {
-      if (y < FRAME - 1) edges.push({ o: "H", x, y });
-      if (x < FRAME - 1) edges.push({ o: "V", x, y });
-    }
-  }
-  return edges;
 }

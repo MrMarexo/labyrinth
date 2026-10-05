@@ -80,7 +80,15 @@
   },
   "editor": {
     "boardLabel": "Plocha bludiska",
-    "cellLabel": "Políčko {x}, {y}",
-    "edgeLabel": "Hrana {o} {x}, {y}"
+    "cellLabel": "Políčko {x}, {y}, {status}",
+    "cellPainted": "namaľované",
+    "cellVoid": "prázdne",
+    "cellStart": "štart",
+    "cellTreasure": "poklad",
+    "cellKey": "kľúč od brány {gate}",
+    "edgeLabel": "Hrana {o} {x}, {y}, {status}",
+    "edgeEmpty": "prázdna",
+    "edgeWall": "stena",
+    "edgeGate": "brána {gate}"
   }
 }

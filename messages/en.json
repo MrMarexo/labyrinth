@@ -80,7 +80,15 @@
   },
   "editor": {
     "boardLabel": "Labyrinth board",
-    "cellLabel": "Square {x}, {y}",
-    "edgeLabel": "Edge {o} {x}, {y}"
+    "cellLabel": "Square {x}, {y}, {status}",
+    "cellPainted": "painted",
+    "cellVoid": "void",
+    "cellStart": "start",
+    "cellTreasure": "treasure",
+    "cellKey": "key for gate {gate}",
+    "edgeLabel": "Edge {o} {x}, {y}, {status}",
+    "edgeEmpty": "empty",
+    "edgeWall": "wall",
+    "edgeGate": "gate {gate}"
   }
 }
