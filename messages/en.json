@@ -159,5 +159,29 @@
     "redo": "Redo",
     "saveFailed": "Your changes could not be saved.",
     "retry": "Retry"
+  },
+  "lobby": {
+    "title": "Match",
+    "waitingForOpponent": "Nobody has joined yet. Share your code and they can.",
+    "youDraw": "Choose the labyrinth your opponent will solve.",
+    "youSubmitted": "Your labyrinth is in.",
+    "opponentDrawing": "Your opponent is still choosing theirs.",
+    "opponentSubmitted": "Your opponent's labyrinth is in.",
+    "bothIn": "Both labyrinths are in. The runs are unlocked.",
+    "runsComingSoon": "Solving arrives in the next release.",
+    "pickHeading": "Your labyrinths at this size",
+    "noneEligible": "You have no labyrinths at this size yet.",
+    "drawNew": "Draw a new one",
+    "mazeDraft": "Draft",
+    "mazeSubmitted": "Already submitted",
+    "submit": "Submit this labyrinth",
+    "submitting": "Submitting…",
+    "confirmSubmit": "Submit {name}? It can never be edited again.",
+    "confirmYes": "Submit",
+    "confirmNo": "Cancel",
+    "deadline": "Expires {when}",
+    "abandoned": "This match was abandoned. Nobody won.",
+    "forfeited": "You ran out of time on this one.",
+    "opponentForfeited": "Your opponent ran out of time."
   }
 }

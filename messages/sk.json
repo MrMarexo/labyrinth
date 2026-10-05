@@ -159,5 +159,29 @@
     "redo": "Dopredu",
     "saveFailed": "Vaše zmeny sa nepodarilo uložiť.",
     "retry": "Skúsiť znova"
+  },
+  "lobby": {
+    "title": "Zápas",
+    "waitingForOpponent": "Zatiaľ sa nikto nepripojil. Zdieľajte svoj kód a môžu sa pridať.",
+    "youDraw": "Vyberte bludisko, ktoré bude riešiť váš súper.",
+    "youSubmitted": "Vaše bludisko je odoslané.",
+    "opponentDrawing": "Váš súper si svoje ešte vyberá.",
+    "opponentSubmitted": "Bludisko vášho súpera je odoslané.",
+    "bothIn": "Obe bludiská sú odoslané. Beh je odomknutý.",
+    "runsComingSoon": "Riešenie pribudne v ďalšej verzii.",
+    "pickHeading": "Vaše bludiská v tejto veľkosti",
+    "noneEligible": "V tejto veľkosti zatiaľ nemáte žiadne bludiská.",
+    "drawNew": "Nakresliť nové",
+    "mazeDraft": "Koncept",
+    "mazeSubmitted": "Už odoslané",
+    "submit": "Odoslať toto bludisko",
+    "submitting": "Odosiela sa…",
+    "confirmSubmit": "Odoslať {name}? Už sa nikdy nebude dať upraviť.",
+    "confirmYes": "Odoslať",
+    "confirmNo": "Zrušiť",
+    "deadline": "Platí do {when}",
+    "abandoned": "Tento zápas bol opustený. Nikto nevyhral.",
+    "forfeited": "V tomto zápase vám vypršal čas.",
+    "opponentForfeited": "Vášmu súperovi vypršal čas."
   }
 }
