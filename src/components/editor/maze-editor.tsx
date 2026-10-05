@@ -178,7 +178,11 @@ export function MazeEditor({
 
   // Unmount only (empty deps): flush whatever the debounce above hasn't sent
   // yet, rather than losing up to AUTOSAVE_MS of drawing to a navigation.
+  // Re-arms `mountedRef` on setup: StrictMode double-invokes this effect in
+  // development (setup -> cleanup -> setup), and without this the cleanup's
+  // `false` would never be undone, permanently disabling the error banner.
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
       mountedRef.current = false;
       maybeSendRef.current();
