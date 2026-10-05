@@ -1,6 +1,49 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 import { signUpAndOpenNewMaze } from "./support/maze";
+
+/** Computed `stroke` of the segment at `edge` (e.g. `"V:0,0"`). */
+async function strokeAt(page: Page, edge: string): Promise<string> {
+  return page
+    .locator(`[data-segment="${edge}"]`)
+    .evaluate((el) => getComputedStyle(el).stroke);
+}
+
+// A stroke that failed to resolve reads back as the SVG initial value
+// `"none"`, not empty — and a regression to solid black is a value equal to
+// one of these, not an empty string either. Neither is "just not the wall's
+// grey", so both are checked explicitly rather than inferred from the
+// gate-vs-wall comparison alone.
+const INVALID_GATE_STROKES = new Set([
+  "none",
+  "",
+  "transparent",
+  "rgb(0, 0, 0)",
+  "rgba(0, 0, 0, 0)",
+  "rgba(0, 0, 0, 1)",
+]);
+
+/**
+ * The actual "distinct hues" claim: two different gates compared to each
+ * other, not just to a wall. A fixture that painted every gate the same
+ * colour would still satisfy "not the wall's grey" and "not empty" —
+ * only a gate-to-gate comparison catches that regression.
+ */
+async function assertGateStrokesAreDistinctAndResolved(
+  page: Page,
+): Promise<void> {
+  const [gateA, gateB, wall] = await Promise.all([
+    strokeAt(page, "V:0,0"),
+    strokeAt(page, "V:2,0"),
+    strokeAt(page, "H:1,0"),
+  ]);
+
+  for (const value of [gateA, gateB]) {
+    expect(INVALID_GATE_STROKES.has(value)).toBe(false);
+    expect(value).not.toBe(wall);
+  }
+  expect(gateA).not.toBe(gateB);
+}
 
 test.describe("board keyboard navigation", () => {
   test("tabs into the grid, arrows to a neighbour, activates it, and a mouse click keeps the tab stop in sync", async ({
@@ -78,14 +121,7 @@ test.describe("gate colours", () => {
     // project runs — a screenshot alone would pass whether gates render in
     // eight hues or all black, since pixel comparison isn't part of this
     // suite.
-    const gateStroke = await page
-      .locator('[data-segment="V:0,0"]')
-      .evaluate((el) => getComputedStyle(el).stroke);
-    const wallStroke = await page
-      .locator('[data-segment="H:1,0"]')
-      .evaluate((el) => getComputedStyle(el).stroke);
-    expect(gateStroke).not.toBe("");
-    expect(gateStroke).not.toBe(wallStroke);
+    await assertGateStrokesAreDistinctAndResolved(page);
 
     // `testInfo.outputPath` scopes the filename under this test's own
     // output directory, which Playwright keys by project (desktop, mobile)
@@ -99,6 +135,9 @@ test.describe("gate colours", () => {
 
     await page.getByRole("combobox", { name: "Theme" }).selectOption("dark");
     await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    // The resolution mechanism doesn't differ by theme, but both themes are
+    // screenshotted below, so both get the real assertion too.
+    await assertGateStrokesAreDistinctAndResolved(page);
     await board.screenshot({
       path: testInfo.outputPath("gate-colours-dark.png"),
     });
