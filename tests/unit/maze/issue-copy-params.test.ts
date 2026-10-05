@@ -3,6 +3,12 @@ import { describe, expect, it } from "vitest";
 import en from "../../../messages/en.json";
 import { MAZE_ISSUE_KEYS } from "~/maze";
 
+// This file checks that each catalogue entry's {placeholder}s match the
+// params the validator actually sends for that key — a pure data/contract
+// check against en.json. It imports and renders nothing from
+// ValidationPanel or any other component; that coverage lives in the
+// end-to-end specs, not here.
+
 type Catalogue = Record<string, unknown>;
 
 function lookup(catalogue: Catalogue, key: string): string | undefined {

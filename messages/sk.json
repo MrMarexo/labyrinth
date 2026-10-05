@@ -59,7 +59,7 @@
     "validate": {
       "wrongCellCount": "Použili ste {actual} z {expected} políčok.",
       "duplicateCell": "Jedno políčko je nakreslené dvakrát.",
-      "boundingBoxTooLarge": "Bludisko má rozmer {width} krát {height} políčok; musí sa zmestiť do {max} krát {max}.",
+      "boundingBoxTooLarge": "Bludisko má rozmer {width} krát {height} políčok; musí sa zmestiť do {max} krát {max} políčok.",
       "disconnectedShape": "Každé políčko musí susediť s ostatnými — žiadne ostrovy.",
       "startNotInShape": "Štart musí byť na nakreslenom políčku.",
       "treasureNotInShape": "Poklad musí byť na nakreslenom políčku.",
