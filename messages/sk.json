@@ -59,7 +59,7 @@
     "validate": {
       "wrongCellCount": "Použili ste {actual} z {expected} políčok.",
       "duplicateCell": "Jedno políčko je nakreslené dvakrát.",
-      "boundingBoxTooLarge": "Bludisko sa musí zmestiť do {max} krát {max} políčok.",
+      "boundingBoxTooLarge": "Bludisko má rozmer {width} krát {height} políčok; musí sa zmestiť do {max} krát {max}.",
       "disconnectedShape": "Každé políčko musí susediť s ostatnými — žiadne ostrovy.",
       "startNotInShape": "Štart musí byť na nakreslenom políčku.",
       "treasureNotInShape": "Poklad musí byť na nakreslenom políčku.",
@@ -93,6 +93,17 @@
     "shapeToolsLabel": "Nástroj tvaru",
     "paint": "Kresliť",
     "eraseCell": "Zmazať políčko",
-    "budget": "{used} / {budget} políčok"
+    "budget": "{used} / {budget} políčok",
+    "detailToolsLabel": "Nástroj detailov",
+    "wall": "Stena",
+    "gate": "Brána",
+    "key": "Kľúč",
+    "start": "Štart",
+    "treasure": "Poklad",
+    "erase": "Guma",
+    "gates": "{gates} / {gateBudget} brán",
+    "keys": "{keys} umiestnených kľúčov",
+    "valid": "Toto bludisko je pripravené na odoslanie.",
+    "notYetValid": "Ešte nie je hotové:"
   }
 }

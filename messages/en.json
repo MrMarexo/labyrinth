@@ -59,7 +59,7 @@
     "validate": {
       "wrongCellCount": "You have used {actual} of {expected} squares.",
       "duplicateCell": "A square has been painted twice.",
-      "boundingBoxTooLarge": "The labyrinth must fit in {max} by {max} squares.",
+      "boundingBoxTooLarge": "The labyrinth measures {width} by {height} squares; it must fit within {max} by {max}.",
       "disconnectedShape": "Every square must join the others — no floating islands.",
       "startNotInShape": "The start must sit on a painted square.",
       "treasureNotInShape": "The treasure must sit on a painted square.",
@@ -93,6 +93,17 @@
     "shapeToolsLabel": "Shape tool",
     "paint": "Paint",
     "eraseCell": "Erase square",
-    "budget": "{used} / {budget} squares"
+    "budget": "{used} / {budget} squares",
+    "detailToolsLabel": "Detail tool",
+    "wall": "Wall",
+    "gate": "Gate",
+    "key": "Key",
+    "start": "Start",
+    "treasure": "Treasure",
+    "erase": "Erase",
+    "gates": "{gates} / {gateBudget} gates",
+    "keys": "{keys} keys placed",
+    "valid": "This labyrinth is ready to submit.",
+    "notYetValid": "Not ready yet:"
   }
 }
