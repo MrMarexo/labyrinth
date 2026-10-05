@@ -132,9 +132,7 @@ function applyEdit(draft: DraftMaze, action: EditorAction): DraftMaze {
         return {
           ...draft,
           segments: [...without, { ...action.edge, kind: "wall" }],
-          keys: removedGate
-            ? draft.keys.filter((k) => k.gate !== removedGate.gate)
-            : draft.keys,
+          keys: releaseKeyForGate(draft.keys, removedGate?.gate),
         };
       }
 
@@ -144,9 +142,7 @@ function applyEdit(draft: DraftMaze, action: EditorAction): DraftMaze {
       return {
         ...draft,
         segments: [...without, { ...action.edge, kind: "gate", gate }],
-        keys: removedGate
-          ? draft.keys.filter((k) => k.gate !== removedGate.gate)
-          : draft.keys,
+        keys: releaseKeyForGate(draft.keys, removedGate?.gate),
       };
     }
 
@@ -158,10 +154,10 @@ function applyEdit(draft: DraftMaze, action: EditorAction): DraftMaze {
       return {
         ...draft,
         segments: draft.segments.filter((s) => edgeKey(s) !== id),
-        keys:
-          removed.kind === "gate"
-            ? draft.keys.filter((k) => k.gate !== removed.gate)
-            : draft.keys,
+        keys: releaseKeyForGate(
+          draft.keys,
+          removed.kind === "gate" ? removed.gate : undefined,
+        ),
       };
     }
 
@@ -203,6 +199,19 @@ function touches(
   const here = { x: edge.x, y: edge.y };
   const other = edge.o === "H" ? step(here, "S") : step(here, "E");
   return cellKey(here) === cellKey(at) || cellKey(other) === cellKey(at);
+}
+
+/**
+ * Removes whichever key is paired with `gate`, or returns `keys` unchanged
+ * when `gate` is undefined. The one place that enforces "a key cannot
+ * outlive its gate" — `placeSegment` and `removeSegment` both route through
+ * it rather than each filtering `keys` themselves.
+ */
+function releaseKeyForGate(
+  keys: DraftMaze["keys"],
+  gate: number | undefined,
+): DraftMaze["keys"] {
+  return gate === undefined ? keys : keys.filter((k) => k.gate !== gate);
 }
 
 /** The smallest gate id not already in use, or null when all 8 are taken. */

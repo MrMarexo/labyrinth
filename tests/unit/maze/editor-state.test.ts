@@ -6,6 +6,7 @@ import {
   initialEditorState,
   cellsUsed,
   gatesPlaced,
+  keysPlaced,
   type EditorState,
 } from "~/maze/editor-state";
 
@@ -35,7 +36,25 @@ describe("painting", () => {
       { type: "paintCell", at: { x: 1, y: 2 } },
       { type: "paintCell", at: { x: 1, y: 2 } },
     );
+    // Asserted both through the counter and directly against the collection:
+    // a broken dedup and a broken counter are different bugs, and a fixture
+    // that only checks `cellsUsed` cannot tell them apart.
+    expect(next.draft.cells).toHaveLength(1);
     expect(cellsUsed(next.draft)).toBe(1);
+  });
+
+  it("counts several distinct cells, not just whether any are painted", () => {
+    // Every other call site in this file asserts `cellsUsed` at exactly 1,
+    // which a hardcoded `cellsUsed() { return 1 }` would also satisfy. This
+    // is the one test that would catch that.
+    const next = apply(
+      start(),
+      { type: "paintCell", at: { x: 0, y: 0 } },
+      { type: "paintCell", at: { x: 1, y: 0 } },
+      { type: "paintCell", at: { x: 2, y: 0 } },
+    );
+    expect(next.draft.cells).toHaveLength(3);
+    expect(cellsUsed(next.draft)).toBe(3);
   });
 
   it("erasing a cell removes what was on it", () => {
@@ -109,6 +128,9 @@ describe("placing", () => {
     );
     expect(next.draft.segments).toHaveLength(1);
     expect(next.draft.segments[0]?.kind).toBe("gate");
+    // Distinct from the "numbers gates" test's count of 2, so a hardcoded
+    // `gatesPlaced() { return 2 }` cannot satisfy both.
+    expect(gatesPlaced(next.draft)).toBe(1);
   });
 
   it("toggles off when the same tool hits the same edge twice", () => {
@@ -130,6 +152,66 @@ describe("placing", () => {
     );
     expect(next.draft.segments).toEqual([]);
     expect(next.draft.keys).toEqual([]);
+    // A third distinct value (0, alongside 1 and 2 above) for the same
+    // reason: no constant return satisfies all three.
+    expect(gatesPlaced(next.draft)).toBe(0);
+  });
+
+  it("counts placed keys, including across more than one gate", () => {
+    const next = apply(
+      start(),
+      { type: "placeSegment", edge: { o: "H", x: 0, y: 0 }, kind: "gate" },
+      { type: "placeSegment", edge: { o: "H", x: 1, y: 0 }, kind: "gate" },
+      { type: "placeKey", at: { x: 3, y: 3 }, gate: 1 },
+      { type: "placeKey", at: { x: 4, y: 4 }, gate: 2 },
+    );
+    expect(next.draft.keys).toHaveLength(2);
+    expect(keysPlaced(next.draft)).toBe(2);
+  });
+
+  it("removing a gate drops its key from the count, not just from the array", () => {
+    const withKey = apply(
+      start(),
+      { type: "placeSegment", edge: { o: "H", x: 0, y: 0 }, kind: "gate" },
+      { type: "placeKey", at: { x: 3, y: 3 }, gate: 1 },
+    );
+    expect(keysPlaced(withKey.draft)).toBe(1);
+
+    const next = editorReducer(withKey, {
+      type: "removeSegment",
+      edge: { o: "H", x: 0, y: 0 },
+    });
+    expect(keysPlaced(next.draft)).toBe(0);
+  });
+
+  it("removeKey removes an existing key", () => {
+    const withKey = apply(
+      start(),
+      { type: "placeSegment", edge: { o: "H", x: 0, y: 0 }, kind: "gate" },
+      { type: "placeKey", at: { x: 3, y: 3 }, gate: 1 },
+    );
+    const next = editorReducer(withKey, {
+      type: "removeKey",
+      at: { x: 3, y: 3 },
+    });
+    expect(next.draft.keys).toEqual([]);
+  });
+
+  it("placeTreasure sets the treasure", () => {
+    const next = editorReducer(start(), {
+      type: "placeTreasure",
+      at: { x: 5, y: 5 },
+    });
+    expect(next.draft.treasure).toEqual({ x: 5, y: 5 });
+  });
+
+  it("placeTreasure moves the treasure rather than adding a second", () => {
+    const next = apply(
+      start(),
+      { type: "placeTreasure", at: { x: 0, y: 0 } },
+      { type: "placeTreasure", at: { x: 2, y: 2 } },
+    );
+    expect(next.draft.treasure).toEqual({ x: 2, y: 2 });
   });
 });
 
