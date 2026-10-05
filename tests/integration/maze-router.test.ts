@@ -148,3 +148,56 @@ describe("maze.get", () => {
     expect(missing).toEqual(notMine);
   });
 });
+
+describe("maze.remove", () => {
+  it("lets the owner remove their own draft", async () => {
+    const caller = createCaller(await signedIn());
+    const created = await caller.maze.createDraft(settings);
+
+    await caller.maze.remove({ id: created.id });
+
+    const [row] = await db.select().from(maze).where(eq(maze.id, created.id));
+    expect(row).toBeUndefined();
+
+    await expect(
+      rejection(caller.maze.get({ id: created.id })),
+    ).resolves.toEqual({ code: "FORBIDDEN", message: "errors.notYourMaze" });
+
+    const mine = await caller.maze.list();
+    expect(mine.map((m) => m.id)).not.toContain(created.id);
+  });
+
+  it("refuses someone else's maze, indistinguishably from a missing one, and leaves it intact", async () => {
+    const owner = createCaller(await signedIn());
+    const created = await owner.maze.createDraft(settings);
+    const stranger = createCaller(await signedIn());
+
+    const notMine = await rejection(stranger.maze.remove({ id: created.id }));
+    const missing = await rejection(
+      stranger.maze.remove({ id: crypto.randomUUID() }),
+    );
+
+    expect(notMine).toEqual({
+      code: "FORBIDDEN",
+      message: "errors.notYourMaze",
+    });
+    expect(missing).toEqual(notMine);
+
+    // The half that actually matters: an error thrown after a successful
+    // delete would also satisfy the assertions above.
+    const fetched = await owner.maze.get({ id: created.id });
+    expect(fetched.id).toBe(created.id);
+  });
+
+  it("rejects an anonymous caller with a message key", async () => {
+    const caller = createCaller(
+      await createTRPCContext({ headers: new Headers() }),
+    );
+    await expect(
+      rejection(caller.maze.remove({ id: crypto.randomUUID() })),
+    ).resolves.toEqual({
+      code: "UNAUTHORIZED",
+      message: "errors.notSignedIn",
+    });
+  });
+});
