@@ -4,12 +4,26 @@ function byPoint(a: Point, b: Point): number {
   return a.y - b.y || a.x - b.x;
 }
 
+/**
+ * Ordinal string comparison. `localeCompare` without an explicit locale
+ * collates through whatever ICU data the host supplies, which this module
+ * cannot tolerate: it must sort identically in every browser and eventual
+ * mobile client (`src/maze/AGENTS.md`) for the content hash to mean anything.
+ */
+function compareStrings(a: string, b: string): number {
+  return a === b ? 0 : a < b ? -1 : 1;
+}
+
 function bySegment(a: Segment, b: Segment): number {
+  // The kind tiebreak only matters for input that hasn't passed structural
+  // validation yet — a valid maze never has two segments at the same (o, x,
+  // y). It's a safety net for `normalize` being callable directly, not
+  // load-bearing for the real parse → validate → normalize pipeline.
   return (
-    a.o.localeCompare(b.o) ||
+    compareStrings(a.o, b.o) ||
     a.y - b.y ||
     a.x - b.x ||
-    a.kind.localeCompare(b.kind)
+    compareStrings(a.kind, b.kind)
   );
 }
 

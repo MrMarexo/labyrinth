@@ -1,7 +1,7 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 
-import type { Maze } from "~/maze/format";
+import { MAX_BOUNDING_BOX, type Maze } from "~/maze/format";
 import { canonicalString, contentHash, normalize } from "~/maze/normalize";
 
 const maze: Maze = {
@@ -52,10 +52,15 @@ describe("normalize", () => {
 
 describe("contentHash", () => {
   it("is stable under translation", () => {
+    // The fixture's coordinates reach x=4, y=3; keep the translated maze
+    // inside the 0..MAX_BOUNDING_BOX-1 box the schema actually allows, rather
+    // than exercising shapes `parseMaze` would reject.
+    const maxDx = MAX_BOUNDING_BOX - 1 - 4;
+    const maxDy = MAX_BOUNDING_BOX - 1 - 3;
     fc.assert(
       fc.property(
-        fc.integer({ min: 0, max: 12 }),
-        fc.integer({ min: 0, max: 12 }),
+        fc.integer({ min: 0, max: maxDx }),
+        fc.integer({ min: 0, max: maxDy }),
         (dx, dy) => {
           expect(contentHash(translate(maze, dx, dy))).toBe(contentHash(maze));
         },

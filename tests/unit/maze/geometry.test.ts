@@ -46,9 +46,13 @@ describe("step and edgeBetween", () => {
     expect(edgeBetween(origin, "E")).toEqual({ o: "V", x: 3, y: 4 });
   });
 
-  // The strong check: an edge is the same edge seen from either side. This is
-  // what would actually fail if one direction's offset had a flipped sign —
-  // the two views of the same edge would stop agreeing.
+  // Catches a single-direction sign flip: an edge must be the same edge seen
+  // from either side, so flipping just one direction's offset makes the two
+  // views disagree. It does NOT catch a globally mirrored convention (e.g.
+  // treating y as increasing upward throughout) — that would satisfy this
+  // property perfectly while disagreeing with the spec. Closing that gap is
+  // what the literal, spec-derived assertions above are for; this property
+  // is strong only in combination with them, not on its own.
   it("agrees with the opposite direction from across the edge", () => {
     fc.assert(
       fc.property(
