@@ -109,3 +109,35 @@ test.describe("drawing a labyrinth", () => {
     ).toBeVisible();
   });
 });
+
+test.describe("recovering from a failed save", () => {
+  test("shows the translated save-error banner with Retry, and clears it once the save succeeds", async ({
+    page,
+  }) => {
+    await signUpAndOpenNewMaze(page);
+
+    // Fails the first saveDraft call only, then lets every later one through
+    // -- this exercises the real network path (autosave, then Retry) rather
+    // than a hand-built tRPC response envelope.
+    let failNext = true;
+    await page.route("**/api/trpc/maze.saveDraft*", async (route) => {
+      if (failNext) {
+        failNext = false;
+        await route.abort("failed");
+        return;
+      }
+      await route.continue();
+    });
+
+    await page.locator('[data-cell="0,0"]').click();
+
+    const banner = page.locator("[data-save-error]");
+    await expect(banner).toBeVisible();
+    await expect(banner).toContainText("Your changes could not be saved.");
+    const retry = page.getByRole("button", { name: "Retry" });
+    await expect(retry).toBeVisible();
+
+    await retry.click();
+    await expect(banner).toHaveCount(0);
+  });
+});
