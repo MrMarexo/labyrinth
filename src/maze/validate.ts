@@ -55,20 +55,25 @@ export function validateStructure(
   }
 
   // Occupancy: at most one of { key, treasure } per cell, and nothing on start.
-  const occupied = new Map<string, number>();
-  occupied.set(cellKey(maze.treasure), 1);
+  // Tracked per cell (not just a running total) so that two independently
+  // over-occupied cells each get their own reported issue, naming that cell.
+  const occupied = new Map<string, { count: number; x: number; y: number }>();
+  const occupy = (p: { x: number; y: number }) => {
+    const at = cellKey(p);
+    const entry = occupied.get(at);
+    if (entry) entry.count += 1;
+    else occupied.set(at, { count: 1, x: p.x, y: p.y });
+  };
+  occupy(maze.treasure);
   for (const key of maze.keys) {
+    occupy(key);
     const at = cellKey(key);
-    occupied.set(at, (occupied.get(at) ?? 0) + 1);
     if (at === cellKey(maze.start)) add("maze.validate.keyOnStart");
     if (!painted.has(at))
       add("maze.validate.keyOutsideShape", { gate: key.gate });
   }
-  for (const [, count] of occupied) {
-    if (count > 1) {
-      add("maze.validate.cellHoldsTwoThings");
-      break;
-    }
+  for (const { count, x, y } of occupied.values()) {
+    if (count > 1) add("maze.validate.cellHoldsTwoThings", { x, y });
   }
 
   // Segments: both sides painted, and no edge named twice.
@@ -76,11 +81,12 @@ export function validateStructure(
   for (const segment of maze.segments) {
     const here = { x: segment.x, y: segment.y };
     const other = segment.o === "H" ? step(here, "S") : step(here, "E");
+    const segmentParams = { o: segment.o, x: segment.x, y: segment.y };
     if (!painted.has(cellKey(here)) || !painted.has(cellKey(other))) {
-      add("maze.validate.segmentOutsideShape");
+      add("maze.validate.segmentOutsideShape", segmentParams);
     }
     const id = edgeKey(segment);
-    if (seenEdges.has(id)) add("maze.validate.duplicateSegment");
+    if (seenEdges.has(id)) add("maze.validate.duplicateSegment", segmentParams);
     seenEdges.add(id);
   }
 

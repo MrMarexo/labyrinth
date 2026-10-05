@@ -100,6 +100,34 @@ describe("validateStructure", () => {
     );
   });
 
+  it("reports one issue per over-occupied cell, each naming its own cell", () => {
+    // Two separate collisions: (1, 0) holds two keys, and the treasure cell
+    // (1, 1) holds a third key too. A reducer that stops at the first
+    // collision would report only one of these.
+    const maze = square();
+    maze.segments = [
+      { o: "V", x: 0, y: 0, kind: "gate", gate: 1 },
+      { o: "V", x: 0, y: 1, kind: "gate", gate: 2 },
+      { o: "H", x: 1, y: 0, kind: "gate", gate: 3 },
+    ];
+    maze.keys = [
+      { gate: 1, x: 1, y: 0 },
+      { gate: 2, x: 1, y: 0 },
+      { gate: 3, x: 1, y: 1 },
+    ];
+    const issues = validateStructure(maze, {
+      cellCount: 4,
+      gateCount: 3,
+    }).filter((i) => i.key === "maze.validate.cellHoldsTwoThings");
+    expect(issues).toHaveLength(2);
+    expect(issues.map((i) => i.params)).toEqual(
+      expect.arrayContaining([
+        { x: 1, y: 0 },
+        { x: 1, y: 1 },
+      ]),
+    );
+  });
+
   it("rejects a bounding box wider than the cap", () => {
     const maze = square();
     maze.cells = [{ x: 0, y: 0 }];
@@ -117,6 +145,15 @@ describe("validateStructure", () => {
     expect(keys(maze)).toContain("maze.validate.segmentOutsideShape");
   });
 
+  it("identifies which segment is outside the shape", () => {
+    const maze = square();
+    maze.segments = [{ o: "H", x: 0, y: 1, kind: "wall" }];
+    const issue = validateStructure(maze, settings).find(
+      (i) => i.key === "maze.validate.segmentOutsideShape",
+    );
+    expect(issue?.params).toEqual({ o: "H", x: 0, y: 1 });
+  });
+
   it("rejects two segments on the same edge", () => {
     const maze = square();
     maze.segments = [
@@ -129,7 +166,9 @@ describe("validateStructure", () => {
   it("rejects gate ids that are not exactly 1..gateCount", () => {
     const maze = square();
     maze.segments = [{ o: "V", x: 0, y: 0, kind: "gate", gate: 2 }];
-    maze.keys = [{ gate: 2, x: 1, y: 1 }];
+    // (1, 0): neither start nor treasure, so this fixture trips only the
+    // rule under test, not the occupancy rule too.
+    maze.keys = [{ gate: 2, x: 1, y: 0 }];
     expect(keys(maze, { cellCount: 4, gateCount: 1 })).toContain(
       "maze.validate.gateIdsNotContiguous",
     );
@@ -141,7 +180,9 @@ describe("validateStructure", () => {
       { o: "V", x: 0, y: 0, kind: "gate", gate: 1 },
       { o: "V", x: 0, y: 1, kind: "gate", gate: 1 },
     ];
-    maze.keys = [{ gate: 1, x: 1, y: 1 }];
+    // (1, 0): neither start nor treasure, so this fixture trips only the
+    // rule under test, not the occupancy rule too.
+    maze.keys = [{ gate: 1, x: 1, y: 0 }];
     expect(keys(maze, { cellCount: 4, gateCount: 1 })).toContain(
       "maze.validate.gateIdReused",
     );
