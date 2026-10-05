@@ -39,6 +39,10 @@ export function MazeEditor({
   gateCount,
 }: MazeEditorProps) {
   const t = useTranslations();
+  // Invariant the first-render guard below depends on: `lastSentRef` and the
+  // reducer's initial draft must be seeded from this exact same `initial`
+  // object, never a copy of it — the guard is a reference-equality check,
+  // and a copy here would make it fire on the very first render.
   const [state, dispatch] = useReducer(
     editorReducer,
     initial,
@@ -61,15 +65,18 @@ export function MazeEditor({
   const lastSentRef = useRef<DraftMaze>(initial);
   // Whether a saveDraft call is currently in flight.
   const savingRef = useRef(false);
-  // The newest draft that arrived while a save was in flight, if any. Sent
-  // the moment the in-flight call settles, which is what keeps requests
-  // strictly ordered — the server never receives a later request's response
-  // before an earlier one's, because there is never more than one on the
-  // wire at a time.
-  const pendingRef = useRef<DraftMaze | null>(null);
+  // Set when something wants to send while a call is already in flight —
+  // a debounce tick, the post-success recheck, a manual retry, or the
+  // unmount flush. Deliberately *not* a stored draft: `onSettled` below
+  // always re-reads the live draft through `draftRef` instead of whatever
+  // value was true at queue time, because a value frozen at queue time can
+  // go stale before it is actually sent (see the fix report's second trace —
+  // an undo arriving after something was queued, but before the in-flight
+  // call settles, must not resurrect the content it undid).
+  const pendingRef = useRef(false);
   const mountedRef = useRef(true);
-  // Mirrors `state.draft` for the unmount-flush effect below, which must read
-  // the latest draft without re-subscribing on every edit.
+  // Mirrors `state.draft` so the pipeline below always reads the live draft
+  // rather than a value some earlier closure captured.
   const draftRef = useRef(state.draft);
   draftRef.current = state.draft;
 
@@ -91,6 +98,23 @@ export function MazeEditor({
         onSuccess: () => {
           lastSentRef.current = draft;
           if (mountedRef.current) setSaveError(null);
+          // The live draft can have moved on while this request was in
+          // flight — most sharply when undo pops the history stack back
+          // onto the very object `lastSentRef` already pointed at, which
+          // makes `state.draft === lastSentRef.current` true again and
+          // defeats the debounce effect's change detection below (it never
+          // sees a "change" to react to, so it never schedules anything).
+          // `maybeSend` re-reads `draftRef` fresh, so this is a correct
+          // recheck rather than a repeat of whatever was queued earlier;
+          // `savingRef` is still true here (this call's own `onSettled`
+          // hasn't run yet), so this only ever sets `pendingRef` — the
+          // actual send happens from `onSettled` below once this call's
+          // bookkeeping is done. Covers redo identically, since it restores
+          // a draft by reference the same way undo does, and converges
+          // through a run of several undo/redo dispatches during one
+          // in-flight save, because each corrective round-trip rechecks the
+          // live draft again on its own settle.
+          maybeSend();
         },
         onError: (error) => {
           if (!mountedRef.current) return;
@@ -102,33 +126,47 @@ export function MazeEditor({
           // remembers to add a check for it.
           if (key === "errors.mazeIsSubmitted") setLocked(true);
           setSaveError(key);
+          // Deliberately no corrective send here: `lastSentRef` stays at its
+          // old value on a failure, so a blind recheck would find the live
+          // draft still "different" forever and retry the same rejected
+          // content in a tight loop. `pendingRef` below still only reflects
+          // a genuinely new edit queued elsewhere while this attempt was in
+          // flight — never the content that just failed.
         },
         onSettled: () => {
           savingRef.current = false;
-          // Deliberately unguarded by `mountedRef`: a queued edit must still
+          // Deliberately unguarded by `mountedRef`: a queued send must still
           // reach the server after the author has navigated away, or it is
           // simply lost. Only the UI feedback above is skipped post-unmount.
-          const next = pendingRef.current;
-          pendingRef.current = null;
-          if (next !== null) send(next);
+          if (pendingRef.current) {
+            pendingRef.current = false;
+            maybeSend();
+          }
         },
       },
     );
   }
 
-  function scheduleSend(draft: DraftMaze) {
+  // The single entry point for "there might be something to save". Sends
+  // immediately if nothing is in flight and the live draft actually differs
+  // from what the server is believed to hold; otherwise marks `pendingRef`
+  // so `onSettled` above re-evaluates (via this same function, so it is
+  // always the live draft that goes out, never a stale snapshot) once the
+  // in-flight call is done.
+  function maybeSend() {
     if (savingRef.current) {
-      pendingRef.current = draft;
+      pendingRef.current = true;
       return;
     }
-    send(draft);
+    if (draftRef.current === lastSentRef.current) return;
+    send(draftRef.current);
   }
 
   // Kept current every render so the unmount effect below — which must use
   // an empty dependency array to fire its cleanup on unmount alone, not on
   // every edit — always calls the version closed over the latest id/state.
-  const scheduleSendRef = useRef(scheduleSend);
-  scheduleSendRef.current = scheduleSend;
+  const maybeSendRef = useRef(maybeSend);
+  maybeSendRef.current = maybeSend;
 
   // Autosave. Debounced at AUTOSAVE_MS: every edit resets the timer, so a
   // burst of clicks produces one request after the author pauses, not one
@@ -137,8 +175,11 @@ export function MazeEditor({
     // Covers the first render: `state.draft` is the same reference as
     // `lastSentRef.current` (both set from `initial`) until a real edit
     // replaces it, so a freshly loaded draft is never written straight back.
+    // (`maybeSend` would reach the same conclusion on its own when the timer
+    // fires; this is the cheap early exit that avoids scheduling a timer
+    // that would do nothing.)
     if (state.draft === lastSentRef.current) return;
-    const timer = setTimeout(() => scheduleSend(state.draft), AUTOSAVE_MS);
+    const timer = setTimeout(() => maybeSend(), AUTOSAVE_MS);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.draft]);
@@ -148,9 +189,7 @@ export function MazeEditor({
   useEffect(() => {
     return () => {
       mountedRef.current = false;
-      if (draftRef.current !== lastSentRef.current) {
-        scheduleSendRef.current(draftRef.current);
-      }
+      maybeSendRef.current();
     };
   }, []);
 
@@ -222,9 +261,22 @@ export function MazeEditor({
         />
 
         {saveError && (
-          <p role="alert" data-save-error className="text-danger text-sm">
-            {t(saveError as never)}
-          </p>
+          <div
+            role="alert"
+            data-save-error
+            className="flex flex-wrap items-center gap-2 text-sm"
+          >
+            <p className="text-danger">{t(saveError as never)}</p>
+            {!locked && (
+              <button
+                type="button"
+                onClick={() => maybeSend()}
+                className="border-border-strong rounded border px-2 py-1 text-xs"
+              >
+                {t("editor.retry")}
+              </button>
+            )}
+          </div>
         )}
 
         <div className="flex gap-2">

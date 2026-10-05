@@ -107,6 +107,7 @@
     "notYetValid": "Not ready yet:",
     "undo": "Undo",
     "redo": "Redo",
-    "saveFailed": "Your changes could not be saved."
+    "saveFailed": "Your changes could not be saved.",
+    "retry": "Retry"
   }
 }

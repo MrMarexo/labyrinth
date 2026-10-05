@@ -107,6 +107,7 @@
     "notYetValid": "Ešte nie je hotové:",
     "undo": "Späť",
     "redo": "Dopredu",
-    "saveFailed": "Vaše zmeny sa nepodarilo uložiť."
+    "saveFailed": "Vaše zmeny sa nepodarilo uložiť.",
+    "retry": "Skúsiť znova"
   }
 }
