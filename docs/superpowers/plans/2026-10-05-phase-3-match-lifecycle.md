@@ -1843,9 +1843,12 @@ Expected: FAIL — `caller.match.submitMaze is not a function`.
 Add these imports to `src/server/api/routers/match.ts`:
 
 ```ts
-import { isNull, ne, notInArray, or } from "drizzle-orm";
+import { ne, notInArray } from "drizzle-orm";
+import type { NeonQueryResultHKT } from "drizzle-orm/neon-serverless";
+import type { PgDatabase } from "drizzle-orm/pg-core";
 
 import { validateMaze } from "~/maze";
+import * as schema from "~/server/db/schema";
 import { maze } from "~/server/db/schema";
 ```
 
@@ -1858,7 +1861,13 @@ Then this helper, above `export const matchRouter`:
  * but not against someone who has already walked the maze.
  */
 async function mazesFacedBy(
-  db: typeof import("~/server/db").db,
+  // Corrected during execution: this previously read
+  // `typeof import("~/server/db").db`, which does not accept a transaction
+  // object — and this helper is called with `ctx.db` from `eligibleMazes`
+  // and with `tx` from inside `submitMaze`'s transaction. Type it against
+  // the base both extend. `participantRows` above gets away with the
+  // narrower type only because nothing calls it with a `tx`.
+  db: PgDatabase<NeonQueryResultHKT, typeof schema>,
   opponentId: string | null,
   exceptMatchId: string,
 ): Promise<string[]> {
@@ -2074,7 +2083,7 @@ Four breaks, one per rule:
 1. Remove the `cellCount`/`gateCount` comparison. Expected: "refuses a maze whose settings do not match" fails.
 2. Replace the `validation.ok` check with `if (false)`. Expected: "refuses a maze that does not validate" fails.
 3. Remove the `faced.includes` check. Expected: "refuses reuse against an opponent who has already faced that maze" fails, and the `eligibleMazes` omission test still passes — which tells you those two are independent code paths and both need their own check.
-4. Change `bothIn` to `seated.length === 2`. Expected: "unlocks the runs once both have submitted" still passes but "records the submission and holds the match in drawing" fails. **That asymmetry is the point** — a test that only ever checked the happy path would have missed it.
+4. Change `bothIn` to `seated.length === 2`. Expected: **five** tests fail, not one. The status flips to `running` after the first submission, which then makes the second player's legitimate submission hit the `matchNotDrawing` guard, and four more tests cascade off that. (An earlier version of this plan predicted only "holds the match in drawing" would fail and that "unlocks the runs" would still pass. That was wrong — corrected during execution.) The lesson stands and is stronger than predicted: a suite that only walked the happy path would have seen none of this.
 
 Restore after each and confirm all 32 green.
 
