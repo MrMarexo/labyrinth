@@ -48,6 +48,31 @@ describe("solve", () => {
     expect(solve(maze)).toEqual({ solvable: true, optimalMoves: 3 });
   });
 
+  it("requires re-entering a junction with a different key set", () => {
+    // (1,0) is a junction on the only route from start to treasure: east to
+    // the junction, east again to collect key 1 at (2,0), back west through
+    // the junction, then south through the now-open gate, then south again to
+    // the treasure. The junction is visited twice — once holding no keys,
+    // once holding key 1 — which is exactly the case a cell-only search gets
+    // wrong: it marks (1,0) seen on the first pass and prunes the second,
+    // so the gate is never reached and the maze is wrongly reported unsolvable.
+    const maze: Maze = {
+      version: 1,
+      cells: [
+        { x: 0, y: 0 },
+        { x: 1, y: 0 },
+        { x: 2, y: 0 },
+        { x: 1, y: 1 },
+        { x: 1, y: 2 },
+      ],
+      start: { x: 0, y: 0 },
+      treasure: { x: 1, y: 2 },
+      segments: [{ o: "H", x: 1, y: 0, kind: "gate", gate: 1 }],
+      keys: [{ gate: 1, x: 2, y: 0 }],
+    };
+    expect(solve(maze)).toEqual({ solvable: true, optimalMoves: 5 });
+  });
+
   it("rejects a key locked behind its own gate", () => {
     const maze: Maze = {
       version: 1,
