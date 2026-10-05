@@ -73,6 +73,29 @@
     "deleteCancel": "Cancel",
     "deleting": "Deleting…"
   },
+  "matches": {
+    "title": "Your matches",
+    "empty": "You have no matches yet. Create one, or join a friend's with their code.",
+    "createHeading": "Start a match",
+    "size": "Size",
+    "sizeOption": "{cells} squares",
+    "gates": "Gates",
+    "create": "Create match",
+    "creating": "Creating…",
+    "joinHeading": "Join a match",
+    "code": "Join code",
+    "join": "Join",
+    "joining": "Joining…",
+    "codeHint": "6 letters and digits, from whoever created the match.",
+    "shareCode": "Share this code: {code}",
+    "open": "Open",
+    "statusAwaitingOpponent": "Waiting for an opponent",
+    "statusDrawing": "Both drawing",
+    "statusRunning": "Running",
+    "statusComplete": "Finished",
+    "statusAbandoned": "Abandoned",
+    "sizeAndGates": "{cells} squares, {gates} gates"
+  },
   "maze": {
     "format": {
       "coordinateNotAnInteger": "A coordinate must be a whole number.",

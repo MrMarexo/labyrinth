@@ -73,6 +73,29 @@
     "deleteCancel": "Zrušiť",
     "deleting": "Maže sa…"
   },
+  "matches": {
+    "title": "Vaše zápasy",
+    "empty": "Zatiaľ nemáte žiadne zápasy. Vytvorte si jeden alebo sa pripojte ku kamarátovi pomocou jeho kódu.",
+    "createHeading": "Založiť zápas",
+    "size": "Veľkosť",
+    "sizeOption": "{cells} políčok",
+    "gates": "Brány",
+    "create": "Vytvoriť zápas",
+    "creating": "Vytvára sa…",
+    "joinHeading": "Pripojiť sa k zápasu",
+    "code": "Kód na pripojenie",
+    "join": "Pripojiť sa",
+    "joining": "Pripája sa…",
+    "codeHint": "6 písmen a číslic od toho, kto zápas založil.",
+    "shareCode": "Zdieľajte tento kód: {code}",
+    "open": "Otvoriť",
+    "statusAwaitingOpponent": "Čaká sa na súpera",
+    "statusDrawing": "Obaja kreslia",
+    "statusRunning": "Prebieha",
+    "statusComplete": "Dokončený",
+    "statusAbandoned": "Opustený",
+    "sizeAndGates": "{cells} políčok, {gates} brán"
+  },
   "maze": {
     "format": {
       "coordinateNotAnInteger": "Súradnica musí byť celé číslo.",
