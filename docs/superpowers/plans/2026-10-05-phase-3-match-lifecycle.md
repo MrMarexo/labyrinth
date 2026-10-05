@@ -2742,8 +2742,8 @@ Expected: PASS, 7 tests.
 - [ ] **Step 5: Break it and watch it fail**
 
 1. Change `lte(match.deadlineAt, now)` to `lte(match.deadlineAt, new Date(0))`. Expected: every closing test fails and "leaves a match alone before its deadline" still passes. Restore.
-2. In the abandoned branch, set `winnerId: row.createdById` instead of null. Expected: three tests fail, including "records the drawing forfeit … and still gives nobody the win". Restore.
-3. Remove the `notInArray(match.status, TERMINAL)` filter. Expected: "never touches a match that has already ended" fails on `lastActivityAt`. Restore.
+2. In the abandoned branch, set `winnerId: row.createdById` instead of null. Expected: **four** tests fail — every test that produces an `abandoned` match asserts `winnerId` is null, and there are four of them (the count said three before execution corrected it). Restore.
+3. Remove the `notInArray(match.status, TERMINAL)` filter. **Expected: the suite stays green** — corrected during execution, where this was predicted to fail. `resolveExpiry` → `deadlineFor` already returns `{ kind: "none" }` for a terminal status, so the domain layer is what makes "never touches a match that has already ended" pass; the SQL filter is defence in depth and a performance guard that keeps `match_sweep_idx` selective as closed matches accumulate. Restore it, and know that no test proves it load-bearing for correctness, because it is not.
 
 Break 2 is the important one: it is the spec's load-bearing principle, and if no test fails when you hand out an unearned win, the suite is not guarding it.
 
