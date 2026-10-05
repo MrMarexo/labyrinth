@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useEffect, useReducer, useRef, useState } from "react";
+import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 
 import type { TranslatableIssue } from "~/lib/issues";
 import {
@@ -194,10 +194,13 @@ export function MazeEditor({
     };
   }, []);
 
-  const complete = draftToMaze(state.draft);
-  const validation = complete
-    ? validateMaze(complete, { cellCount, gateCount })
-    : null;
+  // A parse, eleven structural rules, a BFS over cells x 2^8, a normalize
+  // and a content hash — too much to redo on every render, not just on a
+  // change to the draft or the settings it's validated against.
+  const validation = useMemo(() => {
+    const complete = draftToMaze(state.draft);
+    return complete ? validateMaze(complete, { cellCount, gateCount }) : null;
+  }, [state.draft, cellCount, gateCount]);
   const issues: TranslatableIssue[] = validation
     ? validation.ok
       ? []
