@@ -2449,7 +2449,7 @@ Confirm the boot warning appears exactly once when `E2E_TEST_SUPPORT=true`, and 
 - Create: `tests/integration/sweep.test.ts`
 
 **Interfaces:**
-- Consumes: `resolveExpiry`, `isTerminal` from `~/match`; `situationFor` from `~/server/api/routers/match`; tables `match`, `matchPlayer`.
+- Consumes: `resolveExpiry`, `isTerminal` from `~/match`; `situationFor` from `~/server/match/situation`; tables `match`, `matchPlayer`.
 - Produces: `sweepExpiredMatches(db, now: Date) -> { closed: number }`
 
 ### What this task can and cannot close
@@ -2641,7 +2641,10 @@ Expected: FAIL with `Failed to resolve import "~/server/match/sweep"`.
 import { and, inArray, lte, notInArray } from "drizzle-orm";
 
 import { MATCH_STATUSES, isTerminal, resolveExpiry } from "~/match";
-import { situationFor } from "~/server/api/routers/match";
+// Corrected during execution: `situationFor` lives in its own module,
+// not in the router. A server-side domain helper should not have to be
+// reached through a tRPC router, and the sweep is its second consumer.
+import { situationFor } from "~/server/match/situation";
 import type { db as Database } from "~/server/db";
 import { match, matchPlayer } from "~/server/db/schema";
 
