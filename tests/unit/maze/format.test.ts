@@ -85,6 +85,24 @@ describe("parseMaze", () => {
   it("rejects a non-integer coordinate", () => {
     const result = parseMaze({ ...minimal, start: { x: 0.5, y: 0 } });
     expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.issues.map((i) => i.key)).toContain(
+        "maze.format.coordinateNotAnInteger",
+      );
+    }
+  });
+
+  it("rejects a non-integer gate id", () => {
+    const result = parseMaze({
+      ...minimal,
+      keys: [{ gate: 1.5, x: 1, y: 0 }],
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.issues.map((i) => i.key)).toContain(
+        "maze.format.gateIdNotAnInteger",
+      );
+    }
   });
 
   it("never produces an English message", () => {
@@ -95,6 +113,8 @@ describe("parseMaze", () => {
       { ...minimal, cells: [] },
       { ...minimal, start: { x: -1, y: 0 } },
       { ...minimal, keys: [{ gate: 0, x: 0, y: 0 }] },
+      { ...minimal, start: { x: 0.5, y: 0 } },
+      { ...minimal, keys: [{ gate: 1.5, x: 1, y: 0 }] },
       "not an object",
       null,
     ]) {
