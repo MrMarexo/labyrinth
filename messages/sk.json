@@ -104,6 +104,9 @@
     "gates": "{gates} / {gateBudget} brán",
     "keys": "{keys} umiestnených kľúčov",
     "valid": "Toto bludisko je pripravené na odoslanie.",
-    "notYetValid": "Ešte nie je hotové:"
+    "notYetValid": "Ešte nie je hotové:",
+    "undo": "Späť",
+    "redo": "Dopredu",
+    "saveFailed": "Vaše zmeny sa nepodarilo uložiť."
   }
 }

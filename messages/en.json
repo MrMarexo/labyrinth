@@ -104,6 +104,9 @@
     "gates": "{gates} / {gateBudget} gates",
     "keys": "{keys} keys placed",
     "valid": "This labyrinth is ready to submit.",
-    "notYetValid": "Not ready yet:"
+    "notYetValid": "Not ready yet:",
+    "undo": "Undo",
+    "redo": "Redo",
+    "saveFailed": "Your changes could not be saved."
   }
 }
