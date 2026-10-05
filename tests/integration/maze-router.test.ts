@@ -8,6 +8,12 @@ import { auth } from "~/server/auth";
 import { db } from "~/server/db";
 import { maze } from "~/server/db/schema";
 
+import {
+  SOLVABLE_MAZE_CELL_COUNT,
+  SOLVABLE_MAZE_GATE_COUNT,
+  SOLVABLE_MAZE_OPTIMAL_MOVES,
+  solvableDraft,
+} from "../fixtures/maze";
 import { rejection } from "./support";
 
 async function signedIn() {
@@ -71,6 +77,26 @@ describe("maze.saveDraft", () => {
     expect(row?.optimalMoves).toBeNull();
   });
 
+  it("computes and persists derived metrics for a valid maze", async () => {
+    const caller = createCaller(await signedIn());
+    const created = await caller.maze.createDraft({
+      ...settings,
+      cellCount: SOLVABLE_MAZE_CELL_COUNT,
+      gateCount: SOLVABLE_MAZE_GATE_COUNT,
+    });
+
+    const result = await caller.maze.saveDraft({
+      id: created.id,
+      data: solvableDraft(),
+    });
+
+    expect(result).toEqual({ valid: true, issues: [] });
+
+    const [row] = await db.select().from(maze).where(eq(maze.id, created.id));
+    expect(row?.contentHash).not.toBeNull();
+    expect(row?.optimalMoves).toBe(SOLVABLE_MAZE_OPTIMAL_MOVES);
+  });
+
   it("refuses someone else's maze, indistinguishably from a missing one", async () => {
     const owner = createCaller(await signedIn());
     const created = await owner.maze.createDraft(settings);
@@ -127,6 +153,16 @@ describe("maze.get", () => {
     const fetched = await caller.maze.get({ id: created.id });
     expect(fetched.id).toBe(created.id);
     expect(fetched.data).toEqual(emptyDraft());
+  });
+
+  it("projects only what the editor needs — no authorId, status or derived metrics", async () => {
+    const caller = createCaller(await signedIn());
+    const created = await caller.maze.createDraft(settings);
+    const fetched = await caller.maze.get({ id: created.id });
+    expect(fetched).not.toHaveProperty("authorId");
+    expect(fetched).not.toHaveProperty("status");
+    expect(fetched).not.toHaveProperty("contentHash");
+    expect(fetched).not.toHaveProperty("optimalMoves");
   });
 
   it("refuses someone else's maze, indistinguishably from a missing one", async () => {
@@ -199,5 +235,26 @@ describe("maze.remove", () => {
       code: "UNAUTHORIZED",
       message: "errors.notSignedIn",
     });
+  });
+
+  it("refuses to delete a submitted maze, matching saveDraft's guard", async () => {
+    const caller = createCaller(await signedIn());
+    const created = await caller.maze.createDraft(settings);
+    // Nothing in this phase can submit a maze through the API, so the
+    // status is set directly — this is the one case the API cannot arrange.
+    await db
+      .update(maze)
+      .set({ status: "submitted" })
+      .where(eq(maze.id, created.id));
+
+    await expect(
+      rejection(caller.maze.remove({ id: created.id })),
+    ).resolves.toEqual({
+      code: "FORBIDDEN",
+      message: "errors.mazeIsSubmitted",
+    });
+
+    const [row] = await db.select().from(maze).where(eq(maze.id, created.id));
+    expect(row).toBeDefined();
   });
 });

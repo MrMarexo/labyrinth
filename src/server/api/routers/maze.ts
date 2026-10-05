@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import {
   CELL_COUNT_PRESETS,
+  INCOMPLETE_DRAFT_KEY,
   MAX_GATES,
   draftMazeSchema,
   draftToMaze,
@@ -64,7 +65,13 @@ export const mazeRouter = createTRPCRouter({
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
       const [found] = await ctx.db
-        .select()
+        .select({
+          id: maze.id,
+          name: maze.name,
+          cellCount: maze.cellCount,
+          gateCount: maze.gateCount,
+          data: maze.data,
+        })
         .from(maze)
         .where(ownedBy(input.id, ctx.session.user.id));
       const row = assertOwned(found);
@@ -132,15 +139,26 @@ export const mazeRouter = createTRPCRouter({
       if (validation?.ok) return { valid: true as const, issues: [] };
       return {
         valid: false as const,
-        issues: validation?.issues ?? [
-          { key: "maze.validate.incomplete" as const },
-        ],
+        issues: validation?.issues ?? [{ key: INCOMPLETE_DRAFT_KEY }],
       };
     }),
 
   remove: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
+      const [found] = await ctx.db
+        .select()
+        .from(maze)
+        .where(ownedBy(input.id, ctx.session.user.id));
+      const row = assertOwned(found);
+
+      if (row.status === "submitted") {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "errors.mazeIsSubmitted",
+        });
+      }
+
       const deleted = await ctx.db
         .delete(maze)
         .where(ownedBy(input.id, ctx.session.user.id))
