@@ -73,6 +73,20 @@ test.describe("gate colours", () => {
     await page.locator('[data-edge="H:3,0"]').click();
     await expect(page.locator('[data-segment^="H:"]')).toHaveCount(2);
 
+    // Gate colour is set via the `style` attribute (not a presentation
+    // attribute) specifically so this resolves in WebKit, which the mobile
+    // project runs — a screenshot alone would pass whether gates render in
+    // eight hues or all black, since pixel comparison isn't part of this
+    // suite.
+    const gateStroke = await page
+      .locator('[data-segment="V:0,0"]')
+      .evaluate((el) => getComputedStyle(el).stroke);
+    const wallStroke = await page
+      .locator('[data-segment="H:1,0"]')
+      .evaluate((el) => getComputedStyle(el).stroke);
+    expect(gateStroke).not.toBe("");
+    expect(gateStroke).not.toBe(wallStroke);
+
     // `testInfo.outputPath` scopes the filename under this test's own
     // output directory, which Playwright keys by project (desktop, mobile)
     // as well as test file and title -- without it, the desktop and mobile

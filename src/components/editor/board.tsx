@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 
 import {
+  MAX_BOUNDING_BOX,
   cellKey,
   edgeKey,
   type DraftMaze,
@@ -12,7 +13,7 @@ import {
 } from "~/maze";
 import { gateColour } from "./gate-colours";
 
-export const FRAME = 16;
+export const FRAME = MAX_BOUNDING_BOX;
 export const CELL_PX = 40;
 /** Invisible hit strip for an edge. A wall is one pixel; this is what you click. */
 const EDGE_HIT = 14;
@@ -49,6 +50,12 @@ export type BoardProps = {
   edgesActive: boolean;
 };
 
+/**
+ * Renders every square — `data-cell` for all FRAME² cells, each labelled
+ * painted or void — so this is the author's own board. A run view needs a
+ * sibling component fed only discovered cells and bumped segments; reusing
+ * this one leaks void-vs-walled into the accessibility tree.
+ */
 export function Board({ draft, onCell, onEdge, edgesActive }: BoardProps) {
   const t = useTranslations("editor");
   const painted = new Set(draft.cells.map(cellKey));
@@ -240,7 +247,7 @@ export function Board({ draft, onCell, onEdge, edgesActive }: BoardProps) {
           cx={(key.x + 0.5) * CELL_PX}
           cy={(key.y + 0.5) * CELL_PX}
           r={CELL_PX * 0.18}
-          fill={gateColour(key.gate)}
+          style={{ fill: gateColour(key.gate) }}
         />
       ))}
 
@@ -267,8 +274,10 @@ export function Board({ draft, onCell, onEdge, edgesActive }: BoardProps) {
             strokeWidth={4}
             strokeLinecap="round"
             className={segment.kind === "wall" ? "stroke-wall" : undefined}
-            stroke={
-              segment.kind === "gate" ? gateColour(segment.gate) : undefined
+            style={
+              segment.kind === "gate"
+                ? { stroke: gateColour(segment.gate) }
+                : undefined
             }
           />
         );

@@ -62,18 +62,15 @@ const allKeys = [...MAZE_ISSUE_KEYS, ...MAZE_FORMAT_ISSUE_KEYS, ...ROUTER_KEYS];
 describe.each(catalogues)(
   "issue copy and the params the code supplies (%s)",
   (_locale, catalogue) => {
-    it.each(allKeys)(
-      "%s interpolates only params the code sends",
-      (key) => {
-        const message = lookup(catalogue, key);
-        expect(message).toBeDefined();
-        const used = placeholders(message!);
-        const supplied = expected[key] ?? [];
-        // A placeholder with no matching param renders as a literal brace to
-        // the user — worse than plain copy, because it looks like a bug.
-        expect(used.filter((p) => !supplied.includes(p))).toEqual([]);
-      },
-    );
+    it.each(allKeys)("%s interpolates only params the code sends", (key) => {
+      const message = lookup(catalogue, key);
+      expect(message).toBeDefined();
+      const used = placeholders(message!);
+      const supplied = expected[key] ?? [];
+      // A placeholder with no matching param renders as a literal brace to
+      // the user — worse than plain copy, because it looks like a bug.
+      expect(used.filter((p) => !supplied.includes(p))).toEqual([]);
+    });
 
     it("uses every param the code bothers to send", () => {
       // Not an error, but a param nobody renders is copy that could be clearer.
