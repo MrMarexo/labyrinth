@@ -1585,6 +1585,22 @@ MSG
 
 ### Task 5: Shape mode
 
+> **Corrected during execution.** The sample markup in this task and in Task 6
+> uses `aria-pressed` buttons. That is toggle semantics — independent on/off
+> states — and these palettes are a mutually exclusive single choice, which is
+> what the WAI-ARIA `radiogroup` pattern exists for. Build both palettes as
+> `role="radiogroup"` with `role="radio"` children: exactly one tab stop, arrow
+> keys moving *and* selecting together, `aria-checked` on each option, and an
+> accessible name on the group.
+>
+> One trap the sample does not show: `Tool` is a single shared union across both
+> palettes, so each palette can be rendered while `tool` holds a value none of
+> *its* options represent. A naive `tabIndex={active ? 0 : -1}` then leaves that
+> group with zero tab stops and unreachable by keyboard. Fall the roving stop
+> back to the first option, and leave every `aria-checked` false — no option may
+> claim to be checked when none is.
+
+
 **Files:**
 - Create: `src/components/editor/shape-tools.tsx`
 - Modify: `messages/en.json`, `messages/sk.json`
@@ -1691,6 +1707,22 @@ MSG
 ---
 
 ### Task 6: Detail mode and the validation panel
+
+> **Corrected during execution.** The sample markup in this task and in Task 6
+> uses `aria-pressed` buttons. That is toggle semantics — independent on/off
+> states — and these palettes are a mutually exclusive single choice, which is
+> what the WAI-ARIA `radiogroup` pattern exists for. Build both palettes as
+> `role="radiogroup"` with `role="radio"` children: exactly one tab stop, arrow
+> keys moving *and* selecting together, `aria-checked` on each option, and an
+> accessible name on the group.
+>
+> One trap the sample does not show: `Tool` is a single shared union across both
+> palettes, so each palette can be rendered while `tool` holds a value none of
+> *its* options represent. A naive `tabIndex={active ? 0 : -1}` then leaves that
+> group with zero tab stops and unreachable by keyboard. Fall the roving stop
+> back to the first option, and leave every `aria-checked` false — no option may
+> claim to be checked when none is.
+
 
 **Files:**
 - Create: `src/components/editor/detail-tools.tsx`, `src/components/editor/validation-panel.tsx`
