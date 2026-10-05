@@ -5,6 +5,7 @@ import { useEffect, useReducer, useRef, useState } from "react";
 
 import type { TranslatableIssue } from "~/lib/issues";
 import {
+  INCOMPLETE_DRAFT_KEY,
   cellsUsed,
   draftToMaze,
   editorReducer,
@@ -201,7 +202,7 @@ export function MazeEditor({
     ? validation.ok
       ? []
       : validation.issues
-    : [{ key: "maze.validate.incomplete" }];
+    : [{ key: INCOMPLETE_DRAFT_KEY }];
 
   function onCell(at: Point) {
     if (locked) return;

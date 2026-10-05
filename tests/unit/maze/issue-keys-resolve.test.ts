@@ -4,6 +4,8 @@ import en from "../../../messages/en.json";
 import sk from "../../../messages/sk.json";
 import { MAZE_FORMAT_ISSUE_KEYS, MAZE_ISSUE_KEYS } from "~/maze";
 
+import { ROUTER_KEYS } from "./router-keys";
+
 type Catalogue = Record<string, unknown>;
 
 /** Resolves "a.b.c" against a nested catalogue, or undefined. */
@@ -18,12 +20,6 @@ function lookup(catalogue: Catalogue, key: string): unknown {
       catalogue,
     );
 }
-
-/** Keys emitted outside the unions — by the router, not the domain. */
-const ROUTER_KEYS = [
-  "maze.validate.incomplete",
-  "maze.format.cellCountNotAPreset",
-];
 
 const allKeys = [...MAZE_ISSUE_KEYS, ...MAZE_FORMAT_ISSUE_KEYS, ...ROUTER_KEYS];
 

@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import en from "../../../messages/en.json";
 import sk from "../../../messages/sk.json";
-import { MAZE_ISSUE_KEYS } from "~/maze";
+import { MAZE_FORMAT_ISSUE_KEYS, MAZE_ISSUE_KEYS } from "~/maze";
+
+import { ROUTER_KEYS } from "./router-keys";
 
 // This file checks that each catalogue entry's {placeholder}s match the
 // params the validator actually sends for that key — a pure data/contract
@@ -52,10 +54,15 @@ const expected: Record<string, string[]> = {
   "maze.validate.keyWithoutGate": ["gate"],
 };
 
+// Every key the placeholder check runs over — not just MAZE_ISSUE_KEYS, so a
+// placeholder added to format or router copy tomorrow cannot render as a
+// literal brace any more than a validate.* one could.
+const allKeys = [...MAZE_ISSUE_KEYS, ...MAZE_FORMAT_ISSUE_KEYS, ...ROUTER_KEYS];
+
 describe.each(catalogues)(
   "issue copy and the params the code supplies (%s)",
   (_locale, catalogue) => {
-    it.each(MAZE_ISSUE_KEYS)(
+    it.each(allKeys)(
       "%s interpolates only params the code sends",
       (key) => {
         const message = lookup(catalogue, key);
