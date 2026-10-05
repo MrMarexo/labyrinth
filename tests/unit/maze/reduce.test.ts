@@ -126,6 +126,17 @@ describe("applyMove", () => {
     expect(crossed.outcome).toBe("moved_through_gate");
     expect(crossed.state.penalties).toBe(0);
     expect(crossed.state.openedGates).toBe(1 << 0);
+    // Replay rebuilds the discovered map from the stored deltas alone (spec
+    // §8), so a successful gate crossing must say a gate was there, even
+    // though the runner bumped nothing — otherwise replay draws open floor
+    // and the gate's id is lost for good.
+    expect(crossed.delta.revealedSegment).toEqual({
+      o: "V",
+      x: 0,
+      y: 0,
+      kind: "gate",
+      gate: 1,
+    });
   });
 
   it("refuses to move once the run has finished", () => {

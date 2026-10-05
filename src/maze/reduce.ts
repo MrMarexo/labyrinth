@@ -127,8 +127,22 @@ export function applyMove(
         : "moved";
 
   const revealedCell: RevealedCell = { x: destination.x, y: destination.y };
+  // Independent by design, unlike outcome: a cell can carry both flags (a
+  // configuration validateStructure forbids, but the reducer does not
+  // validate), and each flag simply states a fact that is true regardless of
+  // which single label outcome picked.
   if (isTreasure) revealedCell.treasure = true;
   if (keyHere) revealedCell.key = keyHere.gate;
+
+  // Crossing a gate reveals it, even though the runner holds its key and
+  // bumped nothing: replay (spec §8) reconstructs the discovered map from the
+  // stored deltas alone, with no socket and no live client state to fall back
+  // on, so if this delta doesn't say a gate was here, replay draws open floor
+  // and the gate's id — which the runner never learned by bumping it either
+  // — is unrecoverable. The runner already earned this fact by crossing.
+  const revealedSegment: RevealedSegment | undefined = throughGate
+    ? { ...edge, kind: "gate", gate: segment.gate }
+    : undefined;
 
   return {
     state: next,
@@ -139,6 +153,7 @@ export function applyMove(
       moves: next.moves,
       finished: next.finished,
       revealedCell,
+      revealedSegment,
     },
     outcome,
   };
