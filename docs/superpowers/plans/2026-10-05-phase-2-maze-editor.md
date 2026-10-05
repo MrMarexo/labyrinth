@@ -1408,7 +1408,12 @@ const EDGE_HIT = 14;
 const GATE_HUES = [25, 70, 140, 190, 260, 300, 340, 10];
 
 function gateColour(gate: number): string {
-  return `oklch(60% 0.18 ${GATE_HUES[(gate - 1) % GATE_HUES.length]})`;
+  // Corrected during execution: a fixed oklch here is identical in light and
+  // dark, which AGENTS.md invariant 10 forbids -- a raw value in a component
+  // does not follow the theme. Derive lightness and chroma from an existing
+  // token and override only the hue, so gates track the theme automatically.
+  const hue = GATE_HUES[(gate - 1) % GATE_HUES.length];
+  return `oklch(from var(--color-accent) l c ${hue})`;
 }
 
 export type BoardProps = {
@@ -1494,7 +1499,13 @@ export function Board({ draft, onCell, onEdge, edgesActive }: BoardProps) {
         const horizontal = segment.o === "H";
         const x1 = segment.x * CELL_PX;
         const y1 = (segment.y + (horizontal ? 1 : 0)) * CELL_PX;
-        const x2 = (segment.x + (horizontal ? 1 : 0)) * CELL_PX;
+        // Corrected during execution: this previously read
+        // `(segment.x + (horizontal ? 1 : 0))`, which for a V edge put both
+        // endpoints at x = segment.x * CELL_PX -- one whole cell left of the
+        // edge its own data-segment key named. V edges sit on the boundary
+        // between (x,y) and (x+1,y), so the right-hand gridline is always
+        // (x + 1) * CELL_PX. H edges never read this value.
+        const x2 = (segment.x + 1) * CELL_PX;
         const y2 = (segment.y + 1) * CELL_PX;
 
         return (
