@@ -1,11 +1,15 @@
 import {
   expect,
   request as apiRequestFactory,
+  test as base,
   type Browser,
+  type BrowserContext,
   type Page,
 } from "@playwright/test";
 
 import { signedInContext } from "./auth";
+
+type PlayerOptions = { name: string; cellCount: number; gateCount: number };
 
 /**
  * A signed-in page with a valid labyrinth already seeded at the given size.
@@ -42,10 +46,10 @@ import { signedInContext } from "./auth";
  * per player sidesteps this and is the more honest fixture anyway: two
  * real people would never share one.
  */
-export async function playerWithMaze(
+async function playerWithMaze(
   browser: Browser,
   baseURL: string,
-  options: { name: string; cellCount: number; gateCount: number },
+  options: PlayerOptions,
 ): Promise<Page> {
   const signUpRequest = await apiRequestFactory.newContext({ baseURL });
   const context = await signedInContext(browser, signUpRequest, baseURL);
@@ -67,6 +71,46 @@ export async function playerWithMaze(
 
   return page;
 }
+
+/**
+ * `test`, extended with a `players` fixture that owns every browser context
+ * a spec opens through it and closes all of them in its teardown.
+ *
+ * A context from `browser.newContext()` (which `playerWithMaze` creates,
+ * via `signedInContext`) is not a fixture Playwright owns — closing it is
+ * the test's job. A plain `context.close()` written at the end of a test
+ * body only runs when the body reaches that line; an assertion that throws
+ * partway through skips it, leaking the context for the rest of the
+ * worker's lifetime. That is exactly the run (a failing, re-run, bisected
+ * spec) where the leak is most expensive, since it is also the run whose
+ * output someone is about to read closely.
+ *
+ * A fixture's teardown — the code after `await provideFixture(...)` — runs
+ * whether the test body returns normally or throws, the same guarantee a
+ * `try/finally` gives a single test, but centralised once here instead of
+ * copied into every spec. (The callback is named `provideFixture`, not
+ * Playwright's usual `use`: an identifier starting with `use` reads as a
+ * React hook to `eslint-plugin-react-hooks`, which this repo's config
+ * applies project-wide, and it is not one — Playwright calls it
+ * positionally, so any name works.)
+ */
+export const test = base.extend<{
+  players: (options: PlayerOptions) => Promise<Page>;
+}>({
+  players: async ({ browser, baseURL }, provideFixture) => {
+    const contexts: BrowserContext[] = [];
+    await provideFixture(async (options) => {
+      const page = await playerWithMaze(browser, baseURL!, options);
+      contexts.push(page.context());
+      return page;
+    });
+    // `allSettled`, not `all`: closing must never throw over an assertion
+    // that already failed inside the test body — that assertion's error is
+    // the one worth seeing — and one context failing to close must not stop
+    // the rest from closing.
+    await Promise.allSettled(contexts.map((c) => c.close()));
+  },
+});
 
 /** Reads the join code off the matches page after creating a match. */
 export async function createMatch(

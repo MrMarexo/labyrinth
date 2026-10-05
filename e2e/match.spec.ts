@@ -1,25 +1,19 @@
-import { expect, test } from "@playwright/test";
+import { expect } from "@playwright/test";
 
-import { createMatch, playerWithMaze } from "./support/match";
+import { createMatch, test } from "./support/match";
 
 const SIZE = { cellCount: 36, gateCount: 0 };
 
 test.describe("match lifecycle", () => {
   test("two accounts create, join, submit, and reach running", async ({
-    browser,
-    baseURL,
+    players,
   }) => {
     // The phase's exit criterion, end to end, as two separate people in two
     // separate browser contexts — not one context switching accounts, which
-    // would not prove the ownership boundary holds.
-    const host = await playerWithMaze(browser, baseURL!, {
-      name: "Host maze",
-      ...SIZE,
-    });
-    const guest = await playerWithMaze(browser, baseURL!, {
-      name: "Guest maze",
-      ...SIZE,
-    });
+    // would not prove the ownership boundary holds. `players` owns both
+    // contexts and closes them on teardown, pass or fail.
+    const host = await players({ name: "Host maze", ...SIZE });
+    const guest = await players({ name: "Guest maze", ...SIZE });
 
     const code = await createMatch(host, { cells: 36, gates: 0 });
     await expect(host.locator("[data-match-status]")).toHaveAttribute(
@@ -69,23 +63,11 @@ test.describe("match lifecycle", () => {
       "data-opponent-submitted",
       "true",
     );
-
-    await host.context().close();
-    await guest.context().close();
   });
 
-  test("a submitted labyrinth can no longer be edited", async ({
-    browser,
-    baseURL,
-  }) => {
-    const host = await playerWithMaze(browser, baseURL!, {
-      name: "One way",
-      ...SIZE,
-    });
-    const guest = await playerWithMaze(browser, baseURL!, {
-      name: "Theirs",
-      ...SIZE,
-    });
+  test("a submitted labyrinth can no longer be edited", async ({ players }) => {
+    const host = await players({ name: "One way", ...SIZE });
+    const guest = await players({ name: "Theirs", ...SIZE });
 
     const code = await createMatch(host, { cells: 36, gates: 0 });
     await guest.goto("/en/matches");
@@ -133,19 +115,12 @@ test.describe("match lifecycle", () => {
     // Locked: no retry offered, and undo/redo are disabled.
     await expect(host.getByRole("button", { name: "Retry" })).not.toBeVisible();
     await expect(host.getByRole("button", { name: "Undo" })).toBeDisabled();
-
-    await host.context().close();
-    await guest.context().close();
   });
 
   test("an unknown join code is refused with a translated message", async ({
-    browser,
-    baseURL,
+    players,
   }) => {
-    const player = await playerWithMaze(browser, baseURL!, {
-      name: "Solo",
-      ...SIZE,
-    });
+    const player = await players({ name: "Solo", ...SIZE });
 
     await player.goto("/en/matches");
     await player.getByLabel("Join code").fill("ZZZZZZ");
@@ -156,18 +131,12 @@ test.describe("match lifecycle", () => {
     await expect(error).toHaveText("No match has that code.");
     // The key itself must never reach the person.
     await expect(error).not.toContainText("errors.");
-
-    await player.context().close();
   });
 
   test("the matches list shows a created match and its code", async ({
-    browser,
-    baseURL,
+    players,
   }) => {
-    const player = await playerWithMaze(browser, baseURL!, {
-      name: "Listed",
-      ...SIZE,
-    });
+    const player = await players({ name: "Listed", ...SIZE });
 
     const code = await createMatch(player, { cells: 36, gates: 0 });
 
@@ -175,7 +144,5 @@ test.describe("match lifecycle", () => {
     const row = player.locator("[data-match-row]").first();
     await expect(row).toHaveAttribute("data-status", "awaiting_opponent");
     await expect(row).toContainText(code);
-
-    await player.context().close();
   });
 });
