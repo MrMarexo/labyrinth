@@ -46,7 +46,12 @@
     "matchCodeUnknown": "No match has that code.",
     "matchFull": "That match already has two players.",
     "matchExpired": "That match has expired.",
-    "alreadyInMatch": "You are already in that match."
+    "alreadyInMatch": "You are already in that match.",
+    "mazeInvalid": "That labyrinth is not playable yet.",
+    "mazeSettingsMismatch": "That labyrinth does not match this match's size.",
+    "mazeAlreadyFaced": "Your opponent has already played that labyrinth.",
+    "alreadySubmitted": "You have already submitted a labyrinth.",
+    "matchNotDrawing": "This match is not accepting labyrinths."
   },
   "play": {
     "title": "Your games",

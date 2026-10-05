@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 
 import { CODE_LENGTH, HOURS_24_MS, HOURS_48_MS } from "~/match";
@@ -6,8 +6,13 @@ import { createCaller } from "~/server/api/root";
 import { createTRPCContext } from "~/server/api/trpc";
 import { auth } from "~/server/auth";
 import { db } from "~/server/db";
-import { match, matchPlayer } from "~/server/db/schema";
+import { match, matchPlayer, maze } from "~/server/db/schema";
 
+import {
+  SOLVABLE_MAZE_CELL_COUNT,
+  SOLVABLE_MAZE_GATE_COUNT,
+  solvableDraft,
+} from "../fixtures/maze";
 import { rejection } from "./support";
 
 async function signedIn() {
@@ -18,6 +23,20 @@ async function signedIn() {
   });
   const cookie = response.headers.get("set-cookie") ?? "";
   return createTRPCContext({ headers: new Headers({ cookie }) });
+}
+
+/** A saved, valid labyrinth owned by the caller, ready to submit. */
+async function savedMaze(
+  caller: ReturnType<typeof createCaller>,
+  name = "Mine",
+) {
+  const created = await caller.maze.createDraft({
+    name,
+    cellCount: SOLVABLE_MAZE_CELL_COUNT,
+    gateCount: SOLVABLE_MAZE_GATE_COUNT,
+  });
+  await caller.maze.saveDraft({ id: created.id, data: solvableDraft() });
+  return created.id;
 }
 
 const settings = { cellCount: 36 as const, gateCount: 0 };
@@ -250,5 +269,305 @@ describe("match.list", () => {
 
     const listed = await guest.match.list();
     expect(listed.map((m) => m.id)).toContain(created.id);
+  });
+});
+
+describe("match.submitMaze", () => {
+  it("records the submission and holds the match in drawing until both are in", async () => {
+    const hostCtx = await signedIn();
+    const host = createCaller(hostCtx);
+    const created = await host.match.create(settings);
+    await createCaller(await signedIn()).match.join({ code: created.code });
+    const mazeId = await savedMaze(host);
+
+    const result = await host.match.submitMaze({
+      matchId: created.id,
+      mazeId,
+    });
+
+    expect(result.status).toBe("drawing");
+    const [player] = await db
+      .select()
+      .from(matchPlayer)
+      .where(
+        and(
+          eq(matchPlayer.matchId, created.id),
+          eq(matchPlayer.userId, hostCtx.session!.user.id),
+        ),
+      );
+    expect(player?.mazeId).toBe(mazeId);
+    expect(player?.submittedAt).not.toBeNull();
+  });
+
+  it("marks the maze submitted, so the editor can no longer change it", async () => {
+    const host = createCaller(await signedIn());
+    const created = await host.match.create(settings);
+    await createCaller(await signedIn()).match.join({ code: created.code });
+    const mazeId = await savedMaze(host);
+
+    await host.match.submitMaze({ matchId: created.id, mazeId });
+
+    const [row] = await db.select().from(maze).where(eq(maze.id, mazeId));
+    expect(row?.status).toBe("submitted");
+    expect(row?.contentHash).not.toBeNull();
+    expect(row?.optimalMoves).not.toBeNull();
+
+    expect(
+      await rejection(
+        host.maze.saveDraft({ id: mazeId, data: solvableDraft() }),
+      ),
+    ).toEqual({ code: "FORBIDDEN", message: "errors.mazeIsSubmitted" });
+  });
+
+  it("moves the deadline to row 3's 24h from the submission", async () => {
+    const hostCtx = await signedIn();
+    const host = createCaller(hostCtx);
+    const created = await host.match.create(settings);
+    await createCaller(await signedIn()).match.join({ code: created.code });
+    const mazeId = await savedMaze(host);
+
+    await host.match.submitMaze({ matchId: created.id, mazeId });
+
+    const [row] = await db.select().from(match).where(eq(match.id, created.id));
+    // The submitting player is the host, whose context this test already
+    // holds — no need to search across both seats for a non-null stamp.
+    const [player] = await db
+      .select()
+      .from(matchPlayer)
+      .where(
+        and(
+          eq(matchPlayer.matchId, created.id),
+          eq(matchPlayer.userId, hostCtx.session!.user.id),
+        ),
+      );
+    const submittedAt = player!.submittedAt!;
+    expect(row!.deadlineAt.getTime() - submittedAt.getTime()).toBe(HOURS_24_MS);
+  });
+
+  it("unlocks the runs once both have submitted", async () => {
+    const host = createCaller(await signedIn());
+    const created = await host.match.create(settings);
+    const guest = createCaller(await signedIn());
+    await guest.match.join({ code: created.code });
+
+    await host.match.submitMaze({
+      matchId: created.id,
+      mazeId: await savedMaze(host, "Host"),
+    });
+    const result = await guest.match.submitMaze({
+      matchId: created.id,
+      mazeId: await savedMaze(guest, "Guest"),
+    });
+
+    expect(result.status).toBe("running");
+    const [row] = await db.select().from(match).where(eq(match.id, created.id));
+    expect(row?.status).toBe("running");
+  });
+
+  it("sets row 4's 24h deadline from the moment the runs unlocked", async () => {
+    const host = createCaller(await signedIn());
+    const created = await host.match.create(settings);
+    const guest = createCaller(await signedIn());
+    await guest.match.join({ code: created.code });
+
+    await host.match.submitMaze({
+      matchId: created.id,
+      mazeId: await savedMaze(host, "Host"),
+    });
+    await guest.match.submitMaze({
+      matchId: created.id,
+      mazeId: await savedMaze(guest, "Guest"),
+    });
+
+    const [row] = await db.select().from(match).where(eq(match.id, created.id));
+    const players = await db
+      .select()
+      .from(matchPlayer)
+      .where(eq(matchPlayer.matchId, created.id));
+    const unlockedAt = Math.max(
+      ...players.map((p) => p.submittedAt!.getTime()),
+    );
+    expect(row!.deadlineAt.getTime() - unlockedAt).toBe(HOURS_24_MS);
+  });
+
+  it("refuses a maze whose settings do not match the match", async () => {
+    const host = createCaller(await signedIn());
+    const created = await host.match.create({ cellCount: 64, gateCount: 0 });
+    await createCaller(await signedIn()).match.join({ code: created.code });
+    // The fixture is a 36-cell maze; this match wants 64.
+    const mazeId = await savedMaze(host);
+
+    expect(
+      await rejection(host.match.submitMaze({ matchId: created.id, mazeId })),
+    ).toEqual({
+      code: "BAD_REQUEST",
+      message: "errors.mazeSettingsMismatch",
+    });
+  });
+
+  it("refuses a maze that does not validate", async () => {
+    const host = createCaller(await signedIn());
+    const created = await host.match.create(settings);
+    await createCaller(await signedIn()).match.join({ code: created.code });
+    // Created but never drawn: no start, no treasure, no cells.
+    const empty = await host.maze.createDraft({
+      name: "Empty",
+      cellCount: SOLVABLE_MAZE_CELL_COUNT,
+      gateCount: SOLVABLE_MAZE_GATE_COUNT,
+    });
+
+    expect(
+      await rejection(
+        host.match.submitMaze({ matchId: created.id, mazeId: empty.id }),
+      ),
+    ).toEqual({ code: "BAD_REQUEST", message: "errors.mazeInvalid" });
+  });
+
+  it("refuses someone else's maze, indistinguishably from one that does not exist", async () => {
+    const host = createCaller(await signedIn());
+    const created = await host.match.create(settings);
+    const guest = createCaller(await signedIn());
+    await guest.match.join({ code: created.code });
+    const guestMaze = await savedMaze(guest, "Not yours");
+
+    const notMine = await rejection(
+      host.match.submitMaze({ matchId: created.id, mazeId: guestMaze }),
+    );
+    const missing = await rejection(
+      host.match.submitMaze({
+        matchId: created.id,
+        mazeId: crypto.randomUUID(),
+      }),
+    );
+
+    expect(notMine).toEqual({
+      code: "FORBIDDEN",
+      message: "errors.notYourMaze",
+    });
+    expect(missing).toEqual(notMine);
+  });
+
+  it("refuses a second submission from the same player", async () => {
+    const host = createCaller(await signedIn());
+    const created = await host.match.create(settings);
+    await createCaller(await signedIn()).match.join({ code: created.code });
+    await host.match.submitMaze({
+      matchId: created.id,
+      mazeId: await savedMaze(host, "First"),
+    });
+
+    expect(
+      await rejection(
+        host.match.submitMaze({
+          matchId: created.id,
+          mazeId: await savedMaze(host, "Second"),
+        }),
+      ),
+    ).toEqual({ code: "CONFLICT", message: "errors.alreadySubmitted" });
+  });
+
+  it("refuses a submission before anyone has joined", async () => {
+    const host = createCaller(await signedIn());
+    const created = await host.match.create(settings);
+    const mazeId = await savedMaze(host);
+
+    expect(
+      await rejection(host.match.submitMaze({ matchId: created.id, mazeId })),
+    ).toEqual({ code: "CONFLICT", message: "errors.matchNotDrawing" });
+  });
+
+  it("refuses a stranger, indistinguishably from a match that does not exist", async () => {
+    const host = createCaller(await signedIn());
+    const created = await host.match.create(settings);
+    await createCaller(await signedIn()).match.join({ code: created.code });
+    const strangerCtx = await signedIn();
+    const stranger = createCaller(strangerCtx);
+    const theirMaze = await savedMaze(stranger, "Theirs");
+
+    const notMine = await rejection(
+      stranger.match.submitMaze({ matchId: created.id, mazeId: theirMaze }),
+    );
+    const missing = await rejection(
+      stranger.match.submitMaze({
+        matchId: crypto.randomUUID(),
+        mazeId: theirMaze,
+      }),
+    );
+
+    expect(notMine).toEqual({
+      code: "FORBIDDEN",
+      message: "errors.notYourMatch",
+    });
+    expect(missing).toEqual(notMine);
+  });
+
+  it("lets a submitted maze be reused against a different opponent", async () => {
+    const host = createCaller(await signedIn());
+    const first = await host.match.create(settings);
+    await createCaller(await signedIn()).match.join({ code: first.code });
+    const mazeId = await savedMaze(host, "Reused");
+    await host.match.submitMaze({ matchId: first.id, mazeId });
+
+    const second = await host.match.create(settings);
+    await createCaller(await signedIn()).match.join({ code: second.code });
+
+    const result = await host.match.submitMaze({
+      matchId: second.id,
+      mazeId,
+    });
+    expect(result.status).toBe("drawing");
+  });
+
+  it("refuses reuse against an opponent who has already faced that maze", async () => {
+    const host = createCaller(await signedIn());
+    const rivalCtx = await signedIn();
+    const rival = createCaller(rivalCtx);
+
+    const first = await host.match.create(settings);
+    await rival.match.join({ code: first.code });
+    const mazeId = await savedMaze(host, "Seen it");
+    await host.match.submitMaze({ matchId: first.id, mazeId });
+
+    const second = await host.match.create(settings);
+    await rival.match.join({ code: second.code });
+
+    expect(
+      await rejection(host.match.submitMaze({ matchId: second.id, mazeId })),
+    ).toEqual({ code: "CONFLICT", message: "errors.mazeAlreadyFaced" });
+  });
+});
+
+describe("match.eligibleMazes", () => {
+  it("offers only the caller's mazes at the match's settings", async () => {
+    const host = createCaller(await signedIn());
+    const created = await host.match.create(settings);
+    await createCaller(await signedIn()).match.join({ code: created.code });
+
+    const right = await savedMaze(host, "Right size");
+    const wrong = await host.maze.createDraft({
+      name: "Wrong size",
+      cellCount: 64,
+      gateCount: 0,
+    });
+
+    const offered = await host.match.eligibleMazes({ matchId: created.id });
+    const ids = offered.map((m) => m.id);
+    expect(ids).toContain(right);
+    expect(ids).not.toContain(wrong.id);
+  });
+
+  it("omits a maze this opponent has already faced", async () => {
+    const host = createCaller(await signedIn());
+    const rival = createCaller(await signedIn());
+    const first = await host.match.create(settings);
+    await rival.match.join({ code: first.code });
+    const mazeId = await savedMaze(host, "Seen it");
+    await host.match.submitMaze({ matchId: first.id, mazeId });
+
+    const second = await host.match.create(settings);
+    await rival.match.join({ code: second.code });
+
+    const offered = await host.match.eligibleMazes({ matchId: second.id });
+    expect(offered.map((m) => m.id)).not.toContain(mazeId);
   });
 });

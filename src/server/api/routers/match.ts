@@ -1,12 +1,15 @@
 import { TRPCError } from "@trpc/server";
-import { desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, ne, notInArray } from "drizzle-orm";
+import { type NeonQueryResultHKT } from "drizzle-orm/neon-serverless";
+import { type PgDatabase } from "drizzle-orm/pg-core";
 import { z } from "zod";
 
 import { deadlineFor, makeCode, matchCodeSchema } from "~/match";
-import { CELL_COUNT_PRESETS, MAX_GATES } from "~/maze";
+import { CELL_COUNT_PRESETS, MAX_GATES, validateMaze } from "~/maze";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { type db } from "~/server/db";
-import { match, matchPlayer, user } from "~/server/db/schema";
+import { match, matchPlayer, maze, user } from "~/server/db/schema";
+import type * as schema from "~/server/db/schema";
 import {
   situationFor,
   type MatchRow,
@@ -44,6 +47,48 @@ async function participantRows(tx: typeof db, matchId: string, userId: string) {
  */
 function notYours(): never {
   throw new TRPCError({ code: "FORBIDDEN", message: "errors.notYourMatch" });
+}
+
+/**
+ * Both the pooled client and an open transaction on it satisfy this —
+ * `eligibleMazes` reads outside a transaction, `submitMaze` reuses the same
+ * check inside one, and both need to pass it to `mazesFacedBy`.
+ */
+type DbClient = PgDatabase<NeonQueryResultHKT, typeof schema>;
+
+/**
+ * Every maze of this author that the opponent has already faced in some
+ * other match. Rule 4 of §6: reuse is what makes the library worth having,
+ * but not against someone who has already walked the maze.
+ */
+async function mazesFacedBy(
+  db: DbClient,
+  opponentId: string | null,
+  exceptMatchId: string,
+): Promise<string[]> {
+  if (!opponentId) return [];
+
+  const theirMatches = await db
+    .select({ matchId: matchPlayer.matchId })
+    .from(matchPlayer)
+    .where(eq(matchPlayer.userId, opponentId));
+
+  const ids = theirMatches
+    .map((m) => m.matchId)
+    .filter((id) => id !== exceptMatchId);
+  if (ids.length === 0) return [];
+
+  const faced = await db
+    .select({ mazeId: matchPlayer.mazeId })
+    .from(matchPlayer)
+    .where(
+      and(
+        inArray(matchPlayer.matchId, ids),
+        ne(matchPlayer.userId, opponentId),
+      ),
+    );
+
+  return faced.map((f) => f.mazeId).filter((id): id is string => id !== null);
 }
 
 export const matchRouter = createTRPCRouter({
@@ -253,4 +298,172 @@ export const matchRouter = createTRPCRouter({
       )
       .orderBy(desc(match.createdAt));
   }),
+
+  eligibleMazes: protectedProcedure
+    .input(z.object({ matchId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const found = await participantRows(
+        ctx.db,
+        input.matchId,
+        ctx.session.user.id,
+      );
+      if (!found) notYours();
+      const { row, players } = found;
+
+      const opponentId =
+        players.find((p) => p.userId !== ctx.session.user.id)?.userId ?? null;
+      const faced = await mazesFacedBy(ctx.db, opponentId, row.id);
+
+      const conditions = [
+        eq(maze.authorId, ctx.session.user.id),
+        eq(maze.cellCount, row.cellCount),
+        eq(maze.gateCount, row.gateCount),
+      ];
+      if (faced.length > 0) conditions.push(notInArray(maze.id, faced));
+
+      return ctx.db
+        .select({
+          id: maze.id,
+          name: maze.name,
+          status: maze.status,
+          updatedAt: maze.updatedAt,
+        })
+        .from(maze)
+        .where(and(...conditions))
+        .orderBy(desc(maze.updatedAt));
+    }),
+
+  submitMaze: protectedProcedure
+    .input(z.object({ matchId: z.string(), mazeId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const now = new Date();
+
+      return ctx.db.transaction(async (tx) => {
+        const [row] = await tx
+          .select()
+          .from(match)
+          .where(eq(match.id, input.matchId));
+        const players = row
+          ? await tx
+              .select()
+              .from(matchPlayer)
+              .where(eq(matchPlayer.matchId, row.id))
+          : [];
+        if (!row || !players.some((p) => p.userId === ctx.session.user.id)) {
+          notYours();
+        }
+
+        const you = players.find((p) => p.userId === ctx.session.user.id)!;
+        const them = players.find((p) => p.userId !== ctx.session.user.id);
+
+        if (row.status !== "drawing") {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "errors.matchNotDrawing",
+          });
+        }
+        if (now.getTime() >= row.deadlineAt.getTime()) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "errors.matchExpired",
+          });
+        }
+        if (you.submittedAt !== null) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "errors.alreadySubmitted",
+          });
+        }
+
+        const [mazeRow] = await tx
+          .select()
+          .from(maze)
+          .where(
+            and(
+              eq(maze.id, input.mazeId),
+              eq(maze.authorId, ctx.session.user.id),
+            ),
+          );
+        // Not yours and not there are the same answer, exactly as the maze
+        // router already treats them.
+        if (!mazeRow) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "errors.notYourMaze",
+          });
+        }
+
+        if (
+          mazeRow.cellCount !== row.cellCount ||
+          mazeRow.gateCount !== row.gateCount
+        ) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "errors.mazeSettingsMismatch",
+          });
+        }
+
+        const faced = await mazesFacedBy(tx, them?.userId ?? null, row.id);
+        if (faced.includes(mazeRow.id)) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "errors.mazeAlreadyFaced",
+          });
+        }
+
+        // The server's verdict is the only one that counts (§4). A maze
+        // already marked submitted was validated on its way in, but
+        // re-running it costs one BFS and removes the assumption.
+        const validation = validateMaze(mazeRow.data, {
+          cellCount: row.cellCount,
+          gateCount: row.gateCount,
+        });
+        if (!validation.ok) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "errors.mazeInvalid",
+          });
+        }
+
+        await tx
+          .update(maze)
+          .set({
+            status: "submitted",
+            contentHash: validation.contentHash,
+            optimalMoves: validation.optimalMoves,
+          })
+          .where(eq(maze.id, mazeRow.id));
+
+        await tx
+          .update(matchPlayer)
+          .set({ mazeId: mazeRow.id, submittedAt: now })
+          .where(
+            and(
+              eq(matchPlayer.matchId, row.id),
+              eq(matchPlayer.userId, ctx.session.user.id),
+            ),
+          );
+
+        const seated = players.map((p) =>
+          p.userId === ctx.session.user.id
+            ? { ...p, mazeId: mazeRow.id, submittedAt: now }
+            : p,
+        );
+        const bothIn =
+          seated.length === 2 && seated.every((p) => p.submittedAt !== null);
+        const status = bothIn ? ("running" as const) : row.status;
+        const next = { ...row, status, lastActivityAt: now };
+
+        await tx
+          .update(match)
+          .set({
+            status,
+            lastActivityAt: now,
+            deadlineAt: deadlineFor(situationFor(next, seated))!,
+          })
+          .where(eq(match.id, row.id));
+
+        return { status };
+      });
+    }),
 });
