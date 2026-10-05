@@ -7,7 +7,6 @@ import { z } from "zod";
 import { deadlineFor, makeCode, matchCodeSchema } from "~/match";
 import { CELL_COUNT_PRESETS, MAX_GATES, validateMaze } from "~/maze";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { type db } from "~/server/db";
 import { match, matchPlayer, maze, user } from "~/server/db/schema";
 import type * as schema from "~/server/db/schema";
 import {
@@ -28,8 +27,20 @@ const settingsInput = z.object({
   gateCount: z.number().int().min(0).max(MAX_GATES),
 });
 
+/**
+ * Both the pooled client and an open transaction on it satisfy this. Every
+ * helper below that takes a database handle is called both outside a
+ * transaction (the query procedures) and inside one (`submitMaze`'s
+ * read-check-write), so each takes this rather than `typeof db` — which a
+ * transaction object does not structurally match (it lacks `$client`).
+ * Defined here, in the one file that currently has helpers needing it; a
+ * second router with the same need would be the signal to move it to
+ * `~/server/db`.
+ */
+type DbClient = PgDatabase<NeonQueryResultHKT, typeof schema>;
+
 /** Every read of a match the caller must be part of. */
-async function participantRows(tx: typeof db, matchId: string, userId: string) {
+async function participantRows(tx: DbClient, matchId: string, userId: string) {
   const [row] = await tx.select().from(match).where(eq(match.id, matchId));
   if (!row) return null;
   const players = await tx
@@ -48,13 +59,6 @@ async function participantRows(tx: typeof db, matchId: string, userId: string) {
 function notYours(): never {
   throw new TRPCError({ code: "FORBIDDEN", message: "errors.notYourMatch" });
 }
-
-/**
- * Both the pooled client and an open transaction on it satisfy this —
- * `eligibleMazes` reads outside a transaction, `submitMaze` reuses the same
- * check inside one, and both need to pass it to `mazesFacedBy`.
- */
-type DbClient = PgDatabase<NeonQueryResultHKT, typeof schema>;
 
 /**
  * Every maze of this author that the opponent has already faced in some
@@ -339,19 +343,13 @@ export const matchRouter = createTRPCRouter({
       const now = new Date();
 
       return ctx.db.transaction(async (tx) => {
-        const [row] = await tx
-          .select()
-          .from(match)
-          .where(eq(match.id, input.matchId));
-        const players = row
-          ? await tx
-              .select()
-              .from(matchPlayer)
-              .where(eq(matchPlayer.matchId, row.id))
-          : [];
-        if (!row || !players.some((p) => p.userId === ctx.session.user.id)) {
-          notYours();
-        }
+        const found = await participantRows(
+          tx,
+          input.matchId,
+          ctx.session.user.id,
+        );
+        if (!found) notYours();
+        const { row, players } = found;
 
         const you = players.find((p) => p.userId === ctx.session.user.id)!;
         const them = players.find((p) => p.userId !== ctx.session.user.id);

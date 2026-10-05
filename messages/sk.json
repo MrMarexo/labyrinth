@@ -48,7 +48,7 @@
     "matchExpired": "Platnosť tohto zápasu vypršala.",
     "alreadyInMatch": "V tomto zápase už ste.",
     "mazeInvalid": "Toto bludisko sa ešte nedá hrať.",
-    "mazeSettingsMismatch": "Toto bludisko nemá veľkosť podľa tohto zápasu.",
+    "mazeSettingsMismatch": "Veľkosť tohto bludiska nezodpovedá tomuto zápasu.",
     "mazeAlreadyFaced": "Váš súper toto bludisko už hral.",
     "alreadySubmitted": "Bludisko ste už odoslali.",
     "matchNotDrawing": "Tento zápas už bludiská neprijíma."
