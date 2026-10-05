@@ -401,6 +401,7 @@ awaiting_opponent → drawing → running → complete
 | One submitted a maze, the other has not | 24h from that submission | `abandoned`, no winner; recorded against the player who did not draw |
 | Both submitted, neither has made a single move | 24h from the runs unlocking | `abandoned`, no winner |
 | Both have moved, neither has finished | 48h since the last move by either | `abandoned`, no winner |
+| One has moved, the other has not | 24h from the later of the mover's last move and the unlocking | `abandoned`, no winner; recorded against the player who never moved |
 | One found the treasure, the other has not | 24h from that finish | `complete`; the non-finisher loses, the finisher wins |
 
 Two principles hold this together, and they resolve every case above.
@@ -416,6 +417,14 @@ not put an unearned win on the other player's record.
 **Nothing expires while both players are still engaged.** Every deadline is
 anchored to the last thing that actually happened, so an active match is never
 timed out from under anyone.
+
+The one-moved row was missing from the first draft of this table and was added
+during Phase 3, when an implementer noticed the gap. The two principles above
+settle it between them: a player who is moving **is** engaged, so the clock must
+follow their last move rather than the unlocking, and the player who has not
+started is the one it is running against. Without that row the implementation
+fell through to "neither has moved", which would abandon an actively-playing
+match at a fixed 24h from the unlocking and record fault against nobody.
 
 A scheduled sweep evaluates these, so a stale match closes on its own rather
 than waiting for someone to open it.
@@ -517,6 +526,15 @@ tests by code rather than by copy:
 `MazeInvalid`, `MatchExpired`, `MatchFull`, `NotAParticipant`,
 `RunNotUnlocked`, `RunAlreadyFinished`, `Forbidden`.
 
+That list was written before any of it existed and proved too coarse. Phase 3
+shipped eleven keys, because the cases a person needs told apart are finer than
+the classes above: a code nobody recognises is not the same message as a match
+that is already full, and "this labyrinth is the wrong size for this match" is
+not the same as "this labyrinth is not playable yet". The rule that matters is
+not the length of the list but that **every error is a key, translated in both
+locales, and assertable by code rather than by copy** — keep that, and add keys
+as the cases earn them.
+
 ## 12. Testing
 
 Weighted toward the part worth testing.
@@ -537,8 +555,13 @@ would.
 branch per CI run — instant, disposable, no Docker, and the same engine as
 production rather than an approximation.
 
-The deadline rules in §9.1 get their own table-driven suite here, one case per
-row, with the clock injected rather than slept through. Six rules with
+The deadline rules in §9.1 get their own table-driven suite, one case per row,
+with the clock injected rather than slept through. Phase 3 built it as a **unit**
+suite rather than an integration one, which is better than what this section
+originally said: the rules are pure functions over timestamps and do not need
+Postgres to exercise them. The integration layer separately asserts that the
+stored `deadlineAt` column agrees with what the function computes, which is the
+part that genuinely needs a database. Six rules with
 different anchors and two different durations is exactly the kind of thing that
 quietly rots, and the one that matters most — a forfeit never producing a winner
 who did not reach the treasure — is asserted directly rather than inferred.
