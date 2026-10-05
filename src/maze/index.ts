@@ -9,6 +9,7 @@ import {
 } from "./validate";
 
 export * from "./draft";
+export * from "./editor-state";
 export * from "./format";
 export * from "./geometry";
 export * from "./normalize";
