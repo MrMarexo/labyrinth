@@ -812,7 +812,7 @@ pnpm db:migrate
 
 Commit the generated SQL **and** the `drizzle/meta` changes. Do not hand-write migration SQL. Do not run `db:push`.
 
-Read the generated SQL before committing it and confirm it matches the schema file column for column — types, nullability, defaults, the two indexes, the composite primary key, and all four foreign keys with their `onDelete` behaviour. A schema file and a migration that disagree is a production defect no test in this repo catches.
+Read the generated SQL before committing it and confirm it matches the schema file column for column — types, nullability, defaults, the two indexes, the composite primary key, and all five foreign keys with their `onDelete` behaviour. A schema file and a migration that disagree is a production defect no test in this repo catches.
 
 - [ ] **Step 3: Add the message keys to both catalogues**
 
@@ -1365,9 +1365,13 @@ export const matchRouter = createTRPCRouter({
         winnerId: row.winnerId,
         endReason: row.endReason,
         you: {
-          // Your own maze id is yours to know — it is what the editor link
-          // points at.
-          mazeId: you.mazeId,
+          // Corrected during execution: this previously returned
+          // `mazeId: you.mazeId`, which contradicted this task's own test
+          // asserting the serialised view contains no `mazeId` anywhere.
+          // Your own id is not a secret from you, but nothing in Phase 3
+          // needs it — the picker already knows the ids it offers — and a
+          // blanket "no mazeId on this payload" is a boundary that cannot be
+          // weakened by accident. Add it back when a caller wants it.
           hasSubmitted: you.submittedAt !== null,
           hasForfeited: you.forfeitedAt !== null,
         },
@@ -1419,7 +1423,7 @@ In `src/server/api/root.ts`, import `matchRouter` from `~/server/api/routers/mat
 - [ ] **Step 8: Run the integration tests**
 
 Run: `pnpm test:integration tests/integration/match-router.test.ts`
-Expected: PASS, 17 tests.
+Expected: PASS, 18 tests.
 
 - [ ] **Step 9: Break it and watch it fail**
 
