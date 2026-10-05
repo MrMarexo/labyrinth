@@ -58,8 +58,17 @@ describe("applyMove", () => {
 
   it("picks up a key and reveals it", () => {
     const withKey: Maze = {
-      ...pair(),
-      segments: [{ o: "H", x: 0, y: 0, kind: "gate", gate: 2 }],
+      version: 1,
+      cells: [
+        { x: 0, y: 0 },
+        { x: 1, y: 0 },
+        { x: 2, y: 0 },
+      ],
+      start: { x: 0, y: 0 },
+      treasure: { x: 2, y: 0 },
+      // The gate gives the key a reason to exist; the move under test never
+      // reaches it.
+      segments: [{ o: "V", x: 1, y: 0, kind: "gate", gate: 2 }],
       keys: [{ gate: 2, x: 1, y: 0 }],
     };
     const { state, delta, outcome } = applyMove(

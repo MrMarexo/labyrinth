@@ -111,22 +111,24 @@ export function applyMove(
     finished: isTreasure,
   };
 
-  // A key on the treasure cell is not something the structural validator
-  // permits in a real maze, but the reducer does not validate its input, so
-  // the ordering must still be a deliberate choice: picking up the key is
-  // reported as the move's outcome, while reaching the treasure cell ends
-  // the run regardless of which outcome label it was reported under.
-  const outcome: ServerOutcome = keyHere
-    ? "moved_found_key"
-    : isTreasure
-      ? "moved_found_treasure"
+  // Treasure wins the priority order: landing on it ends the run, and
+  // reporting "you found a key" at the moment the run finished would be the
+  // wrong thing to tell the client. A key sharing the treasure cell is
+  // rejected upstream by validateStructure (maze.validate.cellHoldsTwoThings),
+  // so this ordering is never actually observable in a valid maze — but the
+  // reducer does not itself validate, so the order is still a deliberate
+  // choice rather than an accident of iteration.
+  const outcome: ServerOutcome = isTreasure
+    ? "moved_found_treasure"
+    : keyHere
+      ? "moved_found_key"
       : throughGate
         ? "moved_through_gate"
         : "moved";
 
   const revealedCell: RevealedCell = { x: destination.x, y: destination.y };
+  if (isTreasure) revealedCell.treasure = true;
   if (keyHere) revealedCell.key = keyHere.gate;
-  else if (isTreasure) revealedCell.treasure = true;
 
   return {
     state: next,
