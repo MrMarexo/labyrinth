@@ -46,6 +46,18 @@
     "title": "Vaše hry",
     "empty": "Zatiaľ žiadne hry."
   },
+  "labyrinths": {
+    "title": "Vaše bludiská",
+    "new": "Nové bludisko",
+    "name": "Názov",
+    "squares": "Políčka",
+    "gates": "Brány",
+    "create": "Vytvoriť",
+    "empty": "Zatiaľ ste nenakreslili žiadne bludisko.",
+    "summary": "{squares} políčok, {gates} brán",
+    "delete": "Zmazať {name}",
+    "deleteShort": "Zmazať"
+  },
   "maze": {
     "format": {
       "coordinateNotAnInteger": "Súradnica musí byť celé číslo.",

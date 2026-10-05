@@ -46,6 +46,18 @@
     "title": "Your games",
     "empty": "No games yet."
   },
+  "labyrinths": {
+    "title": "Your labyrinths",
+    "new": "New labyrinth",
+    "name": "Name",
+    "squares": "Squares",
+    "gates": "Gates",
+    "create": "Create",
+    "empty": "You have not drawn any labyrinths yet.",
+    "summary": "{squares} squares, {gates} gates",
+    "delete": "Delete {name}",
+    "deleteShort": "Delete"
+  },
   "maze": {
     "format": {
       "coordinateNotAnInteger": "A coordinate must be a whole number.",
