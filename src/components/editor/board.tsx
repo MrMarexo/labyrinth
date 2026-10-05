@@ -69,8 +69,10 @@ export function Board({ draft, onCell, onEdge, edgesActive }: BoardProps) {
   const segmentAt = new Map(draft.segments.map((s) => [edgeKey(s), s]));
 
   // Roving tabindex: cells and edges are each their own focus group, so Tab
-  // visits the grid once per group instead of once per square. Arrow keys
-  // move the live tab stop within a group; a group that is not in the DOM
+  // visits the grid once per group instead of once per square. The live stop
+  // is whichever target last fired `onFocus` — a click, an arrow move, and a
+  // Tab landing all go through the same DOM focus event, so none of them can
+  // leave the stored stop pointing somewhere else. A group not in the DOM
   // (edges when `edgesActive` is false) contributes no stops at all.
   const [focusedCell, setFocusedCell] = useState<Point>({ x: 0, y: 0 });
   const [focusedEdgeIndex, setFocusedEdgeIndex] = useState(0);
@@ -84,10 +86,13 @@ export function Board({ draft, onCell, onEdge, edgesActive }: BoardProps) {
     if (edgesActive) setFocusedEdgeIndex(0);
   }, [edgesActive]);
 
+  // The live tab stop is set from `onFocus`, not from here — that covers a
+  // click or a programmatic focus the same way it covers an arrow move,
+  // instead of three places independently deciding whose turn tabIndex={0}
+  // is next.
   function moveCellFocus(dx: number, dy: number, from: Point) {
     const next = { x: from.x + dx, y: from.y + dy };
     if (next.x < 0 || next.x >= FRAME || next.y < 0 || next.y >= FRAME) return;
-    setFocusedCell(next);
     cellRefs.current.get(cellKey(next))?.focus();
   }
 
@@ -119,10 +124,11 @@ export function Board({ draft, onCell, onEdge, edgesActive }: BoardProps) {
     }
   }
 
+  // Same reasoning as `moveCellFocus`: this only moves DOM focus, and lets
+  // the target's own `onFocus` record it as the live stop.
   function moveEdgeFocus(delta: number) {
     const next = focusedEdgeIndex + delta;
     if (next < 0 || next >= ALL_EDGES.length) return;
-    setFocusedEdgeIndex(next);
     edgeRefs.current.get(edgeKey(ALL_EDGES[next]!))?.focus();
   }
 
@@ -208,6 +214,7 @@ export function Board({ draft, onCell, onEdge, edgesActive }: BoardProps) {
             strokeWidth={1}
             onClick={() => onCell(at)}
             onKeyDown={(event) => handleCellKeyDown(event, at)}
+            onFocus={() => setFocusedCell(at)}
           />
         );
       })}
@@ -303,6 +310,7 @@ export function Board({ draft, onCell, onEdge, edgesActive }: BoardProps) {
               fill="transparent"
               onClick={() => onEdge(edge)}
               onKeyDown={(event) => handleEdgeKeyDown(event, edge)}
+              onFocus={() => setFocusedEdgeIndex(index)}
             />
           );
         })}
