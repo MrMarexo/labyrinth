@@ -26,7 +26,11 @@ export default defineConfig({
     // Set here rather than inherited from .env: BETTER_AUTH_URL is optional
     // there, and without a loopback value the guard in src/server/auth keeps
     // rate limiting on and the run fails confusingly.
-    env: { BETTER_AUTH_URL: baseURL, E2E_DISABLE_RATE_LIMIT: "true" },
+    env: {
+      BETTER_AUTH_URL: baseURL,
+      E2E_DISABLE_RATE_LIMIT: "true",
+      E2E_TEST_SUPPORT: "true",
+    },
     url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,

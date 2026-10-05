@@ -18,6 +18,12 @@ export const env = createEnv({
     // production rate limiter, which a full desktop+mobile run trips from a
     // shared loopback IP. Guarded again at the call site by `!process.env.VERCEL`.
     E2E_DISABLE_RATE_LIMIT: z.enum(["true", "false"]).default("false"),
+    // Playwright-only: exposes `testSupport.seedMaze`, which writes real
+    // maze rows as the caller. Guarded again at the call site by
+    // `!process.env.VERCEL`, and the router logs a warning at boot if it is
+    // ever on, because the only correct value outside a local e2e run is
+    // "false".
+    E2E_TEST_SUPPORT: z.enum(["true", "false"]).default("false"),
     NODE_ENV: z
       .enum(["development", "test", "production"])
       .default("development"),
@@ -42,6 +48,7 @@ export const env = createEnv({
     BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET,
     BETTER_AUTH_URL: process.env.BETTER_AUTH_URL,
     E2E_DISABLE_RATE_LIMIT: process.env.E2E_DISABLE_RATE_LIMIT,
+    E2E_TEST_SUPPORT: process.env.E2E_TEST_SUPPORT,
     NODE_ENV: process.env.NODE_ENV,
     // NEXT_PUBLIC_CLIENTVAR: process.env.NEXT_PUBLIC_CLIENTVAR,
   },

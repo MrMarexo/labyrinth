@@ -1,17 +1,25 @@
 import { matchRouter } from "~/server/api/routers/match";
 import { mazeRouter } from "~/server/api/routers/maze";
 import { profileRouter } from "~/server/api/routers/profile";
+import { testSupportRouter } from "~/server/api/routers/test-support";
 import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
 
 /**
  * This is the primary router for your server.
  *
  * All routers added in /api/routers should be manually added here.
+ *
+ * `testSupport` is mounted unconditionally in every environment — it refuses
+ * at call time (see `src/server/api/routers/test-support.ts`) rather than
+ * being left out of the router, because mounting it conditionally would
+ * change `AppRouter`'s inferred type between environments and break the
+ * client's typing.
  */
 export const appRouter = createTRPCRouter({
   profile: profileRouter,
   maze: mazeRouter,
   match: matchRouter,
+  testSupport: testSupportRouter,
 });
 
 // export type definition of API
