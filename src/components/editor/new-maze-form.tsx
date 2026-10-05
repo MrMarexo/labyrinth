@@ -3,17 +3,22 @@
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 
+import { resolveErrorKey } from "~/lib/resolve-error-key";
 import { CELL_COUNT_PRESETS, MAX_GATES } from "~/maze";
 import { useRouter } from "~/i18n/navigation";
 import { api } from "~/trpc/react";
 
 export function NewMazeForm() {
   const t = useTranslations("labyrinths");
+  const te = useTranslations();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const create = api.maze.createDraft.useMutation({
     onSuccess: ({ id }) => router.push(`/labyrinths/${id}`),
   });
+  const createError = create.isError
+    ? resolveErrorKey(te, create.error, "errors.unknown")
+    : null;
 
   if (!open) {
     return (
@@ -77,6 +82,12 @@ export function NewMazeForm() {
           className="border-border-strong bg-bg w-full rounded border px-3 py-2"
         />
       </label>
+
+      {createError && (
+        <p role="alert" data-create-error className="text-danger text-sm">
+          {te(createError.key as never, createError.params as never)}
+        </p>
+      )}
 
       <button
         type="submit"

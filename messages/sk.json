@@ -56,7 +56,11 @@
     "empty": "Zatiaľ ste nenakreslili žiadne bludisko.",
     "summary": "{squares} políčok, {gates} brán",
     "delete": "Zmazať {name}",
-    "deleteShort": "Zmazať"
+    "deleteShort": "Zmazať",
+    "confirmDelete": "Potvrdiť zmazanie {name}",
+    "confirmDeleteShort": "Potvrdiť",
+    "deleteCancel": "Zrušiť",
+    "deleting": "Maže sa…"
   },
   "maze": {
     "format": {

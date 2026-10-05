@@ -56,7 +56,11 @@
     "empty": "You have not drawn any labyrinths yet.",
     "summary": "{squares} squares, {gates} gates",
     "delete": "Delete {name}",
-    "deleteShort": "Delete"
+    "deleteShort": "Delete",
+    "confirmDelete": "Confirm delete {name}",
+    "confirmDeleteShort": "Confirm",
+    "deleteCancel": "Cancel",
+    "deleting": "Deleting…"
   },
   "maze": {
     "format": {
