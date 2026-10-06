@@ -5,20 +5,30 @@ import { useState } from "react";
 
 import { MazePicker } from "~/components/match/maze-picker";
 import { resolveErrorKey } from "~/lib/resolve-error-key";
-import { api } from "~/trpc/react";
+import { isTerminal } from "~/match";
+import { api, type RouterOutputs } from "~/trpc/react";
 
 export type MatchLobbyProps = {
   matchId: string;
+  // Fetched server-side as the page's own 404 check (a match that does not
+  // exist and one the caller is not in look identical — see
+  // `matches/[id]/page.tsx`). Seeding `useQuery` with it means this
+  // component never renders `null` waiting on a fetch the server already
+  // did, and the browser never repeats that round trip.
+  initialData: RouterOutputs["match"]["get"];
 };
 
-export function MatchLobby({ matchId }: MatchLobbyProps) {
+export function MatchLobby({ matchId, initialData }: MatchLobbyProps) {
   const t = useTranslations("lobby");
   const tm = useTranslations("matches");
   const te = useTranslations();
   const format = useFormatter();
   const utils = api.useUtils();
 
-  const { data, isPending } = api.match.get.useQuery({ id: matchId });
+  const { data, isPending } = api.match.get.useQuery(
+    { id: matchId },
+    { initialData },
+  );
   // Same query key `MazePicker` reads below, so once the picker is showing
   // this is a cache read, not a second request — it exists here only to
   // look up the chosen maze's name for the confirmation sentence. Gated on
@@ -83,14 +93,16 @@ export function MatchLobby({ matchId }: MatchLobbyProps) {
         data-opponent-submitted={String(data.opponent?.hasSubmitted ?? false)}
       />
 
-      <p className="text-muted text-sm">
-        {t("deadline", {
-          when: format.dateTime(data.deadlineAt, {
-            dateStyle: "medium",
-            timeStyle: "short",
-          }),
-        })}
-      </p>
+      {!isTerminal(data.status) && (
+        <p className="text-muted text-sm">
+          {t("deadline", {
+            when: format.dateTime(data.deadlineAt, {
+              dateStyle: "medium",
+              timeStyle: "short",
+            }),
+          })}
+        </p>
+      )}
 
       {data.status === "drawing" && !data.you.hasSubmitted && (
         <div className="space-y-3">
