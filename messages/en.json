@@ -80,7 +80,7 @@
     "empty": "You have no matches yet. Create one, or join a friend's with their code.",
     "createHeading": "Start a match",
     "size": "Size",
-    "sizeOption": "{cells} squares",
+    "sizeOption": "{cells, plural, one {# square} other {# squares}}",
     "gates": "Gates",
     "create": "Create match",
     "creating": "Creating…",
@@ -96,7 +96,7 @@
     "statusRunning": "Running",
     "statusComplete": "Finished",
     "statusAbandoned": "Abandoned",
-    "sizeAndGates": "{cells} squares, {gates} gates"
+    "sizeAndGates": "{cells, plural, one {# square} other {# squares}}, {gates, plural, one {# gate} other {# gates}}"
   },
   "maze": {
     "format": {

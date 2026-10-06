@@ -80,7 +80,7 @@
     "empty": "Zatiaľ nemáte žiadne zápasy. Vytvorte si jeden alebo sa pripojte ku kamarátovi pomocou jeho kódu.",
     "createHeading": "Založiť zápas",
     "size": "Veľkosť",
-    "sizeOption": "{cells} políčok",
+    "sizeOption": "{cells, plural, one {# políčko} few {# políčka} other {# políčok}}",
     "gates": "Brány",
     "create": "Vytvoriť zápas",
     "creating": "Vytvára sa…",
@@ -96,7 +96,7 @@
     "statusRunning": "Prebieha",
     "statusComplete": "Dokončený",
     "statusAbandoned": "Opustený",
-    "sizeAndGates": "{cells} políčok, {gates} brán"
+    "sizeAndGates": "{cells, plural, one {# políčko} few {# políčka} other {# políčok}}, {gates, plural, one {# brána} few {# brány} other {# brán}}"
   },
   "maze": {
     "format": {
