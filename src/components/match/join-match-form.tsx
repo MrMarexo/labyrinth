@@ -12,8 +12,12 @@ export function JoinMatchForm() {
   const te = useTranslations();
   const router = useRouter();
 
+  const utils = api.useUtils();
   const join = api.match.join.useMutation({
-    onSuccess: ({ id }) => router.push(`/matches/${id}`),
+    onSuccess: ({ id }) => {
+      void utils.match.list.invalidate();
+      router.push(`/matches/${id}`);
+    },
   });
   const joinError = join.isError
     ? resolveErrorKey(te, join.error, "errors.unknown")

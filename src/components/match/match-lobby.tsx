@@ -46,6 +46,7 @@ export function MatchLobby({ matchId, initialData }: MatchLobbyProps) {
     onSuccess: () => {
       setConfirming(false);
       void utils.match.get.invalidate({ id: matchId });
+      void utils.match.list.invalidate();
     },
   });
   const submitError = submit.isError
