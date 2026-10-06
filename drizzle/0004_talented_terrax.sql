@@ -1,0 +1,1 @@
+ALTER TABLE "match" ADD CONSTRAINT "match_winner_requires_win" CHECK ("match"."winner_id" IS NULL OR "match"."end_reason" IN ('finished', 'forfeit'));

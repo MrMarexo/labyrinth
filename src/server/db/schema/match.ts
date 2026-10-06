@@ -1,4 +1,6 @@
+import { sql } from "drizzle-orm";
 import {
+  check,
   index,
   integer,
   pgTable,
@@ -23,6 +25,11 @@ import { maze } from "./maze";
  * from `match_player` (the later of the two `joinedAt`s, and the later of the
  * two `submittedAt`s), and a denormalised copy of a derivable timestamp is a
  * second source of truth waiting to disagree with the first.
+ *
+ * The `match_winner_requires_win` check is the actual enforcement of that
+ * rule: until Phase 4 adds its first non-sweep writer of `winnerId`, the
+ * rule only held because `sweepExpiredMatches` happened to be the one
+ * writer and happened to be correct.
  */
 export const match = pgTable(
   "match",
@@ -50,6 +57,13 @@ export const match = pgTable(
   (table) => [
     // The sweep's only query: open matches whose deadline has passed.
     index("match_sweep_idx").on(table.status, table.deadlineAt),
+    // You cannot win without finding the treasure: a winner is only legal
+    // on a match that actually ended in a win, not one the sweep merely
+    // gave up on.
+    check(
+      "match_winner_requires_win",
+      sql`${table.winnerId} IS NULL OR ${table.endReason} IN ('finished', 'forfeit')`,
+    ),
   ],
 );
 
