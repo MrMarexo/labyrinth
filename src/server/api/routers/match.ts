@@ -1,10 +1,15 @@
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq, inArray, ne, notInArray } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, ne, notInArray } from "drizzle-orm";
 import { type NeonQueryResultHKT } from "drizzle-orm/neon-serverless";
 import { type PgDatabase } from "drizzle-orm/pg-core";
 import { z } from "zod";
 
-import { deadlineFor, makeCode, matchCodeSchema } from "~/match";
+import {
+  deadlineFor,
+  makeCode,
+  matchCodeSchema,
+  type MatchStatus,
+} from "~/match";
 import { CELL_COUNT_PRESETS, MAX_GATES, validateMaze } from "~/maze";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { match, matchPlayer, maze, user } from "~/server/db/schema";
@@ -60,10 +65,16 @@ function notYours(): never {
   throw new TRPCError({ code: "FORBIDDEN", message: "errors.notYourMatch" });
 }
 
+/** Match statuses at which the opponent could actually have seen a maze. */
+const FACED_STATUSES: MatchStatus[] = ["running", "complete"];
+
 /**
  * Every maze of this author that the opponent has already faced in some
  * other match. Rule 4 of §6: reuse is what makes the library worth having,
- * but not against someone who has already walked the maze.
+ * but not against someone who has already walked the maze — which requires
+ * that match to have actually reached `running`. A match still stuck in
+ * `drawing` (including one the sweep later abandons there) never exposed
+ * the maze to anyone, so it does not count.
  */
 async function mazesFacedBy(
   db: DbClient,
@@ -75,7 +86,13 @@ async function mazesFacedBy(
   const theirMatches = await db
     .select({ matchId: matchPlayer.matchId })
     .from(matchPlayer)
-    .where(eq(matchPlayer.userId, opponentId));
+    .innerJoin(match, eq(match.id, matchPlayer.matchId))
+    .where(
+      and(
+        eq(matchPlayer.userId, opponentId),
+        inArray(match.status, FACED_STATUSES),
+      ),
+    );
 
   const ids = theirMatches
     .map((m) => m.matchId)
@@ -248,7 +265,7 @@ export const matchRouter = createTRPCRouter({
         ? await ctx.db
             .select({ id: user.id, name: user.name })
             .from(user)
-            .where(inArray(user.id, [them.userId]))
+            .where(eq(user.id, them.userId))
         : [];
 
       return {
@@ -322,6 +339,11 @@ export const matchRouter = createTRPCRouter({
         eq(maze.authorId, ctx.session.user.id),
         eq(maze.cellCount, row.cellCount),
         eq(maze.gateCount, row.gateCount),
+        // `contentHash` is only ever set by `saveDraft` once the maze
+        // validates at these exact settings — a half-drawn draft has none,
+        // so this is exactly the predicate that keeps `submitMaze` from
+        // rejecting a choice the picker just offered as valid.
+        isNotNull(maze.contentHash),
       ];
       if (faced.length > 0) conditions.push(notInArray(maze.id, faced));
 

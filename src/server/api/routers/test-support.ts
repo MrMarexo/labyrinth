@@ -96,6 +96,15 @@ export const testSupportRouter = createTRPCRouter({
           cellCount: input.cellCount,
           gateCount: input.gateCount,
           data,
+          // `saveDraft` only ever sets these once `validateMaze` passes —
+          // and `match.eligibleMazes` filters on `contentHash` being set
+          // (a half-drawn draft has none) to keep the picker from ever
+          // offering a maze `submitMaze` would reject. This seed already
+          // validated above, so it must carry the same two columns a real
+          // save would, or every e2e spec that seeds a maze and then picks
+          // it in the lobby sees an empty picker.
+          contentHash: validation.contentHash,
+          optimalMoves: validation.optimalMoves,
         })
         .returning({ id: maze.id });
 

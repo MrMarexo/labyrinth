@@ -7,6 +7,7 @@ import { createTRPCContext } from "~/server/api/trpc";
 import { auth } from "~/server/auth";
 import { db } from "~/server/db";
 import { match, matchPlayer, maze } from "~/server/db/schema";
+import { sweepExpiredMatches } from "~/server/match/sweep";
 
 import {
   SOLVABLE_MAZE_CELL_COUNT,
@@ -476,6 +477,22 @@ describe("match.submitMaze", () => {
     ).toEqual({ code: "CONFLICT", message: "errors.matchNotDrawing" });
   });
 
+  it("refuses a submission once the match's deadline has already passed", async () => {
+    const host = createCaller(await signedIn());
+    const created = await host.match.create(settings);
+    await createCaller(await signedIn()).match.join({ code: created.code });
+    const mazeId = await savedMaze(host);
+
+    await db
+      .update(match)
+      .set({ deadlineAt: new Date(Date.now() - 1000) })
+      .where(eq(match.id, created.id));
+
+    expect(
+      await rejection(host.match.submitMaze({ matchId: created.id, mazeId })),
+    ).toEqual({ code: "CONFLICT", message: "errors.matchExpired" });
+  });
+
   it("refuses a stranger, indistinguishably from a match that does not exist", async () => {
     const host = createCaller(await signedIn());
     const created = await host.match.create(settings);
@@ -527,6 +544,13 @@ describe("match.submitMaze", () => {
     await rival.match.join({ code: first.code });
     const mazeId = await savedMaze(host, "Seen it");
     await host.match.submitMaze({ matchId: first.id, mazeId });
+    // The rival must submit too: the match only reaches `running` — the
+    // point at which they could actually see the host's maze — once both
+    // have.
+    await rival.match.submitMaze({
+      matchId: first.id,
+      mazeId: await savedMaze(rival, "Rival's own"),
+    });
 
     const second = await host.match.create(settings);
     await rival.match.join({ code: second.code });
@@ -534,6 +558,41 @@ describe("match.submitMaze", () => {
     expect(
       await rejection(host.match.submitMaze({ matchId: second.id, mazeId })),
     ).toEqual({ code: "CONFLICT", message: "errors.mazeAlreadyFaced" });
+  });
+
+  it("releases a maze from a match the sweep abandoned during drawing", async () => {
+    const host = createCaller(await signedIn());
+    const rivalCtx = await signedIn();
+    const rival = createCaller(rivalCtx);
+
+    const first = await host.match.create(settings);
+    await rival.match.join({ code: first.code });
+    const mazeId = await savedMaze(host, "Never seen");
+    await host.match.submitMaze({ matchId: first.id, mazeId });
+
+    // The rival never draws. The match stays in `drawing` — it never
+    // reaches `running` — until the sweep gives up on it at row 3's
+    // deadline, 24h from the host's submission.
+    await sweepExpiredMatches(db, new Date(Date.now() + HOURS_24_MS + 1000));
+    const [abandonedRow] = await db
+      .select()
+      .from(match)
+      .where(eq(match.id, first.id));
+    expect(abandonedRow?.status).toBe("abandoned");
+
+    // The opponent never saw it, so it is not faced: offered again, and
+    // accepted, against the very same opponent.
+    const second = await host.match.create(settings);
+    await rival.match.join({ code: second.code });
+
+    const offered = await host.match.eligibleMazes({ matchId: second.id });
+    expect(offered.map((m) => m.id)).toContain(mazeId);
+
+    const result = await host.match.submitMaze({
+      matchId: second.id,
+      mazeId,
+    });
+    expect(result.status).toBe("drawing");
   });
 });
 
@@ -563,11 +622,54 @@ describe("match.eligibleMazes", () => {
     await rival.match.join({ code: first.code });
     const mazeId = await savedMaze(host, "Seen it");
     await host.match.submitMaze({ matchId: first.id, mazeId });
+    // Both must submit for the match to reach `running` — see the
+    // `submitMaze` describe block's "refuses reuse..." test for why.
+    await rival.match.submitMaze({
+      matchId: first.id,
+      mazeId: await savedMaze(rival, "Rival's own"),
+    });
 
     const second = await host.match.create(settings);
     await rival.match.join({ code: second.code });
 
     const offered = await host.match.eligibleMazes({ matchId: second.id });
     expect(offered.map((m) => m.id)).not.toContain(mazeId);
+  });
+
+  it("omits a draft that has never validated, so the picker never offers what submitMaze would reject", async () => {
+    const host = createCaller(await signedIn());
+    const created = await host.match.create(settings);
+    await createCaller(await signedIn()).match.join({ code: created.code });
+
+    // Created but never drawn: no `contentHash`, because `saveDraft` only
+    // sets one once the maze validates at these settings.
+    const draft = await host.maze.createDraft({
+      name: "Half-drawn",
+      cellCount: settings.cellCount,
+      gateCount: settings.gateCount,
+    });
+
+    const offered = await host.match.eligibleMazes({ matchId: created.id });
+    expect(offered.map((m) => m.id)).not.toContain(draft.id);
+  });
+
+  it("refuses a stranger, indistinguishably from a match that does not exist", async () => {
+    const host = createCaller(await signedIn());
+    const created = await host.match.create(settings);
+    await createCaller(await signedIn()).match.join({ code: created.code });
+    const stranger = createCaller(await signedIn());
+
+    const notMine = await rejection(
+      stranger.match.eligibleMazes({ matchId: created.id }),
+    );
+    const missing = await rejection(
+      stranger.match.eligibleMazes({ matchId: crypto.randomUUID() }),
+    );
+
+    expect(notMine).toEqual({
+      code: "FORBIDDEN",
+      message: "errors.notYourMatch",
+    });
+    expect(missing).toEqual(notMine);
   });
 });
