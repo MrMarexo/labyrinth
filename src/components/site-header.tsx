@@ -17,6 +17,16 @@ export async function SiteHeader() {
         {t("app.name")}
       </Link>
       <div className="flex items-center gap-3">
+        {session && (
+          <nav className="flex items-center gap-3">
+            <Link href="/matches" className="text-sm underline">
+              {t("nav.matches")}
+            </Link>
+            <Link href="/labyrinths" className="text-sm underline">
+              {t("nav.labyrinths")}
+            </Link>
+          </nav>
+        )}
         <LocaleSwitcher />
         <ThemeToggle />
         {session ? (

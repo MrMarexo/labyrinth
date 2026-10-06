@@ -1,5 +1,6 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import { hasLocale, useLocale, useTranslations } from "next-intl";
 import { useState } from "react";
 
@@ -39,6 +40,7 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
   const router = useRouter();
   const locale = useLocale();
   const setLocale = api.profile.setLocale.useMutation();
+  const queryClient = useQueryClient();
 
   const [errorKey, setErrorKey] = useState<ErrorMessageKey | null>(null);
   const [pending, setPending] = useState(false);
@@ -67,6 +69,15 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
       setErrorKey(messageKeyFor(result.error.code));
       return;
     }
+
+    // This form is also reachable while a different account's data is still
+    // sitting in the browser's QueryClient singleton (`~/trpc/react`) — the
+    // (auth) layout only blocks it for whoever is *currently* signed in, not
+    // for whoever a stale session cookie expired out from under. Clearing
+    // here closes the same hole as `sign-out-button.tsx`'s, for the entry
+    // this form provides to it: signing in as a second account without ever
+    // going through sign-out.
+    queryClient.clear();
 
     if (mode === "sign-up") {
       // Signing up in a given locale is a real preference: record it. A

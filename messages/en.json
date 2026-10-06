@@ -6,7 +6,9 @@
   "nav": {
     "signIn": "Sign in",
     "signUp": "Sign up",
-    "signOut": "Sign out"
+    "signOut": "Sign out",
+    "matches": "Matches",
+    "labyrinths": "Labyrinths"
   },
   "theme": {
     "label": "Theme",

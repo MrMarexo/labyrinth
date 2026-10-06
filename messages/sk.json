@@ -6,7 +6,9 @@
   "nav": {
     "signIn": "Prihlásiť sa",
     "signUp": "Registrovať sa",
-    "signOut": "Odhlásiť sa"
+    "signOut": "Odhlásiť sa",
+    "matches": "Zápasy",
+    "labyrinths": "Bludiská"
   },
   "theme": {
     "label": "Vzhľad",
