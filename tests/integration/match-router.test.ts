@@ -594,6 +594,51 @@ describe("match.submitMaze", () => {
     });
     expect(result.status).toBe("drawing");
   });
+
+  it("still refuses reuse once the match that exposed the maze decays to abandoned", async () => {
+    const host = createCaller(await signedIn());
+    const rivalCtx = await signedIn();
+    const rival = createCaller(rivalCtx);
+
+    const first = await host.match.create(settings);
+    await rival.match.join({ code: first.code });
+    const mazeId = await savedMaze(host, "Seen it, then abandoned");
+    await host.match.submitMaze({ matchId: first.id, mazeId });
+    await rival.match.submitMaze({
+      matchId: first.id,
+      mazeId: await savedMaze(rival, "Rival's own"),
+    });
+
+    const [running] = await db
+      .select()
+      .from(match)
+      .where(eq(match.id, first.id));
+    expect(running?.status).toBe("running");
+
+    // Phase 3 has no move or finish procedure, so `finishedAt` never gets
+    // set and a running match's row-4 deadline (24h from the moment the
+    // runs unlocked) can only ever resolve to `abandoned` — this is not a
+    // contrived edge case, it is what every running match in this phase
+    // becomes within a day. The opponent already saw the maze the moment
+    // both submitted; that must not un-happen just because the match's
+    // current status later moved on.
+    await sweepExpiredMatches(db, new Date(Date.now() + HOURS_24_MS + 1000));
+    const [abandonedRow] = await db
+      .select()
+      .from(match)
+      .where(eq(match.id, first.id));
+    expect(abandonedRow?.status).toBe("abandoned");
+
+    const second = await host.match.create(settings);
+    await rival.match.join({ code: second.code });
+
+    const offered = await host.match.eligibleMazes({ matchId: second.id });
+    expect(offered.map((m) => m.id)).not.toContain(mazeId);
+
+    expect(
+      await rejection(host.match.submitMaze({ matchId: second.id, mazeId })),
+    ).toEqual({ code: "CONFLICT", message: "errors.mazeAlreadyFaced" });
+  });
 });
 
 describe("match.eligibleMazes", () => {

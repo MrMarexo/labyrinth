@@ -4,12 +4,7 @@ import { type NeonQueryResultHKT } from "drizzle-orm/neon-serverless";
 import { type PgDatabase } from "drizzle-orm/pg-core";
 import { z } from "zod";
 
-import {
-  deadlineFor,
-  makeCode,
-  matchCodeSchema,
-  type MatchStatus,
-} from "~/match";
+import { deadlineFor, makeCode, matchCodeSchema } from "~/match";
 import { CELL_COUNT_PRESETS, MAX_GATES, validateMaze } from "~/maze";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { match, matchPlayer, maze, user } from "~/server/db/schema";
@@ -65,16 +60,24 @@ function notYours(): never {
   throw new TRPCError({ code: "FORBIDDEN", message: "errors.notYourMatch" });
 }
 
-/** Match statuses at which the opponent could actually have seen a maze. */
-const FACED_STATUSES: MatchStatus[] = ["running", "complete"];
-
 /**
  * Every maze of this author that the opponent has already faced in some
  * other match. Rule 4 of §6: reuse is what makes the library worth having,
  * but not against someone who has already walked the maze — which requires
- * that match to have actually reached `running`. A match still stuck in
- * `drawing` (including one the sweep later abandons there) never exposed
- * the maze to anyone, so it does not count.
+ * that match to have actually reached `running`.
+ *
+ * That has to be read off the opponent's own `matchPlayer.submittedAt`, not
+ * off `match.status`: in Phase 3 nobody can move or finish a run, so every
+ * `running` match's deadline (row 4 of §9.1) can only ever expire into
+ * `abandoned` — there is no other outcome `resolveExpiry` can reach while
+ * `finishedAt` stays permanently null. A `status`-based filter would
+ * therefore un-face every maze on a one-day timer, the moment the sweep
+ * closes the very match that exposed it. `submittedAt` has no such decay:
+ * it is written once, in the same statement as `mazeId`, and nothing ever
+ * clears it — so it is still true a day, a week, or a year after the match
+ * that set it has moved on to any status at all. A match still stuck in
+ * `drawing` (including one the sweep later abandons there) never got this
+ * far, so it correctly does not count.
  */
 async function mazesFacedBy(
   db: DbClient,
@@ -86,11 +89,10 @@ async function mazesFacedBy(
   const theirMatches = await db
     .select({ matchId: matchPlayer.matchId })
     .from(matchPlayer)
-    .innerJoin(match, eq(match.id, matchPlayer.matchId))
     .where(
       and(
         eq(matchPlayer.userId, opponentId),
-        inArray(match.status, FACED_STATUSES),
+        isNotNull(matchPlayer.submittedAt),
       ),
     );
 
