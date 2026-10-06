@@ -34,3 +34,8 @@ export function canTransition(from: MatchStatus, to: MatchStatus): boolean {
 export function isTerminal(status: MatchStatus): boolean {
   return LEGAL[status].length === 0;
 }
+
+/** The non-terminal statuses, derived rather than hardcoded a second time. */
+export const OPEN_STATUSES = MATCH_STATUSES.filter(
+  (status) => !isTerminal(status),
+);

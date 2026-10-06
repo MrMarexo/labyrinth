@@ -1,6 +1,6 @@
-import { and, asc, eq, inArray, lte, notInArray } from "drizzle-orm";
+import { and, asc, eq, inArray, lte } from "drizzle-orm";
 
-import { MATCH_STATUSES, isTerminal, resolveExpiry } from "~/match";
+import { OPEN_STATUSES, resolveExpiry } from "~/match";
 import type { db as Database } from "~/server/db";
 import { match, matchPlayer } from "~/server/db/schema";
 // `situationFor` lives in its own module, not in the router: a server-side
@@ -15,7 +15,12 @@ import { situationFor } from "~/server/match/situation";
 // candidate set stays small: it is the other half of `match_sweep_idx`
 // alongside `deadlineAt`, keeping the query a cheap index lookup instead of
 // a scan that grows with every match the sweep has ever closed.
-const TERMINAL = MATCH_STATUSES.filter(isTerminal);
+//
+// `inArray` on the leading column of `match_sweep_idx`, not `notInArray`: a
+// `NOT IN` cannot use a `(status, deadline_at)` index as a prefix, so
+// Postgres would fall back to a scan instead of range-scanning `deadlineAt`
+// and satisfying the `ORDER BY` from the index — exactly the growth this
+// filter exists to contain.
 
 // Measured against a real backlog (300 synthetic due matches, each closed in
 // its own transaction over a pooled websocket connection): ~93ms/row. A
@@ -52,7 +57,9 @@ export async function sweepExpiredMatches(
   const due = await db
     .select()
     .from(match)
-    .where(and(notInArray(match.status, TERMINAL), lte(match.deadlineAt, now)))
+    .where(
+      and(inArray(match.status, OPEN_STATUSES), lte(match.deadlineAt, now)),
+    )
     .orderBy(asc(match.deadlineAt))
     .limit(SWEEP_BATCH_LIMIT);
 
