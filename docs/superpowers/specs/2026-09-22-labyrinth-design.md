@@ -85,6 +85,15 @@ elapsed run time. Both players' mazes share the same cell budget and gate count,
 which is what makes the raw comparison defensible — beyond that, asymmetry is
 intentional. You chose how cruel to make your maze.
 
+Elapsed run time is measured from the runner's first move to the move that
+reached the treasure — not from the unlocking, because runs are asynchronous and
+a player who starts a day later has not been slower.
+
+Two runs identical on all three counts complete with **no winner**
+(`endReason: finished`, `winnerId` null). Matching to the millisecond is all but
+impossible, but the outcome has to be defined rather than left to whichever row
+the comparison happened to visit first.
+
 ## 3. Maze format
 
 Stored as `jsonb`. Versioned. Validated by a `zod` schema on the way in and out.
@@ -388,8 +397,8 @@ awaiting_opponent → drawing → running → complete
 - `running` — both mazes submitted. Both runs unlock at once and proceed
   independently.
 - `complete` — both `finishedAt` set, or one player finished and the other ran
-  out of time. Only now is the result computed and revealed, so the second
-  finisher cannot play to a known target.
+  out of time, or one player gave up (§9.2). Only now is the result computed and
+  revealed, so the second finisher cannot play to a known target.
 - `abandoned` — closed with **no winner**. See §9.1.
 
 ### 9.1 Deadlines
@@ -412,7 +421,9 @@ actually reached the treasure. That is why every row but the last closes with no
 winner, including the case where you drew your maze and your opponent never drew
 theirs. Missing a drawing deadline is recorded against the player who missed it —
 which is what a future reliability or reputation stat would read — but it does
-not put an unearned win on the other player's record.
+not put an unearned win on the other player's record. The one exception is a
+player who explicitly gives up, which is a concession rather than an expiry —
+see §9.2.
 
 **Nothing expires while both players are still engaged.** Every deadline is
 anchored to the last thing that actually happened, so an active match is never
@@ -428,6 +439,31 @@ match at a fixed 24h from the unlocking and record fault against nobody.
 
 A scheduled sweep evaluates these, so a stale match closes on its own rather
 than waiting for someone to open it.
+
+### 9.2 Giving up
+
+A player in a `running` match may give up at any point before they finish. It
+is confirmed, irreversible, and **ends the match immediately**: status
+`complete`, `endReason: forfeit`, and the opponent is the winner — exactly as if
+they had found the treasure, whether they had already finished, were mid-run,
+or had not yet moved. The opponent's run stops where it is, and the result
+screen shows both partial runs and who gave up.
+
+This is a deliberate exception to "you cannot win without finding the
+treasure", and the exception is the point. That principle exists so that
+*silence* — a missed deadline, a player who wandered off — never produces a win
+nobody earned. Giving up is not silence; it is one player conceding to the
+other, and a concession that did not award the match would be a button that
+does nothing but wait out a deadline. The principle continues to govern every
+row of §9.1.
+
+The opponent learns of it from the result screen: their next move is refused
+with `MatchOver`, and an open run view polls the match status and switches over
+on its own. Live push arrives with the realtime layer (§8); until then the poll
+is the notification.
+
+A player who has already found the treasure cannot give up — there is nothing
+left to concede.
 
 ## 10. Client
 
@@ -477,6 +513,30 @@ bumped segments instead of the full maze. Arrow keys and WASD on desktop, an
 on-screen d-pad on touch. Penalties take the prominent position since they are
 the score; moves and held keys (colour-matched to their gates) are secondary. A
 blocked move shakes the board and draws the segment that stopped you.
+
+"The same board component" is to be read as the same *look*, not the same
+component: the editor board renders every square of the frame and labels each
+painted or void, which in a run view would leak the shape into the
+accessibility tree. The run board is a sibling that shares the cell size and
+gate colours and is fed only what the runner has discovered. Its viewport grows
+as the runner explores, because the frame's size is itself a secret.
+
+A runner who finds the treasure sees their own score and a waiting state; the
+opponent's score stays hidden until the match ends (§9).
+
+### 10.3.1 Result screen
+
+Shown on `/matches/[id]` once the match is `complete` or `abandoned` — the one
+URL renders the lobby, the run or the result by status. It gives the winner, or
+"no winner"; the reason; both players' penalties, moves and time side by side,
+with the deciding tiebreaker marked; and **both mazes in full**, each with the
+path its runner took drawn over it as a static polyline. The opponent's maze
+with your path is the payoff of the game. Your maze with theirs is the poor
+man's replay until §10.4 exists, and gives way to it then.
+
+Both mazes are safe to show: the match is over, and a maze cannot be reused
+against anyone who has faced it in a match that reached `running` (§6, as
+implemented by `mazesFacedBy`).
 
 ### 10.4 Spectator and replay view
 
@@ -678,6 +738,9 @@ does not need to change to add a lobby later.
 | Enclosure | The labyrinth is always closed; a runner can never leave it. Guaranteed by construction, stated as a rule. |
 | Editing a submitted maze | Not possible, and no duplicate-to-edit either. Reuse it exactly as drawn, or draw a new one. Drafts stay editable. |
 | Forfeits | Missing a deadline never hands the opponent a win unless that opponent reached the treasure. Every deadline except the last closes the match with no winner. |
+| Giving up (Phase 4) | Allowed mid-run, confirmed, irreversible. Ends the match at once and the opponent wins, finished or not. A concession is not silence, so the no-unearned-wins rule does not apply to it (§9.2). |
+| What the result reveals (Phase 4) | Scores, winner, reason, and both full mazes with each runner's path drawn over them. |
+| Perfect tie | No winner. |
 | Spectating layout | Two boards side by side — the runner's fogged view and the author's full maze — because authors do not remember their own walls. |
 | Connectivity rule | Shape must be orthogonally connected and the treasure must be reachable. Sealed pockets allowed. |
 | ORM | Drizzle. |
