@@ -7,7 +7,7 @@ import { createTRPCContext } from "~/server/api/trpc";
 import { auth } from "~/server/auth";
 import { db } from "~/server/db";
 import { match, matchPlayer } from "~/server/db/schema";
-import { sweepExpiredMatches } from "~/server/match/sweep";
+import { closeIfExpired, sweepExpiredMatches } from "~/server/match/sweep";
 
 import { GATED_MAZE_ROUTE } from "../fixtures/maze";
 import {
@@ -250,5 +250,35 @@ describe("sweepExpiredMatches", () => {
       players.find((p) => p.userId === guestId)!.forfeitedAt,
     ).not.toBeNull();
     expect(players.find((p) => p.userId === hostId)!.forfeitedAt).toBeNull();
+  });
+
+  it("re-reads under lock, so a match a move just completed is left alone", async () => {
+    const { host, guest, hostId, matchId } = await runningMatch();
+    for (const [i, dir] of GATED_MAZE_ROUTE.entries()) {
+      await host.run.move({ matchId, seq: i + 1, dir });
+    }
+    for (const [i, dir] of ["N", ...GATED_MAZE_ROUTE].entries()) {
+      await guest.run.move({
+        matchId,
+        seq: i + 1,
+        dir: dir as "N" | "E" | "S" | "W",
+      });
+    }
+    const [done] = await db.select().from(match).where(eq(match.id, matchId));
+    expect(done!.status).toBe("complete");
+
+    const closed = await closeIfExpired(
+      db,
+      matchId,
+      new Date(done!.deadlineAt.getTime() + 1),
+    );
+
+    expect(closed).toBe(false);
+    const [after] = await db.select().from(match).where(eq(match.id, matchId));
+    expect(after).toMatchObject({
+      status: "complete",
+      endReason: "finished",
+      winnerId: hostId,
+    });
   });
 });

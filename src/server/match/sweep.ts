@@ -26,12 +26,82 @@ import { situationFor } from "~/server/match/situation";
 // its own transaction over a pooled websocket connection): ~93ms/row. A
 // Vercel cron invocation's wall-clock budget is as low as 10s on the
 // cheapest plan, so a batch of 50 (~4.7s at that rate) leaves comfortable
-// headroom for connection setup and the two bulk selects below, on top of
+// headroom for connection setup and the batch select below, on top of
 // whatever the production network adds. Ordering by `deadlineAt` ascending
 // means the oldest expiries always drain first, so a steady trickle of new
 // ones can never starve a backlog from ever being cleared — the cron's
 // 15-minute cadence just takes more runs to catch up.
 const SWEEP_BATCH_LIMIT = 50;
+
+/**
+ * Closes one match if, as it stands right now, its deadline has passed.
+ *
+ * The match and its players are re-read here, locked `FOR UPDATE` in the
+ * same order as `participantRows` (match first, then players). The sweep's
+ * batch query read them without a lock, and a move or give-up can complete a
+ * match between that read and this write; trusting the stale row would
+ * overwrite a completion that already committed. Under the lock the
+ * decision is made on the committed state: a match that is no longer open,
+ * or whose expiry outcome is now `none`, is left untouched.
+ *
+ * Returns whether the match was closed.
+ */
+export async function closeIfExpired(
+  db: typeof Database,
+  matchId: string,
+  now: Date,
+): Promise<boolean> {
+  return db.transaction(async (tx) => {
+    const [row] = await tx
+      .select()
+      .from(match)
+      .where(eq(match.id, matchId))
+      .for("update");
+    if (!row || !OPEN_STATUSES.includes(row.status)) return false;
+
+    const seated = await tx
+      .select()
+      .from(matchPlayer)
+      .where(eq(matchPlayer.matchId, matchId))
+      .for("update");
+
+    const outcome = resolveExpiry(situationFor(row, seated), now);
+    if (outcome.kind === "none") return false;
+
+    if (outcome.forfeitedBy.length > 0) {
+      await tx
+        .update(matchPlayer)
+        .set({ forfeitedAt: now })
+        .where(
+          and(
+            eq(matchPlayer.matchId, matchId),
+            inArray(matchPlayer.userId, [...outcome.forfeitedBy]),
+          ),
+        );
+    }
+
+    await tx
+      .update(match)
+      .set(
+        outcome.kind === "complete"
+          ? {
+              status: "complete",
+              endReason: outcome.endReason,
+              winnerId: outcome.winnerId,
+              lastActivityAt: now,
+            }
+          : {
+              status: "abandoned",
+              endReason: "abandoned",
+              winnerId: null,
+              lastActivityAt: now,
+            },
+      )
+      .where(eq(match.id, matchId));
+
+    return true;
+  });
+}
 
 /**
  * Closes every match whose deadline has passed, so a stale match ends on its
@@ -42,7 +112,8 @@ const SWEEP_BATCH_LIMIT = 50;
  * application code. It is capped at `SWEEP_BATCH_LIMIT` per call so one
  * invocation can never blow past a cron platform's wall-clock limit; `capped`
  * tells the caller whether this call drained every due match or whether more
- * are waiting for the next one.
+ * are waiting for the next one. Each candidate is re-checked under lock by
+ * `closeIfExpired`, so a match a player just completed is never overwritten.
  */
 export async function sweepExpiredMatches(
   db: typeof Database,
@@ -59,57 +130,10 @@ export async function sweepExpiredMatches(
 
   if (due.length === 0) return { closed: 0, capped: false };
 
-  const players = await db
-    .select()
-    .from(matchPlayer)
-    .where(
-      inArray(
-        matchPlayer.matchId,
-        due.map((m) => m.id),
-      ),
-    );
-
   let closed = 0;
 
   for (const row of due) {
-    const seated = players.filter((p) => p.matchId === row.id);
-    const outcome = resolveExpiry(situationFor(row, seated), now);
-    if (outcome.kind === "none") continue;
-
-    await db.transaction(async (tx) => {
-      if (outcome.forfeitedBy.length > 0) {
-        await tx
-          .update(matchPlayer)
-          .set({ forfeitedAt: now })
-          .where(
-            and(
-              eq(matchPlayer.matchId, row.id),
-              inArray(matchPlayer.userId, [...outcome.forfeitedBy]),
-            ),
-          );
-      }
-
-      await tx
-        .update(match)
-        .set(
-          outcome.kind === "complete"
-            ? {
-                status: "complete",
-                endReason: outcome.endReason,
-                winnerId: outcome.winnerId,
-                lastActivityAt: now,
-              }
-            : {
-                status: "abandoned",
-                endReason: "abandoned",
-                winnerId: null,
-                lastActivityAt: now,
-              },
-        )
-        .where(eq(match.id, row.id));
-    });
-
-    closed += 1;
+    if (await closeIfExpired(db, row.id, now)) closed += 1;
   }
 
   // A full batch means there may be more due matches than this call fetched;

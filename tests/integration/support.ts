@@ -25,7 +25,10 @@ export async function rejection(call: Promise<unknown>) {
  * before it reaches the match a test is asserting on.
  */
 export async function sweepAll(db: typeof Database, at: Date) {
-  while ((await sweepExpiredMatches(db, at)).capped) {
-    // drain
+  // A due match that resolves to "none" stays due, so stop on a pass that
+  // closed nothing as well as on an uncapped one.
+  for (;;) {
+    const { closed, capped } = await sweepExpiredMatches(db, at);
+    if (!capped || closed === 0) return;
   }
 }
