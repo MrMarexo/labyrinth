@@ -9,10 +9,8 @@ export type PlayerRow = typeof matchPlayer.$inferSelect;
  * the `match` router and Task 5's sweep evaluate the same situations with
  * the same function — one reading of §9.1, not two.
  *
- * `lastMoveAt` and `finishedAt` are hardcoded null: the columns that would
- * feed them are Phase 4's and do not exist yet. That means rows 5 and 6 of
- * §9.1 are unreachable through this bridge, which is correct for Phase 3 —
- * nobody can move. Phase 4 fills them in here and both rows light up.
+ * `lastMoveAt` and `finishedAt` come straight off the player rows; with
+ * them, every row of §9.1 is reachable through this bridge.
  */
 export function situationFor(
   matchRow: MatchRow,
@@ -21,8 +19,8 @@ export function situationFor(
   const players: PlayerSituation[] = playerRows.map((p) => ({
     userId: p.userId,
     submittedAt: p.submittedAt,
-    lastMoveAt: null,
-    finishedAt: null,
+    lastMoveAt: p.lastMoveAt,
+    finishedAt: p.finishedAt,
   }));
 
   return {

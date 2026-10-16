@@ -36,6 +36,13 @@
       "when": 1791235034153,
       "tag": "0004_talented_terrax",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792150163622,
+      "tag": "0005_tiny_the_hand",
+      "breakpoints": true
     }
   ]
 }

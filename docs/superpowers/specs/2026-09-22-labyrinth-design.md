@@ -269,14 +269,13 @@ match           id, code unique, cellCount, gateCount,
                 winnerId nullable, endReason nullable
 
 match_player    matchId, userId, mazeId,          -- the maze THEY drew
-                runStatus (not_started | running | finished),
-                penalties, moveCount, runState jsonb,
-                submittedAt, startedAt, lastMoveAt, finishedAt,
-                forfeitedAt nullable
+                joinedAt, submittedAt, forfeitedAt nullable,
+                runState jsonb, startedAt, lastMoveAt, finishedAt,
+                gaveUpAt nullable
                 primary key (matchId, userId)
 
 move            id, matchId, runnerId, seq, dir, outcome,
-                revealed jsonb, createdAt
+                delta jsonb, createdAt
                 unique (matchId, runnerId, seq)
 ```
 
@@ -307,9 +306,11 @@ discovered set. It is a denormalized cache so a 300-move run does not replay
 itself on every request. **The move log is the source of truth** and is what
 replay reads.
 
+There is no `runStatus` column: not started, running, finished and gave up are `startedAt`, `finishedAt` and `gaveUpAt` being set or not, and penalties and the move count live inside `runState`. Phase 4 settled both, for the same reason Phase 3 left out a stored unlock time: a copy of a derivable value is a second source of truth. `move.delta` stores the runner's delta verbatim, which is what a retry must get back (§7.2).
+
 ## 7. Move protocol and anti-cheat
 
-`match.move({ matchId, seq, dir })`:
+`run.move({ matchId, seq, dir })`:
 
 1. Load `runState` and the opponent's maze.
 2. Apply the pure reducer.
@@ -317,6 +318,8 @@ replay reads.
 4. Publish the delta to the realtime channel (§8).
 5. Return **only the delta**: outcome, new position if it moved, the single
    segment or cell revealed, any key acquired, the running penalty count.
+
+The run's procedures (`run.get`, `run.move`, `run.giveUp`, `run.result`) live on their own router.
 
 `dir` is one of `N | E | S | W`.
 

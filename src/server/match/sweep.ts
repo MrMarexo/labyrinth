@@ -43,12 +43,6 @@ const SWEEP_BATCH_LIMIT = 50;
  * invocation can never blow past a cron platform's wall-clock limit; `capped`
  * tells the caller whether this call drained every due match or whether more
  * are waiting for the next one.
- *
- * Phase 3 note: `situationFor` reports `lastMoveAt` and `finishedAt` as null
- * because the columns that feed them are Phase 4's. So the `complete` branch
- * below is unreachable today and no test exercises it — that is expected,
- * not dead code. The moment Phase 4 fills those two fields in, §9.1 rows 5
- * and 6 start closing here with no change to this file.
  */
 export async function sweepExpiredMatches(
   db: typeof Database,

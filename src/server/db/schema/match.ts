@@ -3,13 +3,21 @@ import {
   check,
   index,
   integer,
+  jsonb,
   pgTable,
   primaryKey,
   text,
   timestamp,
+  unique,
 } from "drizzle-orm/pg-core";
 
 import { END_REASONS, MATCH_STATUSES } from "~/match";
+import {
+  DIRECTIONS,
+  SERVER_OUTCOMES,
+  type RunnerDelta,
+  type StoredRun,
+} from "~/maze";
 
 import { user } from "./auth";
 import { maze } from "./maze";
@@ -68,10 +76,17 @@ export const match = pgTable(
 );
 
 /**
- * Spec §6. `mazeId` is null until that player submits. The run columns
- * (`runStatus`, `penalties`, `moveCount`, `runState`, `startedAt`,
- * `lastMoveAt`, `finishedAt`) are Phase 4's and are deliberately not created
- * here — nothing reads or writes them yet.
+ * Spec §6. `mazeId` is null until that player submits.
+ *
+ * The run columns are Phase 4's. There is no `runStatus`: not started,
+ * running, finished and gave up are `startedAt`, `finishedAt` and `gaveUpAt`
+ * being null or not, and a stored copy would be a second source of truth.
+ * Penalties and the move count live inside `runState`, beside the position
+ * they belong with. `runState` is a cache of the move log (AGENTS.md
+ * invariant 4) and is written in the same transaction as each move.
+ *
+ * `gaveUpAt` is not `forfeitedAt`: the sweep sets `forfeitedAt` on a player
+ * who ran out of time, and the result screen has to tell the two apart.
  */
 export const matchPlayer = pgTable(
   "match_player",
@@ -88,9 +103,59 @@ export const matchPlayer = pgTable(
     joinedAt: timestamp("joined_at").notNull().defaultNow(),
     submittedAt: timestamp("submitted_at"),
     forfeitedAt: timestamp("forfeited_at"),
+    runState: jsonb("run_state").$type<StoredRun>(),
+    startedAt: timestamp("started_at"),
+    lastMoveAt: timestamp("last_move_at"),
+    finishedAt: timestamp("finished_at"),
+    gaveUpAt: timestamp("gave_up_at"),
   },
   (table) => [
     primaryKey({ columns: [table.matchId, table.userId] }),
     index("match_player_user_idx").on(table.userId),
+    // A run ends one way. Giving up after the treasure is refused by
+    // `run.giveUp`; this is what makes that refusal more than a convention.
+    check(
+      "match_player_finished_or_gave_up",
+      sql`${table.finishedAt} IS NULL OR ${table.gaveUpAt} IS NULL`,
+    ),
+  ],
+);
+
+/**
+ * Spec §6 and §7. The move log is the source of truth (AGENTS.md invariant
+ * 4); `match_player.runState` is its cache.
+ *
+ * `outcome` is the server's, and so may be `blocked_boundary`. `delta` is
+ * exactly what the runner was sent — `blocked_boundary` already collapsed to
+ * `blocked_wall` — because it is what a retried request must get back
+ * (§7.2) and what replay will read (§8). Storing the runner's delta rather
+ * than re-deriving it means a retry can never disclose more than the
+ * original answer did.
+ */
+export const move = pgTable(
+  "move",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    matchId: text("match_id")
+      .notNull()
+      .references(() => match.id, { onDelete: "cascade" }),
+    runnerId: text("runner_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    seq: integer("seq").notNull(),
+    dir: text("dir", { enum: DIRECTIONS }).notNull(),
+    outcome: text("outcome", { enum: SERVER_OUTCOMES }).notNull(),
+    delta: jsonb("delta").$type<RunnerDelta>().notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    // §7.2. Also the index every per-runner read of the log uses.
+    unique("move_runner_seq_unique").on(
+      table.matchId,
+      table.runnerId,
+      table.seq,
+    ),
   ],
 );

@@ -1,14 +1,16 @@
 import { TRPCError } from "@trpc/server";
 import { and, desc, eq, inArray, isNotNull, ne, notInArray } from "drizzle-orm";
-import { type NeonQueryResultHKT } from "drizzle-orm/neon-serverless";
-import { type PgDatabase } from "drizzle-orm/pg-core";
 import { z } from "zod";
 
 import { deadlineFor, makeCode, matchCodeSchema } from "~/match";
 import { CELL_COUNT_PRESETS, MAX_GATES, validateMaze } from "~/maze";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { match, matchPlayer, maze, user } from "~/server/db/schema";
-import type * as schema from "~/server/db/schema";
+import {
+  notYours,
+  participantRows,
+  type DbClient,
+} from "~/server/match/access";
 import {
   situationFor,
   type MatchRow,
@@ -26,39 +28,6 @@ const settingsInput = z.object({
     ),
   gateCount: z.number().int().min(0).max(MAX_GATES),
 });
-
-/**
- * Both the pooled client and an open transaction on it satisfy this. Every
- * helper below that takes a database handle is called both outside a
- * transaction (the query procedures) and inside one (`submitMaze`'s
- * read-check-write), so each takes this rather than `typeof db` — which a
- * transaction object does not structurally match (it lacks `$client`).
- * Defined here, in the one file that currently has helpers needing it; a
- * second router with the same need would be the signal to move it to
- * `~/server/db`.
- */
-type DbClient = PgDatabase<NeonQueryResultHKT, typeof schema>;
-
-/** Every read of a match the caller must be part of. */
-async function participantRows(tx: DbClient, matchId: string, userId: string) {
-  const [row] = await tx.select().from(match).where(eq(match.id, matchId));
-  if (!row) return null;
-  const players = await tx
-    .select()
-    .from(matchPlayer)
-    .where(eq(matchPlayer.matchId, matchId));
-  if (!players.some((p) => p.userId === userId)) return null;
-  return { row, players };
-}
-
-/**
- * A match the caller is not in and a match that does not exist get the same
- * answer, for the same reason `maze.get` does: distinguishing them would
- * confirm the match exists to someone with no business knowing.
- */
-function notYours(): never {
-  throw new TRPCError({ code: "FORBIDDEN", message: "errors.notYourMatch" });
-}
 
 /**
  * Every maze of this author that the opponent has already faced in some
@@ -228,6 +197,11 @@ export const matchRouter = createTRPCRouter({
             joinedAt: now,
             submittedAt: null,
             forfeitedAt: null,
+            runState: null,
+            startedAt: null,
+            lastMoveAt: null,
+            finishedAt: null,
+            gaveUpAt: null,
           },
         ];
         const next: MatchRow = {
