@@ -7,14 +7,13 @@ import { createTRPCContext } from "~/server/api/trpc";
 import { auth } from "~/server/auth";
 import { db } from "~/server/db";
 import { match, matchPlayer, maze } from "~/server/db/schema";
-import { sweepExpiredMatches } from "~/server/match/sweep";
 
 import {
   SOLVABLE_MAZE_CELL_COUNT,
   SOLVABLE_MAZE_GATE_COUNT,
   solvableDraft,
 } from "../fixtures/maze";
-import { rejection } from "./support";
+import { rejection, sweepAll } from "./support";
 
 async function signedIn() {
   const email = `test-${crypto.randomUUID()}@example.test`;
@@ -573,7 +572,7 @@ describe("match.submitMaze", () => {
     // The rival never draws. The match stays in `drawing` — it never
     // reaches `running` — until the sweep gives up on it at row 3's
     // deadline, 24h from the host's submission.
-    await sweepExpiredMatches(db, new Date(Date.now() + HOURS_24_MS + 1000));
+    await sweepAll(db, new Date(Date.now() + HOURS_24_MS + 1000));
     const [abandonedRow] = await db
       .select()
       .from(match)
@@ -622,7 +621,7 @@ describe("match.submitMaze", () => {
     // becomes within a day. The opponent already saw the maze the moment
     // both submitted; that must not un-happen just because the match's
     // current status later moved on.
-    await sweepExpiredMatches(db, new Date(Date.now() + HOURS_24_MS + 1000));
+    await sweepAll(db, new Date(Date.now() + HOURS_24_MS + 1000));
     const [abandonedRow] = await db
       .select()
       .from(match)

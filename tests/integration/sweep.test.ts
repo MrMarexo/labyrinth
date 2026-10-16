@@ -14,6 +14,7 @@ import {
   SOLVABLE_MAZE_GATE_COUNT,
   solvableDraft,
 } from "../fixtures/maze";
+import { sweepAll } from "./support";
 
 async function signedIn() {
   const email = `test-${crypto.randomUUID()}@example.test`;
@@ -57,7 +58,7 @@ describe("sweepExpiredMatches", () => {
     const caller = createCaller(await signedIn());
     const created = await caller.match.create(settings);
 
-    await sweepExpiredMatches(db, later(HOURS_24_MS + 1000));
+    await sweepAll(db, later(HOURS_24_MS + 1000));
 
     const [row] = await db.select().from(match).where(eq(match.id, created.id));
     expect(row?.status).toBe("abandoned");
@@ -75,7 +76,7 @@ describe("sweepExpiredMatches", () => {
     const created = await host.match.create(settings);
     await createCaller(await signedIn()).match.join({ code: created.code });
 
-    await sweepExpiredMatches(db, later(HOURS_48_MS + 1000));
+    await sweepAll(db, later(HOURS_48_MS + 1000));
 
     const [row] = await db.select().from(match).where(eq(match.id, created.id));
     expect(row?.status).toBe("abandoned");
@@ -98,7 +99,7 @@ describe("sweepExpiredMatches", () => {
       mazeId: await savedMaze(host, "Drew it"),
     });
 
-    await sweepExpiredMatches(db, later(HOURS_24_MS + 1000));
+    await sweepAll(db, later(HOURS_24_MS + 1000));
 
     const [row] = await db.select().from(match).where(eq(match.id, created.id));
     // The player who drew does NOT win. This is the spec's load-bearing
@@ -132,7 +133,7 @@ describe("sweepExpiredMatches", () => {
       mazeId: await savedMaze(guest, "Guest"),
     });
 
-    await sweepExpiredMatches(db, later(HOURS_24_MS + 1000));
+    await sweepAll(db, later(HOURS_24_MS + 1000));
 
     const [row] = await db.select().from(match).where(eq(match.id, created.id));
     expect(row?.status).toBe("abandoned");
@@ -142,13 +143,13 @@ describe("sweepExpiredMatches", () => {
   it("never touches a match that has already ended", async () => {
     const caller = createCaller(await signedIn());
     const created = await caller.match.create(settings);
-    await sweepExpiredMatches(db, later(HOURS_24_MS + 1000));
+    await sweepAll(db, later(HOURS_24_MS + 1000));
     const [first] = await db
       .select()
       .from(match)
       .where(eq(match.id, created.id));
 
-    await sweepExpiredMatches(db, later(HOURS_48_MS * 10));
+    await sweepAll(db, later(HOURS_48_MS * 10));
 
     const [second] = await db
       .select()
@@ -166,7 +167,7 @@ describe("sweepExpiredMatches", () => {
     const a = await caller.match.create(settings);
     const b = await caller.match.create(settings);
 
-    await sweepExpiredMatches(db, later(HOURS_24_MS + 1000));
+    await sweepAll(db, later(HOURS_24_MS + 1000));
 
     const rows = await db
       .select()
@@ -196,7 +197,7 @@ describe("sweepExpiredMatches", () => {
       })
       .where(eq(match.id, overdue.id));
 
-    await sweepExpiredMatches(db, new Date());
+    await sweepAll(db, new Date());
 
     const rows = await db
       .select()
