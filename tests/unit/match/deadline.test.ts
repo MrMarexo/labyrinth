@@ -92,7 +92,23 @@ describe("deadlineFor — §9.1 row by row", () => {
     expect(deadlineFor(s)).toEqual(at(20_000 + HOURS_48_MS));
   });
 
-  it("row 6: one found the treasure — 24h from that finish", () => {
+  it("row 6: one has moved, the other has not — 24h from the mover's last move", () => {
+    const s = situation({
+      status: "running",
+      bothJoinedAt: at(1000),
+      unlockedAt: at(8000),
+      lastActivityAt: at(50_000),
+      players: [
+        player({ userId: "a", submittedAt: at(7000), lastMoveAt: at(50_000) }),
+        player({ userId: "b", submittedAt: at(8000) }),
+      ],
+    });
+    // Not 24h from the unlocking: a player who is moving is engaged, and
+    // nothing expires from under an engaged player.
+    expect(deadlineFor(s)).toEqual(at(50_000 + HOURS_24_MS));
+  });
+
+  it("row 7: one found the treasure — 24h from that finish", () => {
     const s = situation({
       status: "running",
       bothJoinedAt: at(1000),
@@ -111,7 +127,7 @@ describe("deadlineFor — §9.1 row by row", () => {
     expect(deadlineFor(s)).toEqual(at(30_000 + HOURS_24_MS));
   });
 
-  it("row 6 outranks row 5 even when the other player moved more recently", () => {
+  it("row 7 outranks row 5 even when the other player moved more recently", () => {
     // A finish freezes the match onto the 24h clock. If the non-finisher's
     // later move reset it to 48h, the finisher would wait two days for a
     // result that is already decided.
@@ -166,6 +182,40 @@ describe("resolveExpiry", () => {
     expect(resolveExpiry(s, at(7000 + HOURS_24_MS))).toEqual({
       kind: "abandoned",
       forfeitedBy: ["b"],
+    });
+  });
+
+  it("records the one-moved forfeit against the player who never moved", () => {
+    const s = situation({
+      status: "running",
+      bothJoinedAt: at(1000),
+      unlockedAt: at(8000),
+      lastActivityAt: at(50_000),
+      players: [
+        player({ userId: "a", submittedAt: at(7000), lastMoveAt: at(50_000) }),
+        player({ userId: "b", submittedAt: at(8000) }),
+      ],
+    });
+    expect(resolveExpiry(s, at(50_000 + HOURS_24_MS))).toEqual({
+      kind: "abandoned",
+      forfeitedBy: ["b"],
+    });
+  });
+
+  it("blames nobody when both moved and both went quiet", () => {
+    const s = situation({
+      status: "running",
+      bothJoinedAt: at(1000),
+      unlockedAt: at(8000),
+      lastActivityAt: at(20_000),
+      players: [
+        player({ userId: "a", submittedAt: at(7000), lastMoveAt: at(12_000) }),
+        player({ userId: "b", submittedAt: at(8000), lastMoveAt: at(20_000) }),
+      ],
+    });
+    expect(resolveExpiry(s, at(20_000 + HOURS_48_MS))).toEqual({
+      kind: "abandoned",
+      forfeitedBy: [],
     });
   });
 

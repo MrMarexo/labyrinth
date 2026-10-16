@@ -6,9 +6,9 @@ export const HOURS_48_MS = 48 * 60 * 60 * 1000;
 export type PlayerSituation = {
   userId: string;
   submittedAt: Date | null;
-  /** Phase 4 fills this. Null throughout Phase 3. */
+  /** The runner's latest move. */
   lastMoveAt: Date | null;
-  /** Phase 4 fills this. Null throughout Phase 3. */
+  /** The move that reached the treasure. */
   finishedAt: Date | null;
 };
 
@@ -36,7 +36,7 @@ const plus = (at: Date, ms: number) => new Date(at.getTime() + ms);
 
 /**
  * Spec §9.1, in the spec's own row order — the order is the logic, because
- * later rows describe states that subsume earlier ones. A finish (row 6)
+ * later rows describe states that subsume earlier ones. A finish (row 7)
  * outranks a more recent move by the other player (row 5): once someone has
  * the treasure the result is decided, and leaving the 48h clock running
  * would make the finisher wait two days for it.
@@ -50,7 +50,7 @@ export function deadlineFor(situation: MatchSituation): Date | null {
   const { players } = situation;
   const finished = players.filter((p) => p.finishedAt !== null);
 
-  // Row 6 — one found the treasure, the other has not.
+  // Row 7 — one found the treasure, the other has not.
   if (finished.length === 1 && players.length === 2) {
     return plus(finished[0]!.finishedAt!, HOURS_24_MS);
   }
@@ -61,6 +61,18 @@ export function deadlineFor(situation: MatchSituation): Date | null {
   if (moved.length === 2) {
     const last = Math.max(...moved.map((p) => p.lastMoveAt!.getTime()));
     return plus(new Date(last), HOURS_48_MS);
+  }
+
+  // Row 6 — one has moved, the other has not. Anchored to the mover, not to
+  // the unlocking: a player who is moving is engaged, and nothing expires
+  // from under an engaged player. The clock runs against the one who has
+  // not started.
+  if (moved.length === 1 && players.length === 2 && situation.unlockedAt) {
+    const anchor = Math.max(
+      moved[0]!.lastMoveAt!.getTime(),
+      situation.unlockedAt.getTime(),
+    );
+    return plus(new Date(anchor), HOURS_24_MS);
   }
 
   // Row 4 — both submitted, neither has made a single move.
@@ -105,7 +117,7 @@ export function resolveExpiry(
   const { players } = situation;
   const finished = players.filter((p) => p.finishedAt !== null);
 
-  // Row 6 — the only row that produces a winner, and only for a player who
+  // Row 7 — the only row that produces a winner, and only for a player who
   // actually reached the treasure.
   if (finished.length === 1 && players.length === 2) {
     const winner = finished[0]!;
@@ -125,7 +137,8 @@ export function resolveExpiry(
 /**
  * Who missed the deadline. Nobody is at fault when a match simply went
  * unjoined, or when both players went quiet together — fault is only
- * recorded where one player was waiting on another.
+ * recorded where one player was waiting on another: one drew and the other
+ * did not (row 3), or one ran and the other never started (row 6).
  */
 function blameFor(situation: MatchSituation): readonly string[] {
   const { players } = situation;
@@ -134,6 +147,11 @@ function blameFor(situation: MatchSituation): readonly string[] {
   const submitted = players.filter((p) => p.submittedAt !== null);
   if (submitted.length === 1) {
     return players.filter((p) => p.submittedAt === null).map((p) => p.userId);
+  }
+
+  const moved = players.filter((p) => p.lastMoveAt !== null);
+  if (situation.status === "running" && moved.length === 1) {
+    return players.filter((p) => p.lastMoveAt === null).map((p) => p.userId);
   }
 
   return [];

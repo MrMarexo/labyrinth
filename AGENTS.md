@@ -59,8 +59,13 @@ quietly rather than loudly.
 6. **A void-blocked move must be indistinguishable from a wall-blocked move**
    in everything the runner receives and everything the client renders. This is
    the difference between a hidden maze and a guessable one.
-7. **You cannot win without finding the treasure.** A forfeit never produces a
-   winner who did not reach it. `winnerId` is null for every `abandoned` match.
+7. **You cannot win without finding the treasure — unless your opponent gives
+   up.** Expiry never produces a winner who did not reach the treasure, and
+   `winnerId` is null for every `abandoned` match. Giving up (spec §9.2) is
+   the one exception: it is a concession, not silence, and it awards the match
+   to the other player whether or not they have finished.
+   `resolveCompletion` in `src/match/completion.ts` is the only code that
+   decides a win outside the sweep.
 8. **Database access uses `drizzle-orm/neon-serverless` with `Pool`**, never
    `neon-http`. The HTTP driver cannot open an interactive transaction, and
    moves must commit atomically with their run state.
