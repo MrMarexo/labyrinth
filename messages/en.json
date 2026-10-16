@@ -214,5 +214,29 @@
     "giveUpYes": "Yes, give up",
     "giveUpNo": "Keep going",
     "givingUp": "Giving up…"
+  },
+  "result": {
+    "won": "You won.",
+    "lost": "You lost.",
+    "none": "Nobody won.",
+    "reasonTreasure": "Both runs reached the treasure.",
+    "reasonTie": "The runs tied exactly — penalties, moves and time.",
+    "reasonYouGaveUp": "You gave up.",
+    "reasonOpponentGaveUp": "{name} gave up.",
+    "reasonYouTimedOut": "You ran out of time before finding the treasure.",
+    "reasonOpponentTimedOut": "{name} ran out of time before finding the treasure.",
+    "reasonAbandoned": "The match expired before it was decided.",
+    "decidedByPenalties": "Decided on penalties.",
+    "decidedByMoves": "Penalties were level, so moves decided it.",
+    "decidedByTime": "Penalties and moves were level, so time decided it.",
+    "scoreHeading": "Scores",
+    "you": "You",
+    "penalties": "Penalties",
+    "moves": "Moves",
+    "time": "Time",
+    "didNotFinish": "Did not finish",
+    "theirMaze": "{name}'s labyrinth, and your path through it",
+    "yourMaze": "Your labyrinth, and {name}'s path through it",
+    "backToMatches": "Back to your matches"
   }
 }

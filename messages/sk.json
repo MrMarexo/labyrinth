@@ -214,5 +214,29 @@
     "giveUpYes": "Áno, vzdať sa",
     "giveUpNo": "Pokračovať",
     "givingUp": "Vzdávate sa…"
+  },
+  "result": {
+    "won": "Vyhrali ste.",
+    "lost": "Prehrali ste.",
+    "none": "Nikto nevyhral.",
+    "reasonTreasure": "Oba behy došli k pokladu.",
+    "reasonTie": "Behy skončili presne nerozhodne — v penalizáciách, ťahoch aj čase.",
+    "reasonYouGaveUp": "Vzdali ste sa.",
+    "reasonOpponentGaveUp": "Súper sa vzdal: {name}.",
+    "reasonYouTimedOut": "Vypršal vám čas skôr, než ste našli poklad.",
+    "reasonOpponentTimedOut": "Súperovi vypršal čas skôr, než našiel poklad: {name}.",
+    "reasonAbandoned": "Zápas vypršal skôr, než sa rozhodol.",
+    "decidedByPenalties": "Rozhodli penalizácie.",
+    "decidedByMoves": "Penalizácie boli vyrovnané, rozhodol počet ťahov.",
+    "decidedByTime": "Penalizácie aj ťahy boli vyrovnané, rozhodol čas.",
+    "scoreHeading": "Skóre",
+    "you": "Vy",
+    "penalties": "Penalizácie",
+    "moves": "Ťahy",
+    "time": "Čas",
+    "didNotFinish": "Nedokončené",
+    "theirMaze": "Bludisko hráča {name} a vaša cesta ním",
+    "yourMaze": "Vaše bludisko a cesta hráča {name} ním",
+    "backToMatches": "Späť na vaše zápasy"
   }
 }
