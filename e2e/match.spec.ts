@@ -50,19 +50,14 @@ test.describe("match lifecycle", () => {
     await guest.getByRole("button", { name: "Submit this labyrinth" }).click();
     await guest.getByRole("button", { name: "Submit", exact: true }).click();
 
-    await expect(guest.locator("[data-match-status]")).toHaveAttribute(
-      "data-match-status",
-      "running",
-    );
+    // Since Phase 4 a running match shows the run view in place of the
+    // lobby (spec §10.3.1), so `running` is read off the screen that only
+    // `MatchScreen` renders for that status — and the server sets it only
+    // once both labyrinths are in, which is what the lobby's
+    // `data-opponent-submitted` used to show.
+    await expect(guest.locator("[data-run-view]")).toBeVisible();
     await host.reload();
-    await expect(host.locator("[data-match-status]")).toHaveAttribute(
-      "data-match-status",
-      "running",
-    );
-    await expect(host.locator("[data-opponent-submitted]")).toHaveAttribute(
-      "data-opponent-submitted",
-      "true",
-    );
+    await expect(host.locator("[data-run-view]")).toBeVisible();
   });
 
   test("a submitted labyrinth can no longer be edited", async ({ players }) => {
