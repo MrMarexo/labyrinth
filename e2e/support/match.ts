@@ -9,7 +9,12 @@ import {
 
 import { signedInContext } from "./auth";
 
-type PlayerOptions = { name: string; cellCount: number; gateCount: number };
+type PlayerOptions = {
+  name: string;
+  cellCount: number;
+  gateCount: number;
+  layout?: "open" | "gated";
+};
 
 /**
  * A signed-in page with a valid labyrinth already seeded at the given size.

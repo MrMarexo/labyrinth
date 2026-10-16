@@ -20,3 +20,10 @@ export const SOLVABLE_MAZE_OPTIMAL_MOVES = openMazeOptimalMoves(
 export function solvableDraft(): DraftMaze {
   return openMazeDraft(SOLVABLE_MAZE_CELL_COUNT);
 }
+
+export {
+  GATED_MAZE_CELL_COUNT,
+  GATED_MAZE_GATE_COUNT,
+  GATED_MAZE_ROUTE,
+  gatedMazeDraft,
+} from "~/lib/open-maze";

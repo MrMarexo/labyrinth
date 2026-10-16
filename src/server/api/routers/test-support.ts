@@ -2,11 +2,26 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import { env } from "~/env";
-import { openMazeDraft } from "~/lib/open-maze";
+import {
+  GATED_MAZE_CELL_COUNT,
+  GATED_MAZE_GATE_COUNT,
+  gatedMazeDraft,
+  openMazeDraft,
+} from "~/lib/open-maze";
 import { CELL_COUNT_PRESETS, validateMaze } from "~/maze";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { maze } from "~/server/db/schema";
 import { servingLoopback } from "~/server/env-guards";
+
+/**
+ * Callers that predate the `layout` field send none, and mean the open seed.
+ * zod's discriminated union does not default its discriminator, so the
+ * default is filled in before the union sees the input.
+ */
+const withDefaultLayout = (input: unknown) =>
+  typeof input === "object" && input !== null && !("layout" in input)
+    ? { ...input, layout: "open" }
+    : input;
 
 /**
  * Three independent conditions, the same shape as `E2E_DISABLE_RATE_LIMIT`'s
@@ -48,32 +63,45 @@ export const testSupportRouter = createTRPCRouter({
    */
   seedMaze: protectedProcedure
     .input(
-      z.object({
-        name: z.string().trim().min(1).max(80),
-        cellCount: z
-          .number()
-          .int()
-          .refine(
-            (n): n is (typeof CELL_COUNT_PRESETS)[number] =>
-              (CELL_COUNT_PRESETS as readonly number[]).includes(n),
-            { message: "maze.format.cellCountNotAPreset" },
-          ),
-        // openMazeDraft produces an open maze: no walls, no gates, no keys.
-        // Gated seeding is not supported — Task 8 only ever needs zero, and
-        // teaching the generator to place gates nobody has asked for is
-        // exactly the speculative work this project keeps out. A caller
-        // passing anything else gets zod's default "invalid literal"
-        // message, which falls through to the generic
-        // `errors.validation.invalid` key (see `~/lib/issues`) rather than a
-        // bespoke one — this procedure is test-only, so a precise message
-        // here buys nothing.
-        gateCount: z.literal(0),
-      }),
+      z.preprocess(
+        withDefaultLayout,
+        z.discriminatedUnion("layout", [
+          // The open seed: no walls, no gates, no keys, at any preset size.
+          z.object({
+            layout: z.literal("open"),
+            name: z.string().trim().min(1).max(80),
+            cellCount: z
+              .number()
+              .int()
+              .refine(
+                (n): n is (typeof CELL_COUNT_PRESETS)[number] =>
+                  (CELL_COUNT_PRESETS as readonly number[]).includes(n),
+                { message: "maze.format.cellCountNotAPreset" },
+              ),
+            gateCount: z.literal(0),
+          }),
+          // The gated seed exists at one size only: a generator that placed
+          // gates at every size is speculative work nothing has asked for. A
+          // caller sending any other size or gate count gets zod's default
+          // "invalid literal" message, which falls through to the generic
+          // `errors.validation.invalid` key (see `~/lib/issues`) — this
+          // procedure is test-only, so a precise message buys nothing.
+          z.object({
+            layout: z.literal("gated"),
+            name: z.string().trim().min(1).max(80),
+            cellCount: z.literal(GATED_MAZE_CELL_COUNT),
+            gateCount: z.literal(GATED_MAZE_GATE_COUNT),
+          }),
+        ]),
+      ),
     )
     .mutation(async ({ ctx, input }) => {
       assertEnabled();
 
-      const data = openMazeDraft(input.cellCount);
+      const data =
+        input.layout === "gated"
+          ? gatedMazeDraft()
+          : openMazeDraft(input.cellCount);
       const validation = validateMaze(data, {
         cellCount: input.cellCount,
         gateCount: input.gateCount,
