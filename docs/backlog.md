@@ -12,10 +12,11 @@ so this file is the standing list. When a phase picks one up, delete it here.
   layer in Phase 5.
 - **Live "opponent gave up" push** (Phase 4). Until the realtime layer exists the
   run view learns of it by polling and by its next move being refused. Phase 5.
-- **Rematch, and reusing a maze from a finished match's result screen**
-  (Phase 3). Needed a result screen, which Phase 4 adds.
 
 ## Product, not yet scheduled
+
+- **Rematch, and reusing a maze from a finished match's result screen**
+  (Phase 3; the result screen now exists, Phase 4).
 
 - **Cancelling a match you created** (Phase 3). The 24h sweep closes an unjoined
   match on its own. Needs its own thinking about what cancelling mid-`drawing`
@@ -24,6 +25,11 @@ so this file is the standing list. When a phase picks one up, delete it here.
   the opponent gives up, finishes, or a deadline is near.
 - **Points, rating or win records** (Phase 4). A win is currently `winnerId` on
   a match and nothing more.
+- **A key cell re-announces its key on every visit** (Phase 4). The reducer
+  reports `moved_found_key` each time a runner steps onto a key cell they have
+  already emptied, and the run view announces it. That is harmless, but it reads
+  oddly. The fix belongs in the reducer, and it changes the stored delta, so it
+  needs a replay-compatibility thought first.
 
 ## Technical
 
@@ -35,3 +41,11 @@ so this file is the standing list. When a phase picks one up, delete it here.
   `updated_at` trigger** (Phase 3). The enums live only in the Drizzle types.
 - **An index on `maze (author_id, content_hash)`** (Phase 3), once the library
   is large enough for the reuse lookup to matter.
+- **The run board's "nothing undiscovered" rule has no browser-level test**
+  (Phase 4). The router tests prove `run.get` returns only discovered cells, but
+  nothing proves `RunBoard` draws only what it is given. An e2e test that counts
+  `[data-run-cell]` against moves made would close it.
+- **The e2e "result waits for both" check is instantaneous** (Phase 4). It
+  asserts the opponent's result is absent right after the host finishes, before
+  any poll has run, so it proves less than its title; the router tests cover the
+  rule server-side. Fix: wait for the next `match.get` poll response, then assert.
