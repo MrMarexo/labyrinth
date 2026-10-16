@@ -226,6 +226,8 @@
     "reasonYouTimedOut": "Vypršal vám čas skôr, než ste našli poklad.",
     "reasonOpponentTimedOut": "Súperovi vypršal čas skôr, než našiel poklad: {name}.",
     "reasonAbandoned": "Zápas vypršal skôr, než sa rozhodol.",
+    "reasonAbandonedYou": "Zápas vypršal a vám vypršal čas.",
+    "reasonAbandonedOpponent": "Zápas vypršal a čas vypršal hráčovi {name}.",
     "decidedByPenalties": "Rozhodli penalizácie.",
     "decidedByMoves": "Penalizácie boli vyrovnané, rozhodol počet ťahov.",
     "decidedByTime": "Penalizácie aj ťahy boli vyrovnané, rozhodol čas.",

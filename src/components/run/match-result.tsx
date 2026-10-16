@@ -46,7 +46,11 @@ export function MatchResult({ matchId }: { matchId: string }) {
         : t("reasonOpponentTimedOut", { name });
       break;
     case "abandoned":
-      reasonText = t("reasonAbandoned");
+      reasonText = you.timedOut
+        ? t("reasonAbandonedYou")
+        : opponent?.timedOut
+          ? t("reasonAbandonedOpponent", { name })
+          : t("reasonAbandoned");
       break;
   }
 
@@ -117,7 +121,9 @@ export function MatchResult({ matchId }: { matchId: string }) {
               <td className={bold("time")}>
                 {score.elapsedMs === null
                   ? t("didNotFinish")
-                  : formatElapsed(score.elapsedMs)}
+                  : formatElapsed(score.elapsedMs, {
+                      tenths: decidedBy === "time",
+                    })}
               </td>
             </tr>
           ))}

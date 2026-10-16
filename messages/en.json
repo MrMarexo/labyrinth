@@ -226,6 +226,8 @@
     "reasonYouTimedOut": "You ran out of time before finding the treasure.",
     "reasonOpponentTimedOut": "{name} ran out of time before finding the treasure.",
     "reasonAbandoned": "The match expired before it was decided.",
+    "reasonAbandonedYou": "The match expired, and you ran out of time.",
+    "reasonAbandonedOpponent": "The match expired, and {name} ran out of time.",
     "decidedByPenalties": "Decided on penalties.",
     "decidedByMoves": "Penalties were level, so moves decided it.",
     "decidedByTime": "Penalties and moves were level, so time decided it.",

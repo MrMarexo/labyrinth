@@ -17,4 +17,12 @@ describe("formatElapsed", () => {
   it("truncates rather than rounds, so 59.9s never reads as a minute", () => {
     expect(formatElapsed(59_900)).toBe("0:59");
   });
+
+  it("appends a truncated tenth of a second on request", () => {
+    expect(formatElapsed(42_399, { tenths: true })).toBe("0:42.3");
+    expect(formatElapsed(0, { tenths: true })).toBe("0:00.0");
+    expect(formatElapsed(59_999, { tenths: true })).toBe("0:59.9");
+    expect(formatElapsed(3_600_000, { tenths: true })).toBe("1:00:00.0");
+    expect(formatElapsed(3_600_000 + 100, { tenths: false })).toBe("1:00:00");
+  });
 });
