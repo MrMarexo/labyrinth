@@ -1,7 +1,7 @@
 import { getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
 
-import { MatchLobby } from "~/components/match/match-lobby";
+import { MatchScreen } from "~/components/match/match-screen";
 import { api } from "~/trpc/server";
 
 export default async function MatchPage({
@@ -23,7 +23,7 @@ export default async function MatchPage({
   return (
     <main className="mx-auto max-w-3xl space-y-6 p-8">
       <h1 className="text-3xl font-bold">{t("title")}</h1>
-      <MatchLobby matchId={id} initialData={found} />
+      <MatchScreen matchId={id} initialData={found} />
     </main>
   );
 }

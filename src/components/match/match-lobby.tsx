@@ -61,15 +61,12 @@ export function MatchLobby({ matchId, initialData }: MatchLobbyProps) {
   let statusText: string;
   if (data.status === "awaiting_opponent") {
     statusText = t("waitingForOpponent");
-  } else if (data.status === "running") {
-    statusText = `${t("bothIn")} ${t("runsComingSoon")}`;
   } else if (data.status === "abandoned") {
     statusText = t("abandoned");
   } else {
-    // "drawing", and "complete" — the latter is unreachable in Phase 3 (see
-    // src/server/match/sweep.ts), but when it does become reachable both
-    // players will necessarily have submitted already, so this combination
-    // still reads correctly until a dedicated winner sentence exists.
+    // "drawing", plus a "complete" match that never reached "running" — which
+    // cannot happen, since "complete" requires both runs. A running match is
+    // `MatchScreen`'s to render, not the lobby's.
     const yours = data.you.hasSubmitted ? t("youSubmitted") : t("youDraw");
     const theirs = data.opponent?.hasSubmitted
       ? t("opponentSubmitted")
