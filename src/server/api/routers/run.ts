@@ -1,9 +1,11 @@
 import { TRPCError } from "@trpc/server";
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
 import {
   deadlineFor,
+  decidingField,
+  elapsedMs,
   isTerminal,
   resolveCompletion,
   type RunFacts,
@@ -15,10 +17,12 @@ import {
   freshRun,
   heldKeys,
   mazeSchema,
+  pathFrom,
   type Maze,
+  type Point,
 } from "~/maze";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { match, matchPlayer, maze, move } from "~/server/db/schema";
+import { match, matchPlayer, maze, move, user } from "~/server/db/schema";
 import {
   notYours,
   participantRows,
@@ -206,5 +210,168 @@ export const runRouter = createTRPCRouter({
 
         return { delta, matchOver: completion.kind === "complete" };
       });
+    }),
+
+  /** Spec §9.2. Confirmed in the client; irreversible here. */
+  giveUp: protectedProcedure
+    .input(z.object({ matchId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const now = new Date();
+      const me = ctx.session.user.id;
+
+      return ctx.db.transaction(async (tx) => {
+        const found = await participantRows(tx, input.matchId, me, {
+          lock: true,
+        });
+        if (!found) notYours();
+        const { row, players } = found;
+
+        assertRunOpen(row, now);
+        const you = players.find((p) => p.userId === me)!;
+        if (you.finishedAt !== null) refuse("errors.runAlreadyFinished");
+
+        await tx
+          .update(matchPlayer)
+          .set({ gaveUpAt: now })
+          .where(
+            and(eq(matchPlayer.matchId, row.id), eq(matchPlayer.userId, me)),
+          );
+
+        const seated = players.map((p) =>
+          p.userId === me ? { ...p, gaveUpAt: now } : p,
+        );
+        const completion = resolveCompletion(seated.map(factsFor));
+        // A give-up completes the match by definition; `resolveCompletion`
+        // returning anything else would be a bug in it, not a state to
+        // handle.
+        if (completion.kind !== "complete") {
+          throw new Error("a give-up must complete the match");
+        }
+
+        await tx
+          .update(match)
+          .set({
+            status: "complete",
+            winnerId: completion.winnerId,
+            endReason: completion.endReason,
+            lastActivityAt: now,
+          })
+          .where(eq(match.id, row.id));
+
+        return { status: "complete" as const };
+      });
+    }),
+
+  /**
+   * Spec §10.3.1. Returns both mazes — the second sanctioned reader of
+   * `maze.data` (see `routers/AGENTS.md`) — and only once the match is over
+   * **and** both players submitted. A match abandoned during `drawing` never
+   * exposed either maze to the other player, and `mazesFacedBy` agrees: it
+   * counts a maze as faced only once the opponent submitted too. Revealing
+   * one here would show a maze its author may still reuse against this
+   * opponent.
+   */
+  result: protectedProcedure
+    .input(z.object({ matchId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const me = ctx.session.user.id;
+      const found = await participantRows(ctx.db, input.matchId, me);
+      if (!found) notYours();
+      const { row, players } = found;
+      if (row.status !== "complete" && row.status !== "abandoned") {
+        refuse("errors.resultNotReady");
+      }
+
+      const you = players.find((p) => p.userId === me)!;
+      const them = players.find((p) => p.userId !== me) ?? null;
+
+      const names = await ctx.db
+        .select({ id: user.id, name: user.name })
+        .from(user)
+        .where(
+          inArray(
+            user.id,
+            players.map((p) => p.userId),
+          ),
+        );
+      const nameOf = (id: string) => names.find((n) => n.id === id)?.name ?? "";
+
+      const score = (p: PlayerRow) => ({
+        displayName: nameOf(p.userId),
+        penalties: p.runState?.state.penalties ?? 0,
+        moves: p.runState?.state.moves ?? 0,
+        elapsedMs: elapsedMs(factsFor(p)),
+        finished: p.finishedAt !== null,
+        gaveUp: p.gaveUpAt !== null,
+        timedOut: p.forfeitedAt !== null,
+      });
+
+      const quitter = players.find((p) => p.gaveUpAt !== null) ?? null;
+      const reason =
+        row.status === "abandoned"
+          ? ("abandoned" as const)
+          : quitter
+            ? ("gaveUp" as const)
+            : row.endReason === "finished"
+              ? row.winnerId === null
+                ? ("tie" as const)
+                : ("treasure" as const)
+              : ("timeout" as const);
+
+      let mazes: {
+        theirs: { maze: Maze; path: Point[] };
+        yours: { maze: Maze; path: Point[] };
+      } | null = null;
+
+      if (them && you.submittedAt !== null && them.submittedAt !== null) {
+        const mazeRows = await ctx.db
+          .select({ id: maze.id, data: maze.data })
+          .from(maze)
+          .where(inArray(maze.id, [you.mazeId!, them.mazeId!]));
+        const log = await ctx.db
+          .select({ runnerId: move.runnerId, delta: move.delta })
+          .from(move)
+          .where(eq(move.matchId, row.id))
+          .orderBy(asc(move.seq));
+
+        const load = (id: string) =>
+          mazeSchema.parse(mazeRows.find((m) => m.id === id)!.data);
+        // Deltas are start-relative (see RunnerDelta); the result draws on
+        // the full maze, so translate back by its start cell.
+        const pathOn = (m: Maze, runnerId: string) =>
+          pathFrom(
+            log.filter((l) => l.runnerId === runnerId).map((l) => l.delta),
+          ).map((p) => ({ x: p.x + m.start.x, y: p.y + m.start.y }));
+
+        const theirMaze = load(them.mazeId!);
+        const yourMaze = load(you.mazeId!);
+        mazes = {
+          theirs: { maze: theirMaze, path: pathOn(theirMaze, me) },
+          yours: { maze: yourMaze, path: pathOn(yourMaze, them.userId) },
+        };
+      }
+
+      return {
+        status: row.status,
+        outcome:
+          row.winnerId === null
+            ? ("none" as const)
+            : row.winnerId === me
+              ? ("won" as const)
+              : ("lost" as const),
+        reason,
+        gaveUpBy: quitter
+          ? quitter.userId === me
+            ? ("you" as const)
+            : ("opponent" as const)
+          : null,
+        decidedBy:
+          reason === "treasure" && them
+            ? decidingField(factsFor(you), factsFor(them))
+            : null,
+        you: score(you),
+        opponent: them ? score(them) : null,
+        mazes,
+      };
     }),
 });

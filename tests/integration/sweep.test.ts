@@ -9,11 +9,13 @@ import { db } from "~/server/db";
 import { match, matchPlayer } from "~/server/db/schema";
 import { sweepExpiredMatches } from "~/server/match/sweep";
 
+import { GATED_MAZE_ROUTE } from "../fixtures/maze";
 import {
   SOLVABLE_MAZE_CELL_COUNT,
   SOLVABLE_MAZE_GATE_COUNT,
   solvableDraft,
 } from "../fixtures/maze";
+import { runningMatch } from "./players";
 import { sweepAll } from "./support";
 
 async function signedIn() {
@@ -207,5 +209,46 @@ describe("sweepExpiredMatches", () => {
     const notYetDueRow = rows.find((r) => r.id === notYetDue.id);
     expect(overdueRow?.status).toBe("abandoned");
     expect(notYetDueRow?.status).toBe("awaiting_opponent");
+  });
+
+  it("gives the finisher the win once the other runner's 24h is up", async () => {
+    const { host, hostId, guestId, matchId } = await runningMatch();
+    for (const [i, dir] of GATED_MAZE_ROUTE.entries()) {
+      await host.run.move({ matchId, seq: i + 1, dir });
+    }
+    const [row] = await db.select().from(match).where(eq(match.id, matchId));
+
+    await sweepAll(db, new Date(row!.deadlineAt.getTime() + 1));
+
+    const [after] = await db.select().from(match).where(eq(match.id, matchId));
+    expect(after).toMatchObject({
+      status: "complete",
+      endReason: "forfeit",
+      winnerId: hostId,
+    });
+    const [guestRow] = await db
+      .select()
+      .from(matchPlayer)
+      .where(eq(matchPlayer.userId, guestId));
+    expect(guestRow!.forfeitedAt).not.toBeNull();
+  });
+
+  it("abandons a one-mover match on row 6, blaming the one who never moved", async () => {
+    const { host, guestId, hostId, matchId } = await runningMatch();
+    await host.run.move({ matchId, seq: 1, dir: "S" });
+    const [row] = await db.select().from(match).where(eq(match.id, matchId));
+
+    await sweepAll(db, new Date(row!.deadlineAt.getTime() + 1));
+
+    const [after] = await db.select().from(match).where(eq(match.id, matchId));
+    expect(after).toMatchObject({ status: "abandoned", winnerId: null });
+    const players = await db
+      .select()
+      .from(matchPlayer)
+      .where(eq(matchPlayer.matchId, matchId));
+    expect(
+      players.find((p) => p.userId === guestId)!.forfeitedAt,
+    ).not.toBeNull();
+    expect(players.find((p) => p.userId === hostId)!.forfeitedAt).toBeNull();
   });
 });

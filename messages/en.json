@@ -52,6 +52,7 @@
     "matchCodeUnknown": "No match has that code.",
     "matchFull": "That match already has two players.",
     "matchExpired": "That match has expired.",
+    "resultNotReady": "The result is not ready yet.",
     "alreadyInMatch": "You are already in that match.",
     "mazeInvalid": "That labyrinth is not playable yet.",
     "mazeSettingsMismatch": "That labyrinth does not match this match's size.",

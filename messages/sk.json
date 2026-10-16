@@ -52,6 +52,7 @@
     "matchCodeUnknown": "Žiadny zápas nemá taký kód.",
     "matchFull": "Tento zápas už má dvoch hráčov.",
     "matchExpired": "Platnosť tohto zápasu vypršala.",
+    "resultNotReady": "Výsledok ešte nie je k dispozícii.",
     "alreadyInMatch": "V tomto zápase už ste.",
     "mazeInvalid": "Toto bludisko sa ešte nedá hrať.",
     "mazeSettingsMismatch": "Veľkosť tohto bludiska nezodpovedá tomuto zápasu.",
