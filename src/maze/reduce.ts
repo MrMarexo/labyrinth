@@ -2,14 +2,17 @@ import type { Direction, Maze, Orientation, Point } from "./format";
 import { cellKey, edgeBetween, edgeKey, step } from "./geometry";
 
 /** Spec §7. `blocked_boundary` is server-side only — see RunnerDelta. */
-export type ServerOutcome =
-  | "moved"
-  | "moved_found_key"
-  | "moved_found_treasure"
-  | "moved_through_gate"
-  | "blocked_wall"
-  | "blocked_gate"
-  | "blocked_boundary";
+export const SERVER_OUTCOMES = [
+  "moved",
+  "moved_found_key",
+  "moved_found_treasure",
+  "moved_through_gate",
+  "blocked_wall",
+  "blocked_gate",
+  "blocked_boundary",
+] as const;
+
+export type ServerOutcome = (typeof SERVER_OUTCOMES)[number];
 
 export type RunnerOutcome = Exclude<ServerOutcome, "blocked_boundary">;
 

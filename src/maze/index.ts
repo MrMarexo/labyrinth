@@ -14,6 +14,7 @@ export * from "./format";
 export * from "./geometry";
 export * from "./normalize";
 export * from "./reduce";
+export * from "./run";
 export * from "./solve";
 export * from "./validate";
 
