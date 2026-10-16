@@ -15,7 +15,7 @@ const MAX_WAITING = 1;
 type Handlers = {
   onDelta: (delta: RunnerDelta) => void;
   /** The match ended under us: the opponent gave up, or the deadline passed. */
-  onMatchOver: () => void;
+  onMatchOver: (key: "errors.matchOver" | "errors.matchExpired") => void;
   /** Anything else went wrong. Trust the server: refetch and start again. */
   onResync: () => void;
 };
@@ -31,10 +31,14 @@ export function useMoveQueue(
   nextSeq: number,
   handlers: Handlers,
 ) {
+  const utils = api.useUtils();
   const move = api.run.move.useMutation();
   const queue = useRef<Direction[]>([]);
   const busy = useRef(false);
   const seq = useRef(nextSeq);
+  // After an error the server is the authority, so the next `nextSeq` may
+  // move the counter backwards; otherwise it only ever moves forward.
+  const resyncing = useRef(false);
   const latest = useRef(handlers);
   const [pending, setPending] = useState(false);
 
@@ -43,7 +47,9 @@ export function useMoveQueue(
   });
 
   useEffect(() => {
-    if (!busy.current) seq.current = nextSeq;
+    if (busy.current) return;
+    seq.current = resyncing.current ? nextSeq : Math.max(seq.current, nextSeq);
+    resyncing.current = false;
   }, [nextSeq]);
 
   const pump = useCallback(async () => {
@@ -54,17 +60,21 @@ export function useMoveQueue(
     busy.current = true;
     setPending(true);
     try {
+      // A background refetch that began before this move would land after it
+      // and roll the cache (and `nextSeq`) back to the older snapshot.
+      await utils.run.get.cancel({ matchId });
       const result = await move.mutateAsync({ matchId, seq: seq.current, dir });
       seq.current += 1;
       latest.current.onDelta(result.delta);
       if (result.delta.finished || result.matchOver) queue.current = [];
-      if (result.matchOver) latest.current.onMatchOver();
+      if (result.matchOver) latest.current.onMatchOver("errors.matchOver");
     } catch (error) {
       queue.current = [];
       const message = (error as { message?: string }).message;
       if (message === "errors.matchOver" || message === "errors.matchExpired") {
-        latest.current.onMatchOver();
+        latest.current.onMatchOver(message);
       } else {
+        resyncing.current = true;
         latest.current.onResync();
       }
     } finally {
@@ -72,7 +82,7 @@ export function useMoveQueue(
       setPending(false);
       void pump();
     }
-  }, [matchId, move]);
+  }, [matchId, move, utils]);
 
   const enqueue = useCallback(
     (dir: Direction) => {

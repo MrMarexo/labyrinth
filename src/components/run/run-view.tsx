@@ -1,6 +1,6 @@
 "use client";
 
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 
 import { gateColour } from "~/components/editor/gate-colours";
@@ -49,20 +49,32 @@ function isTypingTarget(target: EventTarget | null): boolean {
 export function RunView({
   matchId,
   opponentName,
+  deadlineAt,
 }: {
   matchId: string;
   opponentName: string;
+  deadlineAt: Date;
 }) {
   const t = useTranslations("run");
   const te = useTranslations();
+  const format = useFormatter();
   const utils = api.useUtils();
 
   const { data } = api.run.get.useQuery({ matchId });
   const [bump, setBump] = useState<Bump | null>(null);
   const [announcement, setAnnouncement] = useState("");
   const [confirming, setConfirming] = useState(false);
+  // The match is `running` until the sweep closes it, so a refused move past
+  // the deadline needs showing here rather than waiting for a status change.
+  const [expired, setExpired] = useState(false);
 
   const giveUp = api.run.giveUp.useMutation({
+    onError: (error) => {
+      const { key } = resolveErrorKey(te, error, "errors.unknown");
+      if (key === "errors.matchOver" || key === "errors.matchExpired") {
+        void utils.match.get.invalidate({ id: matchId });
+      }
+    },
     onSuccess: () => {
       void utils.match.get.invalidate({ id: matchId });
     },
@@ -110,8 +122,12 @@ export function RunView({
 
   const { enqueue, pending } = useMoveQueue(matchId, data?.nextSeq ?? 1, {
     onDelta,
-    onMatchOver: () => {
+    onMatchOver: (key) => {
       void utils.match.get.invalidate({ id: matchId });
+      if (key === "errors.matchExpired") {
+        setExpired(true);
+        setAnnouncement(te("errors.matchExpired"));
+      }
     },
     onResync: () => {
       void utils.run.get.invalidate({ matchId });
@@ -127,7 +143,7 @@ export function RunView({
     },
   });
 
-  const finished = data?.finished ?? true;
+  const finished = (data?.finished ?? true) || expired;
   useEffect(() => {
     if (finished || confirming) return;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -189,6 +205,20 @@ export function RunView({
         pending={pending}
       />
       <p className="text-muted text-sm">{t("hint")}</p>
+      <p data-run-deadline className="text-muted text-sm">
+        {t("deadline", {
+          when: format.dateTime(deadlineAt, {
+            dateStyle: "medium",
+            timeStyle: "short",
+          }),
+        })}
+      </p>
+
+      {expired && (
+        <p role="alert" data-run-expired className="text-danger text-sm">
+          {te("errors.matchExpired")}
+        </p>
+      )}
 
       {data.finished ? (
         <p data-run-finished>
@@ -197,7 +227,7 @@ export function RunView({
             moves: data.moves,
           })}
         </p>
-      ) : (
+      ) : expired ? null : (
         <>
           <div
             role="group"

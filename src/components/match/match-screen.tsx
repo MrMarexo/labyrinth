@@ -42,6 +42,7 @@ export function MatchScreen({
       <RunView
         matchId={matchId}
         opponentName={data.opponent?.displayName ?? ""}
+        deadlineAt={data.deadlineAt}
       />
     );
   }

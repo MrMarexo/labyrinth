@@ -191,6 +191,7 @@
   },
   "run": {
     "boardLabel": "Váš pohľad na bludisko",
+    "deadline": "Váš beh vyprší {when}.",
     "hint": "Pohybujte sa šípkami alebo klávesmi WASD. Každý náraz stojí penalizáciu.",
     "penaltiesLabel": "Penalizácie",
     "movesLabel": "Ťahy",

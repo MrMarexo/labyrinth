@@ -191,6 +191,7 @@
   },
   "run": {
     "boardLabel": "Your view of the labyrinth",
+    "deadline": "Your run expires {when}.",
     "hint": "Arrow keys or WASD to move. Every bump costs a penalty.",
     "penaltiesLabel": "Penalties",
     "movesLabel": "Moves",
