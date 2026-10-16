@@ -443,6 +443,12 @@ match at a fixed 24h from the unlocking and record fault against nobody.
 A scheduled sweep evaluates these, so a stale match closes on its own rather
 than waiting for someone to open it.
 
+The deadline a running player sees is the match's single `deadlineAt`, so it
+moves with the opponent's run: a player can tell from it that the opponent has
+finished (the clock drops to 24h from their finish). This is accepted. Hiding a
+clock that is running against a player is worse than the disclosure, and it
+reveals that the opponent finished, not their score. Phase 4 settled this.
+
 ### 9.2 Giving up
 
 A player in a `running` match may give up at any point before they finish. It
