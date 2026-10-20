@@ -192,6 +192,8 @@
     "opponentForfeited": "Vášmu súperovi vypršal čas."
   },
   "run": {
+    "watching": "{count, plural, one {Sleduje # človek} few {Sledujú # ľudia} other {Sleduje # ľudí}}",
+    "watchLive": "Sledovať súpera naživo",
     "boardLabel": "Váš pohľad na bludisko",
     "deadline": "Váš beh vyprší {when}.",
     "hint": "Pohybujte sa šípkami alebo klávesmi WASD. Každý náraz stojí penalizáciu.",

@@ -4,8 +4,10 @@ import { useFormatter, useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 
 import { gateColour } from "~/components/editor/gate-colours";
+import { useChannel } from "~/components/realtime/use-channel";
 import { RunBoard, type Bump } from "~/components/run/run-board";
 import { useMoveQueue } from "~/components/run/use-move-queue";
+import { Link } from "~/i18n/navigation";
 import { resolveErrorKey } from "~/lib/resolve-error-key";
 import {
   heldKeys,
@@ -50,10 +52,12 @@ export function RunView({
   matchId,
   opponentName,
   deadlineAt,
+  runChannel,
 }: {
   matchId: string;
   opponentName: string;
   deadlineAt: Date;
+  runChannel: string;
 }) {
   const t = useTranslations("run");
   const te = useTranslations();
@@ -61,6 +65,9 @@ export function RunView({
   const utils = api.useUtils();
 
   const { data } = api.run.get.useQuery({ matchId });
+  const [members, setMembers] = useState(0);
+  useChannel(runChannel, { onMembers: setMembers });
+  const watchers = Math.max(0, members - 1);
   const [bump, setBump] = useState<Bump | null>(null);
   const [announcement, setAnnouncement] = useState("");
   const [confirming, setConfirming] = useState(false);
@@ -190,6 +197,11 @@ export function RunView({
             )}
           </div>
         </div>
+        {watchers >= 1 && (
+          <span data-watchers={watchers} className="text-muted text-sm">
+            {t("watching", { count: watchers })}
+          </span>
+        )}
         {pending && <span data-run-pending hidden />}
       </div>
 
@@ -221,12 +233,21 @@ export function RunView({
       )}
 
       {data.finished ? (
-        <p data-run-finished>
-          {t("finishedWaiting", {
-            penalties: data.penalties,
-            moves: data.moves,
-          })}
-        </p>
+        <div data-run-finished className="space-y-2">
+          <p>
+            {t("finishedWaiting", {
+              penalties: data.penalties,
+              moves: data.moves,
+            })}
+          </p>
+          <Link
+            href={`/matches/${matchId}/watch?run=opponent`}
+            data-watch-live
+            className="text-accent inline-block text-sm underline"
+          >
+            {t("watchLive")}
+          </Link>
+        </div>
       ) : expired ? null : (
         <>
           <div

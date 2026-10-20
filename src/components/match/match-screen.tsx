@@ -1,17 +1,17 @@
 "use client";
 
+import { useChannel } from "~/components/realtime/use-channel";
 import { MatchLobby } from "~/components/match/match-lobby";
 import { MatchResult } from "~/components/run/match-result";
 import { RunView } from "~/components/run/run-view";
-import { isTerminal } from "~/match";
+import { EVENTS, isTerminal } from "~/match";
 import { api, type RouterOutputs } from "~/trpc/react";
 
 /**
- * How often an open run checks whether the match ended under it — the
- * opponent gave up, or finished second. It is the whole notification until
- * the realtime layer exists (spec §9.2, Phase 5).
+ * The fallback for a dropped connection: pings on the match channel are the
+ * notification (spec §8), and this catches what a lost connection missed.
  */
-const POLL_MS = 20_000;
+const POLL_MS = 60_000;
 
 /**
  * One URL for the whole match (spec §10.3.1): the lobby until the runs
@@ -31,9 +31,23 @@ export function MatchScreen({
     {
       initialData,
       refetchInterval: (query) =>
-        query.state.data?.status === "running" ? POLL_MS : false,
+        query.state.data && !isTerminal(query.state.data.status)
+          ? POLL_MS
+          : false,
     },
   );
+
+  const utils = api.useUtils();
+  const refresh = () => {
+    void utils.match.get.invalidate({ id: matchId });
+    void utils.run.get.invalidate({ matchId });
+  };
+  useChannel(data.channels.match, {
+    onEvent: (event) => {
+      if (event === EVENTS.changed) refresh();
+    },
+    onReconnect: refresh,
+  });
 
   const ran = data.you.hasSubmitted && (data.opponent?.hasSubmitted ?? false);
 
@@ -43,6 +57,7 @@ export function MatchScreen({
         matchId={matchId}
         opponentName={data.opponent?.displayName ?? ""}
         deadlineAt={data.deadlineAt}
+        runChannel={data.channels.yourRun}
       />
     );
   }
