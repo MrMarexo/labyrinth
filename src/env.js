@@ -28,6 +28,14 @@ export const env = createEnv({
     // dev` does not demand it; the route refuses every request when it is
     // unset, which is the right default for a secret.
     CRON_SECRET: z.string().min(32).optional(),
+    // Spec §8.1. All four or none: without them the server publishes to the
+    // in-process bus, which only reaches browsers on the same Node process
+    // (local dev, `next start`, the e2e suite). A deployment without them
+    // still works — clients fall back to polling.
+    PUSHER_APP_ID: z.string().optional(),
+    PUSHER_KEY: z.string().optional(),
+    PUSHER_SECRET: z.string().optional(),
+    PUSHER_CLUSTER: z.string().optional(),
     NODE_ENV: z
       .enum(["development", "test", "production"])
       .default("development"),
@@ -39,7 +47,10 @@ export const env = createEnv({
    * `NEXT_PUBLIC_`.
    */
   client: {
-    // NEXT_PUBLIC_CLIENTVAR: z.string(),
+    // The public half of the Pusher config. Set both, or the client uses the
+    // local event stream.
+    NEXT_PUBLIC_PUSHER_KEY: z.string().optional(),
+    NEXT_PUBLIC_PUSHER_CLUSTER: z.string().optional(),
   },
 
   /**
@@ -54,6 +65,12 @@ export const env = createEnv({
     E2E_DISABLE_RATE_LIMIT: process.env.E2E_DISABLE_RATE_LIMIT,
     E2E_TEST_SUPPORT: process.env.E2E_TEST_SUPPORT,
     CRON_SECRET: process.env.CRON_SECRET,
+    PUSHER_APP_ID: process.env.PUSHER_APP_ID,
+    PUSHER_KEY: process.env.PUSHER_KEY,
+    PUSHER_SECRET: process.env.PUSHER_SECRET,
+    PUSHER_CLUSTER: process.env.PUSHER_CLUSTER,
+    NEXT_PUBLIC_PUSHER_KEY: process.env.NEXT_PUBLIC_PUSHER_KEY,
+    NEXT_PUBLIC_PUSHER_CLUSTER: process.env.NEXT_PUBLIC_PUSHER_CLUSTER,
     NODE_ENV: process.env.NODE_ENV,
     // NEXT_PUBLIC_CLIENTVAR: process.env.NEXT_PUBLIC_CLIENTVAR,
   },
