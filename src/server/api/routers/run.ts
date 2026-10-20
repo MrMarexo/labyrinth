@@ -440,10 +440,11 @@ export const runRouter = createTRPCRouter({
         .from(move)
         .where(and(eq(move.matchId, row.id), eq(move.runnerId, runner.userId)))
         .orderBy(asc(move.seq));
-      const [named] = await ctx.db
-        .select({ name: user.name })
+      const names = await ctx.db
+        .select({ id: user.id, name: user.name })
         .from(user)
-        .where(eq(user.id, runner.userId));
+        .where(inArray(user.id, [runner.userId, author.userId]));
+      const nameOf = (id: string) => names.find((n) => n.id === id)?.name ?? "";
 
       const live =
         !isTerminal(row.status) &&
@@ -455,7 +456,8 @@ export const runRouter = createTRPCRouter({
         moves: log,
         live,
         channel: live ? runChannel(row.id, runner.userId) : null,
-        runnerName: named?.name ?? "",
+        runnerName: nameOf(runner.userId),
+        authorName: nameOf(author.userId),
       };
     }),
 });

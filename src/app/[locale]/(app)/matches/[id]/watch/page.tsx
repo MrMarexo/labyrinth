@@ -21,7 +21,11 @@ export default async function WatchPage({
 
   return (
     <main className="mx-auto max-w-5xl space-y-6 p-8">
-      <WatchView matchId={id} whose={whose} />
+      <WatchView
+        matchId={id}
+        whose={whose}
+        matchChannel={found.channels.match}
+      />
     </main>
   );
 }

@@ -51,9 +51,11 @@ function isControlTarget(target: EventTarget | null): boolean {
 export function WatchView({
   matchId,
   whose,
+  matchChannel,
 }: {
   matchId: string;
   whose: Whose;
+  matchChannel: string;
 }) {
   const t = useTranslations("watch");
   const te = useTranslations();
@@ -82,8 +84,9 @@ export function WatchView({
     <WatchPlayer
       matchId={matchId}
       whose={whose}
+      matchChannel={matchChannel}
       data={data}
-      refetch={() => void refetch()}
+      refetch={refetch}
     />
   );
 }
@@ -92,13 +95,16 @@ export function WatchView({
 function WatchPlayer({
   matchId,
   whose,
+  matchChannel,
   data,
   refetch,
 }: {
   matchId: string;
   whose: Whose;
+  matchChannel: string;
   data: Replay;
-  refetch: () => void;
+  /** react-query's refetch, which keeps its identity across renders. */
+  refetch: () => Promise<unknown>;
 }) {
   const t = useTranslations("watch");
   const tr = useTranslations("run");
@@ -122,8 +128,28 @@ function WatchPlayer({
       setMoves((m) => mergeMoves(m, [move]));
       if (move.delta.finished) setLive(false);
     },
-    onReconnect: refetch,
+    onReconnect: () => void refetch(),
   });
+
+  // A run that ends without a finishing move (a give-up, or expiry) is
+  // announced only on the match channel; the refetch then reports it over.
+  useChannel(live ? matchChannel : null, {
+    onEvent: (event) => {
+      if (event === EVENTS.changed) void refetch();
+    },
+    onReconnect: () => void refetch(),
+  });
+
+  // A move published between the first fetch and the subscription is never
+  // delivered, and every later move waits behind the gap. Ask the log once
+  // per new move count, so a gap a refetch cannot close is not hammered.
+  const gapRefetchedAt = useRef<number | null>(null);
+  useEffect(() => {
+    if (moves.length <= timeline.length) return;
+    if (gapRefetchedAt.current === moves.length) return;
+    gapRefetchedAt.current = moves.length;
+    void refetch();
+  }, [moves.length, timeline.length, refetch]);
 
   const [state, dispatch] = useReducer(playback, undefined, () =>
     initialPlayback(playable(data.moves).length, data.live),
@@ -193,11 +219,11 @@ function WatchPlayer({
         <h1 className="text-3xl font-bold">
           {whose === "opponent"
             ? t("opponentTitle", { name: data.runnerName })
-            : t("mineTitle", { name: data.runnerName })}
+            : t("mineTitle", { name: data.authorName })}
         </h1>
         {state.live && (
           <span
-            data-live
+            data-live-badge
             className="border-danger text-danger rounded-full border px-2 py-0.5 text-xs font-medium uppercase"
           >
             {t("live")}

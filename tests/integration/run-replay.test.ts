@@ -64,6 +64,8 @@ describe("run.replay", () => {
     const mine = await host.run.replay({ matchId, whose: "mine" });
     expect(mine.live).toBe(false);
     expect(mine.moves).toHaveLength(GATED_MAZE_ROUTE.length);
+    // Both test users share a name, so this proves only that it is returned.
+    expect(mine.authorName).toBe("Test Person");
   });
 
   it("refuses someone not in the match", async () => {
