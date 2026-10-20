@@ -373,11 +373,42 @@ feature that will actually get used; live spectating is the same component with
 a different source. Sharing the component is what stops the two drifting apart
 visually.
 
-**Spectating leaks nothing.** A watching author sees their own maze, which they
-already know, plus the runner's position within it. They learn nothing about
-the maze *they* still have to solve, because that is the other player's
-creation. Watching is therefore unrestricted and needs no gating on the
-watcher's own run state.
+**Watching opens when your own run is over.** A watching author sees their own
+maze, which they already know, plus the runner's position within it, so they
+learn nothing about the maze *they* still have to solve. But they do learn the
+runner's progress — every bump, the running penalty count — and a player who
+watched before running would play to a known target, which §9 exists to
+prevent. So the author may join the runner's channel, and read their run
+through `run.replay`, only once the author's own run has reached the treasure or
+the match has ended. The first draft said watching needed no gating; that
+missed the score, and Phase 5 corrected it.
+
+One consequence is accepted: the runner's "1 watching" badge can only light up
+once the opponent has finished, so it tells the runner that much. The deadline
+already discloses the same fact (§9.1).
+
+**Two channels.** `run-{matchId}-{runnerId}` (presence) carries each move's
+delta with its `seq`; the runner joins it only for the member count, the author
+to watch. `match-{matchId}` (private, both players) carries a payload-free
+"changed" ping on join, submit, give-up and completion, so the lobby updates
+live and an open run learns at once that the opponent gave up. Pings carry no
+data — the client refetches through the ordinary procedures, so the channel can
+disclose nothing they would not. A slow poll (60s) remains as the fallback for
+a dropped connection.
+
+**Publishing never fails a move.** The server publishes after the transaction
+commits; a publish error is logged and swallowed. A watcher who missed a delta
+recovers it from the move log, deduplicating by `seq`.
+
+**Replay timing is a fixed pace**, not the recorded intervals: an asynchronous
+run can pause for hours between moves. 1× is four moves a second, with 2×, 4×
+and 8×.
+
+**Who can replay what.** During the match, the author can replay the
+opponent's run through the author's maze — under the same gate as watching.
+After the match, both players can replay both runs, under the result screen's
+rule (§10.3.1): only once both mazes were submitted. Nobody outside the match
+can watch or replay.
 
 ### 8.1 Publisher abstraction
 
@@ -387,6 +418,16 @@ development and test. Pusher in CI is flaky and rate-limited; the e2e suite runs
 against the local implementation, with a single nightly smoke test against the
 real service. This is the operational cost of choosing a realtime vendor, paid
 deliberately.
+
+"In-process" still has to reach a browser. Locally, the in-process bus feeds a
+server-sent-events route (`/api/realtime/stream`), which also tracks presence
+for its open connections; the client's `useChannel` hook picks `pusher-js` when
+a Pusher key is configured and `EventSource` otherwise. One subscription rule
+decides both Pusher's auth endpoint and the local stream, so the two cannot
+disagree about who may listen. The local bus works within one server process,
+which covers `next dev`, `next start` and the e2e suite; a deployment without
+Pusher keys gets no live updates and falls back to polling, with a warning in
+the server log.
 
 ## 9. Match lifecycle
 
@@ -562,7 +603,14 @@ confusing.
 On narrow screens the two boards stack, with the runner's view first.
 
 Replay is the same two-board layout with a scrubber, play/pause and speed. The
-runner sees a small "2 watching" badge fed from the presence member list.
+runner sees a small "watching" badge fed from the presence member list.
+
+Watching and replay share one page, `/matches/[id]/watch?run=opponent|mine`.
+While the run is still going, new moves arrive live; a viewer at the end of the
+timeline follows them, and one who has scrubbed back stays put with a "jump to
+live" control. The entry points are the waiting screen after your own finish
+("watch them live") and the result screen, which keeps its static path summary
+(§10.3.1) and adds a replay link for each run.
 
 ### 10.5 Theming
 
@@ -750,6 +798,7 @@ does not need to change to add a lobby later.
 | Giving up (Phase 4) | Allowed mid-run, confirmed, irreversible. Ends the match at once and the opponent wins, finished or not. A concession is not silence, so the no-unearned-wins rule does not apply to it (§9.2). |
 | What the result reveals (Phase 4) | Scores, winner, reason, and both full mazes with each runner's path drawn over them. |
 | Perfect tie | No winner. |
+| Watching (Phase 5) | Only once your own run is over — before that the opponent's live score would be a known target (§8). Pace-based replay, 1×–8×. |
 | Spectating layout | Two boards side by side — the runner's fogged view and the author's full maze — because authors do not remember their own walls. |
 | Connectivity rule | Shape must be orthogonally connected and the treasure must be reachable. Sealed pockets allowed. |
 | ORM | Drizzle. |
