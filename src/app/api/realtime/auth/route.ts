@@ -18,11 +18,17 @@ export async function POST(request: Request) {
   const session = await getSession(request.headers);
   if (!session) return new Response("Unauthorized", { status: 401 });
 
-  const form = await request.formData();
+  let form: FormData;
+  try {
+    form = await request.formData();
+  } catch {
+    return new Response("Bad request", { status: 400 });
+  }
   const socketField = form.get("socket_id");
   const channelField = form.get("channel_name");
   const socketId = typeof socketField === "string" ? socketField : "";
   const channel = typeof channelField === "string" ? channelField : "";
+  if (!socketId) return new Response("Bad request", { status: 400 });
   if (!(await canSubscribe(db, session.user.id, channel))) {
     return new Response("Forbidden", { status: 403 });
   }

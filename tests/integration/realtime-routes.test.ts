@@ -78,6 +78,16 @@ describe("GET /api/realtime/stream", () => {
     await new Promise((r) => setTimeout(r, 50));
     expect(memberCount(channel)).toBe(0);
   });
+
+  it("cleans up a stream aborted before it started", async () => {
+    const { hostId, hostCookie, matchId } = await runningMatch();
+    const channel = runChannel(matchId, hostId);
+    const abort = new AbortController();
+    abort.abort();
+    await stream(streamRequest(channel, hostCookie, abort.signal));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(memberCount(channel)).toBe(0);
+  });
 });
 
 describe("POST /api/realtime/auth", () => {

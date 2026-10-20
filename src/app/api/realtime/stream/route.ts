@@ -58,7 +58,9 @@ export async function GET(request: Request) {
           // Already closed by the runtime.
         }
       };
-      request.signal.addEventListener("abort", () => stop());
+      request.signal.addEventListener("abort", () => stop(), { once: true });
+      // The client may have left while the session or DB check was awaited.
+      if (request.signal.aborted) stop();
     },
     cancel() {
       stop();
