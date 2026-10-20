@@ -359,8 +359,8 @@ sequential `seq`-numbered moves so holding an arrow key feels continuous at
 ## 8. Realtime, spectating and replay
 
 On commit, the server publishes the move delta to a Pusher **presence** channel
-scoped to `{ matchId, runnerId }`. The channel auth endpoint admits only the
-maze's author.
+scoped to `{ matchId, runnerId }`. The channel auth endpoint admits the runner
+and the maze's author, the author only once their own run is over (below).
 
 The runner subscribes to the same channel solely to read its member list — that
 is the "someone is watching you" indicator, and it costs nothing extra because
