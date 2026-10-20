@@ -7,7 +7,10 @@ import {
   decidingField,
   elapsedMs,
   isTerminal,
+  mayReplayOwn,
+  mayWatchOpponent,
   resolveCompletion,
+  runChannel,
   type RunFacts,
 } from "~/match";
 import {
@@ -34,6 +37,7 @@ import {
   type PlayerRow,
 } from "~/server/match/situation";
 import { publishMatchChanged, publishMove } from "~/server/realtime/events";
+import { watchFactsFor } from "~/server/realtime/access";
 
 function refuse(message: string): never {
   throw new TRPCError({ code: "CONFLICT", message });
@@ -396,6 +400,62 @@ export const runRouter = createTRPCRouter({
         you: score(you),
         opponent: them ? score(them) : null,
         mazes,
+      };
+    }),
+  /**
+   * Spec §8: the watch and replay page's one read. The third sanctioned
+   * reader of `maze.data` (routers/AGENTS.md): for "opponent" it is your
+   * own maze, and for "mine" the opponent's, only once the match is over.
+   */
+  replay: protectedProcedure
+    .input(
+      z.object({ matchId: z.string(), whose: z.enum(["opponent", "mine"]) }),
+    )
+    .query(async ({ ctx, input }) => {
+      const me = ctx.session.user.id;
+      const found = await participantRows(ctx.db, input.matchId, me);
+      if (!found) notYours();
+      const { row, players } = found;
+
+      const facts = watchFactsFor(row, players, me);
+      if (input.whose === "opponent" && !mayWatchOpponent(facts)) {
+        refuse("errors.watchNotYet");
+      }
+      if (input.whose === "mine" && !mayReplayOwn(facts)) {
+        refuse("errors.replayNotReady");
+      }
+
+      const you = players.find((p) => p.userId === me)!;
+      const them = players.find((p) => p.userId !== me)!;
+      // §6: a runner walks the *other* player's maze.
+      const runner = input.whose === "opponent" ? them : you;
+      const author = input.whose === "opponent" ? you : them;
+
+      const [mazeRow] = await ctx.db
+        .select({ data: maze.data })
+        .from(maze)
+        .where(eq(maze.id, author.mazeId!));
+      const log = await ctx.db
+        .select({ seq: move.seq, delta: move.delta })
+        .from(move)
+        .where(and(eq(move.matchId, row.id), eq(move.runnerId, runner.userId)))
+        .orderBy(asc(move.seq));
+      const [named] = await ctx.db
+        .select({ name: user.name })
+        .from(user)
+        .where(eq(user.id, runner.userId));
+
+      const live =
+        !isTerminal(row.status) &&
+        runner.finishedAt === null &&
+        runner.gaveUpAt === null;
+
+      return {
+        maze: mazeSchema.parse(mazeRow!.data),
+        moves: log,
+        live,
+        channel: live ? runChannel(row.id, runner.userId) : null,
+        runnerName: named?.name ?? "",
       };
     }),
 });

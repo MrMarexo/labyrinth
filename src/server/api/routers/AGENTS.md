@@ -9,11 +9,13 @@ on every procedure that touches a maze, and say so in the review.
 
 Root `AGENTS.md`, invariant 1.
 
-## The two sanctioned readers
+## The sanctioned readers
 
 `run.move` reads the opponent's `maze.data` to apply the reducer, and returns
 only a `RunnerDelta`. `run.result` returns both mazes, and only for a terminal
-match in which both players submitted. Those are the only two. A new procedure
+match in which both players submitted. `run.replay` returns one maze: for `whose: "opponent"` the caller's own maze, which they drew, and for `whose: "mine"` the opponent's, only once the match is terminal and both submitted — the result screen's rule. Its gates are `mayWatchOpponent` and `mayReplayOwn` in `src/match/watch.ts`.
+
+Those are the only three. A new procedure
 that needs the maze is a design conversation, not an implementation detail.
 
 `run.get` is the runner's read and must stay free of `maze.data`: everything it

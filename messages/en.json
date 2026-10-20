@@ -33,6 +33,8 @@
     "needAccount": "Need an account?"
   },
   "errors": {
+    "watchNotYet": "Finish your own run first.",
+    "replayNotReady": "Your run can be replayed once the match is over.",
     "notSignedIn": "You need to sign in to do that.",
     "invalidCredentials": "Wrong email or password.",
     "emailTaken": "That email is already registered.",
