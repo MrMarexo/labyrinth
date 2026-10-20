@@ -43,6 +43,9 @@ export function getPusher(): Pusher | null {
   return pusher;
 }
 
+/** A hung Pusher call must not stall a move response or the sweep. */
+export const PUBLISH_TIMEOUT_MS = 2000;
+
 /**
  * Spec §8: publishing never fails a move. Callers publish after their
  * transaction commits; an error here is logged and swallowed, and a watcher
@@ -53,10 +56,22 @@ export async function publishSafely(
   event: string,
   data: unknown,
 ): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    await active.publish(channel, event, data);
+    const timedOut = new Promise<"timeout">((resolve) => {
+      timer = setTimeout(() => resolve("timeout"), PUBLISH_TIMEOUT_MS);
+    });
+    const outcome = await Promise.race([
+      active.publish(channel, event, data),
+      timedOut,
+    ]);
+    if (outcome === "timeout") {
+      console.error(`[realtime] publishing ${event} on ${channel} timed out`);
+    }
   } catch (error) {
     console.error(`[realtime] publishing ${event} on ${channel} failed`, error);
+  } finally {
+    clearTimeout(timer);
   }
 }
 
