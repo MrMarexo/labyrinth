@@ -244,6 +244,23 @@
     "didNotFinish": "Did not finish",
     "theirMaze": "{name}'s labyrinth, and your path through it",
     "yourMaze": "Your labyrinth, and {name}'s path through it",
-    "backToMatches": "Back to your matches"
+    "backToMatches": "Back to your matches",
+    "replayMine": "Replay your run",
+    "replayTheirs": "Replay {name}'s run"
+  },
+  "watch": {
+    "opponentTitle": "{name} in your labyrinth",
+    "mineTitle": "Your run through {name}'s labyrinth",
+    "runnerView": "What the runner has seen",
+    "mazeView": "The whole labyrinth",
+    "play": "Play",
+    "pause": "Pause",
+    "scrubber": "Timeline",
+    "speed": "Speed",
+    "speedOption": "{speed}×",
+    "live": "Live",
+    "jumpToLive": "Jump to live",
+    "step": "Move {step} of {length}",
+    "back": "Back to the match"
   }
 }

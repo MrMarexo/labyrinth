@@ -244,6 +244,23 @@
     "didNotFinish": "Nedokončené",
     "theirMaze": "Bludisko hráča {name} a vaša cesta ním",
     "yourMaze": "Vaše bludisko a cesta hráča {name} ním",
-    "backToMatches": "Späť na vaše zápasy"
+    "backToMatches": "Späť na vaše zápasy",
+    "replayMine": "Prehrať váš beh",
+    "replayTheirs": "Prehrať beh hráča {name}"
+  },
+  "watch": {
+    "opponentTitle": "Hráč {name} vo vašom bludisku",
+    "mineTitle": "Váš beh bludiskom hráča {name}",
+    "runnerView": "Čo bežec zatiaľ videl",
+    "mazeView": "Celé bludisko",
+    "play": "Prehrať",
+    "pause": "Pozastaviť",
+    "scrubber": "Časová os",
+    "speed": "Rýchlosť",
+    "speedOption": "{speed}×",
+    "live": "Naživo",
+    "jumpToLive": "Prejsť na živé vysielanie",
+    "step": "Ťah {step} z {length}",
+    "back": "Späť na zápas"
   }
 }

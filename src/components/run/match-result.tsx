@@ -147,6 +147,25 @@ export function MatchResult({ matchId }: { matchId: string }) {
         </div>
       )}
 
+      {mazes && (
+        <div className="flex flex-wrap gap-4">
+          <Link
+            href={`/matches/${matchId}/watch?run=mine`}
+            data-replay-link="mine"
+            className="text-accent underline"
+          >
+            {t("replayMine")}
+          </Link>
+          <Link
+            href={`/matches/${matchId}/watch?run=opponent`}
+            data-replay-link="opponent"
+            className="text-accent underline"
+          >
+            {t("replayTheirs", { name })}
+          </Link>
+        </div>
+      )}
+
       <Link href="/matches" className="underline">
         {t("backToMatches")}
       </Link>
