@@ -1,0 +1,75 @@
+import { isPresenceChannel } from "~/match";
+import { getSession } from "~/server/auth";
+import { db } from "~/server/db";
+import { pusherConfigured } from "~/server/realtime";
+import { canSubscribe } from "~/server/realtime/access";
+import { join, subscribe } from "~/server/realtime/local-bus";
+
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
+const KEEP_ALIVE_MS = 25_000;
+
+/**
+ * Spec §8.1: the local transport. Streams the in-process bus to one browser
+ * as server-sent events, and holds its presence while the connection is
+ * open. With Pusher configured this route does not exist — two live
+ * transports would be two places for a subscription rule to drift.
+ */
+export async function GET(request: Request) {
+  if (pusherConfigured) return new Response("Not found", { status: 404 });
+
+  const session = await getSession(request.headers);
+  if (!session) return new Response("Unauthorized", { status: 401 });
+
+  const channel = new URL(request.url).searchParams.get("channel") ?? "";
+  if (!(await canSubscribe(db, session.user.id, channel))) {
+    return new Response("Forbidden", { status: 403 });
+  }
+
+  const encoder = new TextEncoder();
+  let stop = () => undefined as void;
+
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      const write = (text: string) => controller.enqueue(encoder.encode(text));
+      const off = subscribe(channel, (event, data) => {
+        write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+      });
+      // After subscribing, so this connection hears its own arrival.
+      const leave = isPresenceChannel(channel)
+        ? join(channel, session.user.id)
+        : () => undefined;
+      const keepAlive = setInterval(
+        () => write(": keep-alive\n\n"),
+        KEEP_ALIVE_MS,
+      );
+
+      let stopped = false;
+      stop = () => {
+        if (stopped) return;
+        stopped = true;
+        clearInterval(keepAlive);
+        off();
+        leave();
+        try {
+          controller.close();
+        } catch {
+          // Already closed by the runtime.
+        }
+      };
+      request.signal.addEventListener("abort", () => stop());
+    },
+    cancel() {
+      stop();
+    },
+  });
+
+  return new Response(body, {
+    headers: {
+      "content-type": "text/event-stream",
+      "cache-control": "no-cache, no-transform",
+      connection: "keep-alive",
+    },
+  });
+}

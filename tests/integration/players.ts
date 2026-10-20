@@ -15,7 +15,8 @@ export async function signedIn() {
     asResponse: true,
   });
   const cookie = response.headers.get("set-cookie") ?? "";
-  return createTRPCContext({ headers: new Headers({ cookie }) });
+  const ctx = await createTRPCContext({ headers: new Headers({ cookie }) });
+  return Object.assign(ctx, { cookie });
 }
 
 const settings = {
@@ -52,6 +53,8 @@ export async function runningMatch() {
     guest,
     hostId: hostCtx.session!.user.id,
     guestId: guestCtx.session!.user.id,
+    hostCookie: hostCtx.cookie,
+    guestCookie: guestCtx.cookie,
     matchId: created.id,
   };
 }
