@@ -33,6 +33,7 @@ import {
   type MatchRow,
   type PlayerRow,
 } from "~/server/match/situation";
+import { publishMatchChanged, publishMove } from "~/server/realtime/events";
 
 function refuse(message: string): never {
   throw new TRPCError({ code: "CONFLICT", message });
@@ -119,7 +120,7 @@ export const runRouter = createTRPCRouter({
       const now = new Date();
       const me = ctx.session.user.id;
 
-      return ctx.db.transaction(async (tx) => {
+      const outcome = await ctx.db.transaction(async (tx) => {
         const found = await participantRows(tx, input.matchId, me, {
           lock: true,
         });
@@ -139,7 +140,11 @@ export const runRouter = createTRPCRouter({
             ),
           );
         if (stored) {
-          return { delta: stored.delta, matchOver: isTerminal(row.status) };
+          return {
+            delta: stored.delta,
+            matchOver: isTerminal(row.status),
+            fresh: false as const,
+          };
         }
 
         assertRunOpen(row, now);
@@ -208,8 +213,24 @@ export const runRouter = createTRPCRouter({
             .where(eq(match.id, row.id));
         }
 
-        return { delta, matchOver: completion.kind === "complete" };
+        return {
+          delta,
+          matchOver: completion.kind === "complete",
+          fresh: true as const,
+        };
       });
+
+      // After commit (spec §8): a publish inside the transaction could
+      // announce a move that rolls back, and would hold the row lock across
+      // a network call. A replayed seq was announced the first time.
+      if (outcome.fresh) {
+        await publishMove(input.matchId, me, {
+          seq: input.seq,
+          delta: outcome.delta,
+        });
+        if (outcome.matchOver) await publishMatchChanged(input.matchId);
+      }
+      return { delta: outcome.delta, matchOver: outcome.matchOver };
     }),
 
   /** Spec §9.2. Confirmed in the client; irreversible here. */
@@ -219,7 +240,7 @@ export const runRouter = createTRPCRouter({
       const now = new Date();
       const me = ctx.session.user.id;
 
-      return ctx.db.transaction(async (tx) => {
+      const result = await ctx.db.transaction(async (tx) => {
         const found = await participantRows(tx, input.matchId, me, {
           lock: true,
         });
@@ -260,6 +281,9 @@ export const runRouter = createTRPCRouter({
 
         return { status: "complete" as const };
       });
+
+      await publishMatchChanged(input.matchId);
+      return result;
     }),
 
   /**

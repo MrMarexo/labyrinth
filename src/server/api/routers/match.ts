@@ -2,7 +2,13 @@ import { TRPCError } from "@trpc/server";
 import { and, desc, eq, inArray, isNotNull, ne, notInArray } from "drizzle-orm";
 import { z } from "zod";
 
-import { deadlineFor, makeCode, matchCodeSchema } from "~/match";
+import {
+  deadlineFor,
+  makeCode,
+  matchChannel,
+  matchCodeSchema,
+  runChannel,
+} from "~/match";
 import { CELL_COUNT_PRESETS, MAX_GATES, validateMaze } from "~/maze";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { match, matchPlayer, maze, user } from "~/server/db/schema";
@@ -16,6 +22,7 @@ import {
   type MatchRow,
   type PlayerRow,
 } from "~/server/match/situation";
+import { publishMatchChanged } from "~/server/realtime/events";
 
 const settingsInput = z.object({
   cellCount: z
@@ -143,7 +150,7 @@ export const matchRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const now = new Date();
 
-      return ctx.db.transaction(async (tx) => {
+      const joined = await ctx.db.transaction(async (tx) => {
         const [row] = await tx
           .select()
           .from(match)
@@ -221,6 +228,9 @@ export const matchRouter = createTRPCRouter({
 
         return { id: row.id };
       });
+
+      await publishMatchChanged(joined.id);
+      return joined;
     }),
 
   get: protectedProcedure
@@ -264,6 +274,12 @@ export const matchRouter = createTRPCRouter({
               hasForfeited: them.forfeitedAt !== null,
             }
           : null,
+        // Names only; the server decides who may join (canSubscribe).
+        channels: {
+          match: matchChannel(row.id),
+          yourRun: runChannel(row.id, you.userId),
+          opponentRun: them ? runChannel(row.id, them.userId) : null,
+        },
       };
     }),
 
@@ -340,7 +356,7 @@ export const matchRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const now = new Date();
 
-      return ctx.db.transaction(async (tx) => {
+      const submitted = await ctx.db.transaction(async (tx) => {
         const found = await participantRows(
           tx,
           input.matchId,
@@ -461,5 +477,8 @@ export const matchRouter = createTRPCRouter({
 
         return { status };
       });
+
+      await publishMatchChanged(input.matchId);
+      return submitted;
     }),
 });

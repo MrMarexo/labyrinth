@@ -7,6 +7,7 @@ import { match, matchPlayer } from "~/server/db/schema";
 // domain helper should not have to be reached through a tRPC router, and the
 // sweep is its second consumer.
 import { situationFor } from "~/server/match/situation";
+import { publishMatchChanged } from "~/server/realtime/events";
 
 // `resolveExpiry` already no-ops on a terminal status (`deadlineFor` returns
 // null the moment `isTerminal(situation.status)` is true), so this filter is
@@ -51,7 +52,7 @@ export async function closeIfExpired(
   matchId: string,
   now: Date,
 ): Promise<boolean> {
-  return db.transaction(async (tx) => {
+  const closed = await db.transaction(async (tx) => {
     const [row] = await tx
       .select()
       .from(match)
@@ -101,6 +102,9 @@ export async function closeIfExpired(
 
     return true;
   });
+
+  if (closed) await publishMatchChanged(matchId);
+  return closed;
 }
 
 /**
