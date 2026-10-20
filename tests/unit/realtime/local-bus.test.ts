@@ -22,6 +22,18 @@ describe("the local bus", () => {
     expect(got).toEqual([["move", { seq: 1 }]]);
   });
 
+  it("does not orphan a later subscriber on a double unsubscribe", () => {
+    const channel = unique();
+    const off = subscribe(channel, () => undefined);
+    off();
+    const got: unknown[] = [];
+    const offLater = subscribe(channel, (event) => got.push(event));
+    off();
+    emit(channel, "move", {});
+    expect(got).toEqual(["move"]);
+    offLater();
+  });
+
   it("keeps delivering when one listener throws", () => {
     const channel = unique();
     const got: number[] = [];

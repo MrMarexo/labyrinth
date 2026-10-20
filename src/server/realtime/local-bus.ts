@@ -29,9 +29,15 @@ export function subscribe(channel: string, listener: Listener): () => void {
   let set = bus.listeners.get(channel);
   if (!set) bus.listeners.set(channel, (set = new Set()));
   set.add(listener);
+  const mine = set;
+  let left = false;
   return () => {
-    set.delete(listener);
-    if (set.size === 0) bus.listeners.delete(channel);
+    if (left) return;
+    left = true;
+    mine.delete(listener);
+    if (mine.size === 0 && bus.listeners.get(channel) === mine) {
+      bus.listeners.delete(channel);
+    }
   };
 }
 
