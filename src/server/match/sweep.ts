@@ -136,12 +136,16 @@ export async function sweepExpiredMatches(
 
   const closed: string[] = [];
 
-  for (const row of due) {
-    if (await closeIfExpired(db, row.id, now)) closed.push(row.id);
+  try {
+    for (const row of due) {
+      if (await closeIfExpired(db, row.id, now)) closed.push(row.id);
+    }
+  } finally {
+    // Committed closes are pinged even if a later one throws; publishSafely
+    // never throws, so this cannot mask that error. Concurrently, so the
+    // batch spends at most one publish timeout on them.
+    await Promise.all(closed.map(publishMatchChanged));
   }
-
-  // Concurrently, so the batch spends at most one publish timeout on them.
-  await Promise.all(closed.map(publishMatchChanged));
 
   // A full batch means there may be more due matches than this call fetched;
   // the next invocation picks up where this one left off, oldest first.
