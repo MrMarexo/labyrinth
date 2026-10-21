@@ -81,6 +81,31 @@ describe("GET /api/realtime/stream", () => {
     abort.abort();
   });
 
+  it("tells a second tab of the same user the member count", async () => {
+    const { hostId, hostCookie, matchId } = await runningMatch();
+    const channel = runChannel(matchId, hostId);
+    const firstTab = new AbortController();
+    const secondTab = new AbortController();
+    try {
+      const first = await stream(
+        streamRequest(channel, hostCookie, firstTab.signal),
+      );
+      await readUntil(first.body!, (t) => t.includes(EVENTS.members));
+
+      const second = await stream(
+        streamRequest(channel, hostCookie, secondTab.signal),
+      );
+      const text = await readUntil(second.body!, (t) =>
+        t.includes(EVENTS.members),
+      );
+      expect(text).toContain(`event: ${EVENTS.members}`);
+      expect(text).toContain('"count":1');
+    } finally {
+      firstTab.abort();
+      secondTab.abort();
+    }
+  });
+
   it("leaving drops the member count", async () => {
     const { hostId, hostCookie, matchId } = await runningMatch();
     const channel = runChannel(matchId, hostId);

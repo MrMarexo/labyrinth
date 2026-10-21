@@ -1,9 +1,9 @@
-import { isPresenceChannel } from "~/match";
+import { EVENTS, isPresenceChannel } from "~/match";
 import { getSession } from "~/server/auth";
 import { db } from "~/server/db";
 import { pusherConfigured } from "~/server/realtime";
 import { canSubscribe } from "~/server/realtime/access";
-import { join, subscribe } from "~/server/realtime/local-bus";
+import { join, memberCount, subscribe } from "~/server/realtime/local-bus";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -38,13 +38,16 @@ export async function GET(request: Request) {
   const body = new ReadableStream<Uint8Array>({
     start(controller) {
       const write = (text: string) => controller.enqueue(encoder.encode(text));
-      const off = subscribe(channel, (event, data) => {
+      const send = (event: string, data: unknown) =>
         write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-      });
-      // After subscribing, so this connection hears its own arrival.
-      const leave = isPresenceChannel(channel)
-        ? join(channel, session.user.id)
-        : () => undefined;
+      const off = subscribe(channel, send);
+      let leave = () => undefined as void;
+      if (isPresenceChannel(channel)) {
+        leave = join(channel, session.user.id);
+        // `join` announces only a change in distinct users, so a second tab
+        // of the same user would otherwise never learn the count.
+        send(EVENTS.members, { count: memberCount(channel) });
+      }
       const keepAlive = setInterval(
         () => write(": keep-alive\n\n"),
         KEEP_ALIVE_MS,
