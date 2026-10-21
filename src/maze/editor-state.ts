@@ -331,6 +331,34 @@ function releaseKeyForGate(
   return gate === undefined ? keys : keys.filter((k) => k.gate !== gate);
 }
 
+/** The gate ids that have a gate placed, or with "key", a key placed. */
+export function placedNumbers(
+  kind: "gate" | "key",
+  draft: DraftMaze,
+): ReadonlySet<number> {
+  return new Set(
+    kind === "key"
+      ? draft.keys.map((k) => k.gate)
+      : draft.segments.flatMap((s) => (s.kind === "gate" ? [s.gate] : [])),
+  );
+}
+
+/**
+ * The lowest number in 1..gateCount with no gate (or, with "key", no key)
+ * placed yet, or null when every one is.
+ */
+export function lowestUnplaced(
+  kind: "gate" | "key",
+  draft: DraftMaze,
+  gateCount: number,
+): number | null {
+  const placed = placedNumbers(kind, draft);
+  for (let n = 1; n <= gateCount; n += 1) {
+    if (!placed.has(n)) return n;
+  }
+  return null;
+}
+
 /** Whether `gate` is an id this maze's gate budget allows. */
 function inBudget(gate: number, gateCount: number): boolean {
   return Number.isInteger(gate) && gate >= 1 && gate <= gateCount;

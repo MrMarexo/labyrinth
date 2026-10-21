@@ -567,8 +567,10 @@ touch there is no hover; the stroke itself is the feedback.
 **Gate and key numbers.** With the gate or key tool active, the panel offers
 one numbered, colour-swatched choice per gate the maze allows, 1 to its gate
 count, each marked when already placed. Activating the tool selects the
-lowest number not yet placed (or 1 when all are); after that only the author
-changes it. Placing gate N where gate N already is elsewhere moves it, and
+lowest number not yet placed (or 1 when all are). Each placement then moves
+the choice on to the lowest number still unplaced, so consecutive clicks place
+1, 2, 3; a toggle-off, a refused placement, undo and redo leave it where it
+is, and so does a placement once every number is down. Placing gate N where gate N already is elsewhere moves it, and
 the editor never accepts a gate or key numbered outside 1 to the gate count.
 A key may go down before its gate.
 

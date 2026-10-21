@@ -133,6 +133,67 @@ test.describe("choosing a gate", () => {
   });
 });
 
+test.describe("the number advances after a placement", () => {
+  test("two gate clicks without touching the picker place gates 1 and 2", async ({
+    page,
+  }) => {
+    await signUpAndOpenNewMaze(page, { gates: 2 });
+    await paintTwoRows(page);
+    await page.getByRole("radio", { name: "Gate", exact: true }).click();
+
+    await edge(page, "V:0,0").click();
+    await expect(page.locator('[data-gate-option="2"]')).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    await edge(page, "V:2,0").click();
+    await expect(page.locator('[data-segment="V:0,0"]')).toHaveAttribute(
+      "data-gate",
+      "1",
+    );
+    await expect(page.locator('[data-segment="V:2,0"]')).toHaveAttribute(
+      "data-gate",
+      "2",
+    );
+    // Every number is placed now, so the choice stays where it was.
+    await expect(page.locator('[data-gate-option="2"]')).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+  });
+
+  test("two key clicks without touching the picker place keys 1 and 2", async ({
+    page,
+  }) => {
+    await signUpAndOpenNewMaze(page, { gates: 2 });
+    await paintTwoRows(page);
+    await page.getByRole("radio", { name: "Key", exact: true }).click();
+
+    await cell(page, 1, 1).click();
+    await cell(page, 2, 1).click();
+    await expect(page.locator('[data-key="1"]')).toHaveCount(1);
+    await expect(page.locator('[data-key="2"]')).toHaveCount(1);
+  });
+
+  test("undo does not move the choice", async ({ page }) => {
+    await signUpAndOpenNewMaze(page, { gates: 2 });
+    await paintTwoRows(page);
+    await page.getByRole("radio", { name: "Gate", exact: true }).click();
+
+    await edge(page, "V:0,0").click();
+    await expect(page.locator('[data-gate-option="2"]')).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    await page.getByRole("button", { name: "Undo" }).click();
+    await expect(page.locator("[data-segment]")).toHaveCount(0);
+    await expect(page.locator('[data-gate-option="2"]')).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+  });
+});
+
 test.describe("choosing a key", () => {
   test("picking key 2 and clicking a square places key 2", async ({ page }) => {
     await signUpAndOpenNewMaze(page, { gates: 2 });

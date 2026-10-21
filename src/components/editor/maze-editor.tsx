@@ -14,7 +14,10 @@ import {
   gatesPlaced,
   initialEditorState,
   keysPlaced,
+  lowestUnplaced,
+  placedNumbers,
   validateMaze,
+  type EditorAction,
   type DraftMaze,
   type Edge,
   type Point,
@@ -250,7 +253,12 @@ export function MazeEditor({
       case "key":
         return chosen === null
           ? undefined
-          : dispatch({ type: "placeKey", at, gate: chosen, gateCount });
+          : placeNumbered("key", {
+              type: "placeKey",
+              at,
+              gate: chosen,
+              gateCount,
+            });
       case "erase":
         return dispatch({ type: "removeKey", at });
       default:
@@ -258,12 +266,28 @@ export function MazeEditor({
     }
   }
 
+  /**
+   * Places a numbered gate or key, then moves the choice on to the lowest
+   * number still unplaced, so consecutive clicks place 1, 2, 3… Done here,
+   * on the placement itself, and not in an effect on the draft: undo and
+   * redo must not move the choice. A refusal or a toggle-off leaves it
+   * alone, and so does a draft with every number placed.
+   */
+  function placeNumbered(kind: "gate" | "key", action: EditorAction) {
+    const after = editorReducer(state, action).draft;
+    dispatch(action);
+    if (after === state.draft || chosen === null) return;
+    if (!placedNumbers(kind, after).has(chosen)) return;
+    const next = lowestUnplaced(kind, after, gateCount);
+    if (next !== null) setChosen(next);
+  }
+
   function onEdge(edge: Edge) {
     if (locked) return;
     if (tool === "wall")
       return dispatch({ type: "placeSegment", edge, kind: "wall" });
     if (tool === "gate" && chosen !== null) {
-      return dispatch({
+      return placeNumbered("gate", {
         type: "placeSegment",
         edge,
         kind: "gate",
@@ -344,7 +368,7 @@ export function MazeEditor({
           keys={keysPlaced(state.draft)}
           chosen={chosen}
           onChoose={setChosen}
-          placed={placedNumbers(tool, state.draft)}
+          placed={placedNumbers(tool === "key" ? "key" : "gate", state.draft)}
         />
 
         {saveError && (
@@ -397,15 +421,6 @@ export function MazeEditor({
   );
 }
 
-/** The gate ids that already have a gate, or a key with the key tool. */
-function placedNumbers(tool: Tool, draft: DraftMaze): ReadonlySet<number> {
-  return new Set(
-    tool === "key"
-      ? draft.keys.map((k) => k.gate)
-      : draft.segments.flatMap((s) => (s.kind === "gate" ? [s.gate] : [])),
-  );
-}
-
 /**
  * The number the gate or key tool starts on: the lowest one not yet placed
  * for that tool, or 1 when every one is. Null when the maze has no gates.
@@ -416,9 +431,5 @@ function defaultNumber(
   gateCount: number,
 ): number | null {
   if (gateCount < 1) return null;
-  const placed = placedNumbers(tool, draft);
-  for (let n = 1; n <= gateCount; n += 1) {
-    if (!placed.has(n)) return n;
-  }
-  return 1;
+  return lowestUnplaced(tool, draft, gateCount) ?? 1;
 }

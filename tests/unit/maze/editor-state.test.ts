@@ -7,6 +7,7 @@ import {
   cellsUsed,
   gatesPlaced,
   keysPlaced,
+  lowestUnplaced,
   type EditorState,
 } from "~/maze/editor-state";
 import { edgeKey } from "~/maze/geometry";
@@ -605,5 +606,57 @@ describe("choosing the gate number", () => {
       { type: "eraseCell", at: { x: 0, y: 0 } },
     );
     expect(next.draft.keys).toEqual([{ gate: 2, x: 3, y: 3 }]);
+  });
+});
+
+describe("lowestUnplaced", () => {
+  const a = { o: "H", x: 0, y: 0 } as const;
+  const b = { o: "H", x: 1, y: 0 } as const;
+
+  it("is 1 on an empty draft, and null when the maze has no gates", () => {
+    expect(lowestUnplaced("gate", start().draft, 2)).toBe(1);
+    expect(lowestUnplaced("key", start().draft, 2)).toBe(1);
+    expect(lowestUnplaced("gate", start().draft, 0)).toBeNull();
+  });
+
+  it("skips placed gates, and is null once every one is placed", () => {
+    const one = apply(start(), {
+      type: "placeSegment",
+      edge: a,
+      kind: "gate",
+      gate: 1,
+      gateCount: 2,
+    });
+    expect(lowestUnplaced("gate", one.draft, 2)).toBe(2);
+    // Keys are counted on their own: gate 1 being placed says nothing about key 1.
+    expect(lowestUnplaced("key", one.draft, 2)).toBe(1);
+
+    const both = editorReducer(one, {
+      type: "placeSegment",
+      edge: b,
+      kind: "gate",
+      gate: 2,
+      gateCount: 2,
+    });
+    expect(lowestUnplaced("gate", both.draft, 2)).toBeNull();
+  });
+
+  it("offers a number again after its gate is removed", () => {
+    const next = apply(
+      start(),
+      { type: "placeSegment", edge: a, kind: "gate", gate: 1, gateCount: 2 },
+      { type: "placeSegment", edge: b, kind: "gate", gate: 2, gateCount: 2 },
+      { type: "removeSegment", edge: a },
+    );
+    expect(lowestUnplaced("gate", next.draft, 2)).toBe(1);
+  });
+
+  it("skips placed keys", () => {
+    const next = apply(
+      start(),
+      { type: "placeKey", at: { x: 1, y: 1 }, gate: 1, gateCount: 3 },
+      { type: "placeKey", at: { x: 2, y: 1 }, gate: 3, gateCount: 3 },
+    );
+    expect(lowestUnplaced("key", next.draft, 3)).toBe(2);
   });
 });
