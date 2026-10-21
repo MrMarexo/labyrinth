@@ -42,6 +42,8 @@
   --grid-line: oklch(88% 0 0);
   --wall: oklch(25% 0 0);
   --treasure: oklch(70% 0.15 85);
+  /* Detail drawn on --treasure (the chest's latch): dark in both themes. */
+  --treasure-ink: oklch(35% 0.07 70);
 }
 
 :root[data-theme="dark"] {
@@ -63,6 +65,7 @@
   --grid-line: oklch(27% 0 0);
   --wall: oklch(88% 0 0);
   --treasure: oklch(78% 0.14 85);
+  --treasure-ink: oklch(30% 0.07 70);
 }
 
 @theme inline {
@@ -79,6 +82,7 @@
   --color-grid-line: var(--grid-line);
   --color-wall: var(--wall);
   --color-treasure: var(--treasure);
+  --color-treasure-ink: var(--treasure-ink);
 }
 
 body {

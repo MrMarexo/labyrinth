@@ -54,7 +54,9 @@ export function StartIcon({ x, y, size, ...rest }: IconProps) {
         y={cy}
         textAnchor="middle"
         dominantBaseline="central"
-        fontSize={size * 0.36}
+        // At phone width the editor board draws a 40px square in about 20px;
+        // this keeps the S near 10px there rather than 7.
+        fontSize={size * 0.48}
         fontWeight={700}
         className="fill-on-accent select-none"
       >
@@ -89,7 +91,7 @@ export function TreasureIcon({ x, y, size, ...rest }: IconProps) {
         width={4 * u}
         height={6 * u}
         rx={1 * u}
-        className="fill-wall"
+        className="fill-treasure-ink"
       />
     </g>
   );

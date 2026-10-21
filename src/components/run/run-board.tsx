@@ -126,7 +126,12 @@ export function RunBoard({ map, at, heldKeys, bump, pending }: RunBoardProps) {
         cx={(at.x + 0.5) * CELL_PX}
         cy={(at.y + 0.5) * CELL_PX}
         r={CELL_PX * 0.25}
-        className={pending ? "fill-accent opacity-60" : "fill-accent"}
+        // The outline keeps the runner visible on the start square, whose
+        // marker is the same accent colour.
+        strokeWidth={3}
+        className={
+          pending ? "fill-accent stroke-bg opacity-60" : "fill-accent stroke-bg"
+        }
       />
     </>
   );
