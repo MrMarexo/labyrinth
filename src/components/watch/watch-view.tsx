@@ -181,17 +181,17 @@ function WatchPlayer({
           return;
         case "ArrowLeft":
           event.preventDefault();
-          dispatch({ type: "scrub", step: state.step - 1 });
+          dispatch({ type: "step", by: -1 });
           return;
         case "ArrowRight":
           event.preventDefault();
-          dispatch({ type: "scrub", step: state.step + 1 });
+          dispatch({ type: "step", by: 1 });
           return;
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [state.playing, state.step]);
+  }, [state.playing]);
 
   const frame = useMemo(
     () => frameAt(timeline, state.step),

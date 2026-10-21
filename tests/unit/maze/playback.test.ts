@@ -86,6 +86,30 @@ describe("playback", () => {
     expect(s).toMatchObject({ step: 6, live: false, following: false });
   });
 
+  it("steps by one in either direction", () => {
+    const mid = playback(initialPlayback(5, false), { type: "scrub", step: 2 });
+    expect(playback(mid, { type: "step", by: 1 }).step).toBe(3);
+    expect(playback(mid, { type: "step", by: -1 }).step).toBe(1);
+  });
+
+  it("clamps a step at both ends of the timeline", () => {
+    const start = initialPlayback(5, false);
+    expect(playback(start, { type: "step", by: -1 }).step).toBe(0);
+    const end = playback(start, { type: "scrub", step: 5 });
+    expect(playback(end, { type: "step", by: 1 }).step).toBe(5);
+  });
+
+  it("stops following on a step back and follows again at the live edge", () => {
+    const back = playback(initialPlayback(5, true), { type: "step", by: -1 });
+    expect(back).toMatchObject({ step: 4, following: false });
+    const edge = playback(back, { type: "step", by: 1 });
+    expect(edge).toMatchObject({ step: 5, following: true });
+    expect(playback(edge, { type: "step", by: 1 })).toMatchObject({
+      step: 5,
+      following: true,
+    });
+  });
+
   it("ticks four moves a second at 1×", () => {
     expect(tickMs(1)).toBe(250);
     expect(tickMs(8)).toBe(31.25);

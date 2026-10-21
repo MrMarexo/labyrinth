@@ -25,6 +25,8 @@ export type Playback = {
 export type PlaybackAction =
   | { type: "tick" }
   | { type: "scrub"; step: number }
+  /** Relative to the current step, so a key handler needs no state. */
+  | { type: "step"; by: number }
   | { type: "play" }
   | { type: "pause" }
   | { type: "speed"; speed: Speed }
@@ -44,6 +46,11 @@ export function initialPlayback(length: number, live: boolean): Playback {
 
 const clamp = (n: number, max: number) => Math.max(0, Math.min(n, max));
 
+function scrubTo(state: Playback, target: number): Playback {
+  const step = clamp(target, state.length);
+  return { ...state, step, following: state.live && step === state.length };
+}
+
 export function playback(state: Playback, action: PlaybackAction): Playback {
   switch (action.type) {
     case "tick": {
@@ -51,10 +58,10 @@ export function playback(state: Playback, action: PlaybackAction): Playback {
       const step = state.step + 1;
       return { ...state, step, following: state.live && step === state.length };
     }
-    case "scrub": {
-      const step = clamp(action.step, state.length);
-      return { ...state, step, following: state.live && step === state.length };
-    }
+    case "scrub":
+      return scrubTo(state, action.step);
+    case "step":
+      return scrubTo(state, state.step + action.by);
     case "play":
       // At the end of a finished run, play means "watch it again".
       if (state.step >= state.length && !state.live) {
