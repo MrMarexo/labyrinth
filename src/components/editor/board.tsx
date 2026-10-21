@@ -1,17 +1,34 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FocusEvent,
+  type KeyboardEvent,
+  type PointerEvent,
+} from "react";
 
 import {
   MAX_BOUNDING_BOX,
   cellKey,
   edgeKey,
+  isInteriorEdge,
+  outlineEdges,
   type DraftMaze,
   type Edge,
   type Point,
+  type Tool,
 } from "~/maze";
 import { gateColour } from "./gate-colours";
+import {
+  cellUnder,
+  cellsBetween,
+  inFrame,
+  nearestInteriorEdge,
+  samplesBetween,
+} from "./hit-test";
 
 export const FRAME = MAX_BOUNDING_BOX;
 export const CELL_PX = 40;
@@ -28,8 +45,9 @@ const ALL_CELLS: Point[] = (() => {
 })();
 
 /**
- * Every interior edge of the frame, each with its one legal spelling. Fixed
- * by `FRAME` alone, so built once rather than on every render.
+ * Every edge strictly inside the frame, each with its one legal spelling.
+ * Fixed by `FRAME` alone, so built once; each render keeps only the ones
+ * inside the painted shape.
  */
 const ALL_EDGES: Edge[] = (() => {
   const edges: Edge[] = [];
@@ -42,12 +60,64 @@ const ALL_EDGES: Edge[] = (() => {
   return edges;
 })();
 
+/** Tools whose press-drag-release is one stroke; the rest act on a tap. */
+const STROKE_TOOLS: ReadonlySet<Tool> = new Set([
+  "paint",
+  "erase-cell",
+  "wall",
+  "erase",
+]);
+/** Tools that act on an edge. The eraser acts on an edge or a square. */
+const EDGE_TOOLS: ReadonlySet<Tool> = new Set(["wall", "gate", "erase"]);
+/** Edge hit-tests along a swipe are this far apart, in cells. */
+const SAMPLE_SPACING = 0.25;
+
+type Target = { kind: "cell"; at: Point } | { kind: "edge"; edge: Edge };
+
+function targetKey(target: Target | null): string {
+  if (!target) return "";
+  return target.kind === "cell"
+    ? `c:${cellKey(target.at)}`
+    : `e:${edgeKey(target.edge)}`;
+}
+
+/** Endpoints of the line an edge is drawn as, in board pixels. */
+function edgeLine(edge: Edge) {
+  // {o:"H",x,y} sits between (x,y) and (x,y+1): a horizontal line one
+  // cell down, spanning column x. {o:"V",x,y} sits between (x,y) and
+  // (x+1,y): a vertical line one cell right, spanning row y.
+  const horizontal = edge.o === "H";
+  return {
+    x1: (edge.x + (horizontal ? 0 : 1)) * CELL_PX,
+    y1: (edge.y + (horizontal ? 1 : 0)) * CELL_PX,
+    x2: (edge.x + 1) * CELL_PX,
+    y2: (edge.y + 1) * CELL_PX,
+  };
+}
+
+type Stroke = {
+  pointerId: number;
+  /** Last pointer position, in cell units. */
+  last: { x: number; y: number };
+};
+
 export type BoardProps = {
   draft: DraftMaze;
+  tool: Tool;
+  /** False once the square budget is spent, so paint previews nothing. */
+  canPaint: boolean;
+  /** The gate id the gate tool would place next, or null when none is free. */
+  nextGate: number | null;
+  /** The gate the key tool would place a key for, or null when none. */
+  nextKey: number | null;
+  /** A single activation: a tap, or Enter/Space on a focused target. */
   onCell: (at: Point) => void;
   onEdge: (edge: Edge) => void;
-  /** Edges are only clickable when the active tool places something on one. */
-  edgesActive: boolean;
+  /** A stroke tool's press; every target it passes over follows, then end. */
+  onStrokeBegin: () => void;
+  onStrokeCell: (at: Point) => void;
+  onStrokeEdge: (edge: Edge) => void;
+  onStrokeEnd: () => void;
 };
 
 /**
@@ -56,9 +126,25 @@ export type BoardProps = {
  * sibling component fed only discovered cells and bumped segments; reusing
  * this one leaks void-vs-walled into the accessibility tree.
  */
-export function Board({ draft, onCell, onEdge, edgesActive }: BoardProps) {
+export function Board({
+  draft,
+  tool,
+  canPaint,
+  nextGate,
+  nextKey,
+  onCell,
+  onEdge,
+  onStrokeBegin,
+  onStrokeCell,
+  onStrokeEdge,
+  onStrokeEnd,
+}: BoardProps) {
   const t = useTranslations("editor");
+  const edgesActive = EDGE_TOOLS.has(tool);
   const painted = new Set(draft.cells.map(cellKey));
+  // Only edges with a painted square on both sides take a wall; the rest of
+  // the shape's border is drawn as the outline and is never a target.
+  const interiorEdges = ALL_EDGES.filter((e) => isInteriorEdge(e, painted));
   const keyGateAt = new Map(draft.keys.map((k) => [cellKey(k), k.gate]));
   const segmentAt = new Map(draft.segments.map((s) => [edgeKey(s), s]));
 
@@ -69,16 +155,44 @@ export function Board({ draft, onCell, onEdge, edgesActive }: BoardProps) {
   // leave the stored stop pointing somewhere else. A group not in the DOM
   // (edges when `edgesActive` is false) contributes no stops at all.
   const [focusedCell, setFocusedCell] = useState<Point>({ x: 0, y: 0 });
-  const [focusedEdgeIndex, setFocusedEdgeIndex] = useState(0);
+  const [focusedEdge, setFocusedEdge] = useState<string | null>(null);
   const cellRefs = useRef(new Map<string, SVGRectElement>());
   const edgeRefs = useRef(new Map<string, SVGRectElement>());
+  // The edge group's stop is kept by name, since the set of interior edges
+  // changes with the shape; a stop that is no longer interior falls back to
+  // the first one.
+  const storedEdgeIndex = interiorEdges.findIndex(
+    (e) => edgeKey(e) === focusedEdge,
+  );
+  const focusedEdgeIndex = storedEdgeIndex === -1 ? 0 : storedEdgeIndex;
 
   // Edges mount and unmount with the active tool; start the group over at
   // its first member each time it reappears, rather than keeping a stop that
   // may not even render the same way (e.g. a wall placed while away).
   useEffect(() => {
-    if (edgesActive) setFocusedEdgeIndex(0);
+    if (edgesActive) setFocusedEdge(null);
   }, [edgesActive]);
+
+  // Our own focus ring, drawn only for keyboard focus. The browser's outline
+  // is turned off on these rects: around an SVG <rect> it is clipped and
+  // rounded and cannot be styled.
+  const [ring, setRing] = useState<Target | null>(null);
+  const [hover, setHover] = useState<Target | null>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+  const strokeRef = useRef<Stroke | null>(null);
+
+  function showRingIfKeyboard(
+    event: FocusEvent<SVGRectElement> | KeyboardEvent<SVGRectElement>,
+    target: Target,
+  ) {
+    let visible = false;
+    try {
+      visible = event.currentTarget.matches(":focus-visible");
+    } catch {
+      // A browser without :focus-visible gets no ring rather than an error.
+    }
+    setRing(visible ? target : null);
+  }
 
   // The live tab stop is set from `onFocus`, not from here — that covers a
   // click or a programmatic focus the same way it covers an arrow move,
@@ -91,6 +205,8 @@ export function Board({ draft, onCell, onEdge, edgesActive }: BoardProps) {
   }
 
   function handleCellKeyDown(event: KeyboardEvent<SVGRectElement>, at: Point) {
+    // Focus that a click gave becomes keyboard focus once a key is pressed.
+    showRingIfKeyboard(event, { kind: "cell", at });
     switch (event.key) {
       case "Enter":
       case " ":
@@ -122,11 +238,12 @@ export function Board({ draft, onCell, onEdge, edgesActive }: BoardProps) {
   // the target's own `onFocus` record it as the live stop.
   function moveEdgeFocus(delta: number) {
     const next = focusedEdgeIndex + delta;
-    if (next < 0 || next >= ALL_EDGES.length) return;
-    edgeRefs.current.get(edgeKey(ALL_EDGES[next]!))?.focus();
+    if (next < 0 || next >= interiorEdges.length) return;
+    edgeRefs.current.get(edgeKey(interiorEdges[next]!))?.focus();
   }
 
   function handleEdgeKeyDown(event: KeyboardEvent<SVGRectElement>, edge: Edge) {
+    showRingIfKeyboard(event, { kind: "edge", edge });
     switch (event.key) {
       case "Enter":
       case " ":
@@ -145,6 +262,219 @@ export function Board({ draft, onCell, onEdge, edgesActive }: BoardProps) {
         return;
       default:
         return;
+    }
+  }
+
+  /** Client coordinates to board coordinates, in cell units. */
+  function toBoard(event: PointerEvent<SVGSVGElement>) {
+    const matrix = svgRef.current?.getScreenCTM();
+    if (!matrix) return null;
+    const p = new DOMPoint(event.clientX, event.clientY).matrixTransform(
+      matrix.inverse(),
+    );
+    return { x: p.x / CELL_PX, y: p.y / CELL_PX };
+  }
+
+  /** What the active tool would act on at `p`. */
+  function targetAt(p: { x: number; y: number }): Target | null {
+    if (EDGE_TOOLS.has(tool)) {
+      const edge = nearestInteriorEdge(p, painted);
+      if (edge) return { kind: "edge", edge };
+      // The eraser falls back to the square, to take a key off it.
+      if (tool !== "erase") return null;
+    }
+    const at = cellUnder(p);
+    return inFrame(at, FRAME) ? { kind: "cell", at } : null;
+  }
+
+  /** Feeds every target between two pointer samples to the stroke. */
+  function strokeAlong(
+    from: { x: number; y: number },
+    to: { x: number; y: number },
+  ) {
+    if (tool === "paint" || tool === "erase-cell") {
+      for (const at of cellsBetween(cellUnder(from), cellUnder(to))) {
+        if (inFrame(at, FRAME)) onStrokeCell(at);
+      }
+      return;
+    }
+    let previous = "";
+    for (const sample of samplesBetween(from, to, SAMPLE_SPACING)) {
+      const target = targetAt(sample);
+      const key = targetKey(target);
+      if (!target || key === previous) continue;
+      previous = key;
+      if (target.kind === "edge") onStrokeEdge(target.edge);
+      else onStrokeCell(target.at);
+    }
+  }
+
+  function handlePointerDown(event: PointerEvent<SVGSVGElement>) {
+    if (event.button !== 0 || strokeRef.current) return;
+    const p = toBoard(event);
+    if (!p) return;
+    setHover(null);
+
+    if (!STROKE_TOOLS.has(tool)) {
+      const target = targetAt(p);
+      if (target?.kind === "edge") onEdge(target.edge);
+      else if (target) onCell(target.at);
+      return;
+    }
+
+    // Captured so the stroke keeps its moves and its release even when the
+    // pointer leaves the board. The press itself has already been dispatched
+    // to the rect under it, so the browser still focuses that rect.
+    strokeRef.current = { pointerId: event.pointerId, last: p };
+    try {
+      svgRef.current?.setPointerCapture(event.pointerId);
+    } catch {
+      // Without capture the stroke still works while the pointer stays on
+      // the board, and lostpointercapture/pointerup end it either way.
+    }
+    onStrokeBegin();
+    strokeAlong(p, p);
+  }
+
+  function handlePointerMove(event: PointerEvent<SVGSVGElement>) {
+    const stroke = strokeRef.current;
+    if (stroke?.pointerId === event.pointerId) {
+      const p = toBoard(event);
+      if (!p) return;
+      strokeAlong(stroke.last, p);
+      stroke.last = p;
+      return;
+    }
+
+    if (event.pointerType !== "mouse" || event.buttons !== 0) return;
+    const p = toBoard(event);
+    const next = p ? targetAt(p) : null;
+    setHover((current) =>
+      targetKey(current) === targetKey(next) ? current : next,
+    );
+  }
+
+  function handlePointerEnd(event: PointerEvent<SVGSVGElement>) {
+    const stroke = strokeRef.current;
+    if (stroke?.pointerId !== event.pointerId) return;
+    strokeRef.current = null;
+    onStrokeEnd();
+  }
+
+  /**
+   * What the active tool would do at the hovered target, drawn faintly.
+   * Mouse only: on touch there is no hover, and the stroke is the feedback.
+   */
+  function renderHover(target: Target) {
+    const common = {
+      "data-hover": tool,
+      "aria-hidden": true,
+      pointerEvents: "none",
+    } as const;
+
+    if (target.kind === "edge") {
+      const key = edgeKey(target.edge);
+      const line = {
+        ...common,
+        "data-hover-edge": key,
+        ...edgeLine(target.edge),
+        strokeWidth: 4,
+        strokeLinecap: "round",
+      } as const;
+      if (tool === "wall") {
+        return <line {...line} opacity={0.4} className="stroke-wall" />;
+      }
+      if (tool === "gate" && nextGate !== null) {
+        return (
+          <line
+            {...line}
+            opacity={0.5}
+            style={{ stroke: gateColour(nextGate) }}
+          />
+        );
+      }
+      if (tool === "erase" && segmentAt.has(key)) {
+        return (
+          <line
+            {...line}
+            strokeWidth={6}
+            opacity={0.6}
+            className="stroke-danger"
+          />
+        );
+      }
+      return null;
+    }
+
+    const { at } = target;
+    const key = cellKey(at);
+    const isPainted = painted.has(key);
+    const cell = { ...common, "data-hover-cell": key } as const;
+    const square = {
+      ...cell,
+      x: at.x * CELL_PX,
+      y: at.y * CELL_PX,
+      width: CELL_PX,
+      height: CELL_PX,
+      opacity: 0.35,
+    } as const;
+    const cx = (at.x + 0.5) * CELL_PX;
+    const cy = (at.y + 0.5) * CELL_PX;
+
+    switch (tool) {
+      case "paint":
+        return !isPainted && canPaint ? (
+          <rect {...square} className="fill-accent" />
+        ) : null;
+      case "erase-cell":
+        return isPainted ? <rect {...square} className="fill-danger" /> : null;
+      case "erase":
+        return keyGateAt.has(key) ? (
+          <circle
+            {...cell}
+            cx={cx}
+            cy={cy}
+            r={CELL_PX * 0.22}
+            opacity={0.6}
+            className="fill-danger"
+          />
+        ) : null;
+      case "key":
+        return isPainted && nextKey !== null ? (
+          <circle
+            {...cell}
+            cx={cx}
+            cy={cy}
+            r={CELL_PX * 0.18}
+            opacity={0.5}
+            style={{ fill: gateColour(nextKey) }}
+          />
+        ) : null;
+      case "start":
+        return isPainted ? (
+          <circle
+            {...cell}
+            cx={cx}
+            cy={cy}
+            r={CELL_PX * 0.3}
+            opacity={0.4}
+            className="fill-accent"
+          />
+        ) : null;
+      case "treasure":
+        return isPainted ? (
+          <rect
+            {...cell}
+            x={(at.x + 0.25) * CELL_PX}
+            y={(at.y + 0.25) * CELL_PX}
+            width={CELL_PX * 0.5}
+            height={CELL_PX * 0.5}
+            opacity={0.4}
+            className="fill-danger"
+          />
+        ) : null;
+      default:
+        return null;
     }
   }
 
@@ -176,11 +506,20 @@ export function Board({ draft, onCell, onEdge, edgesActive }: BoardProps) {
 
   return (
     <svg
+      ref={svgRef}
       data-board
       role="group"
       aria-label={t("boardLabel")}
       viewBox={`0 0 ${FRAME * CELL_PX} ${FRAME * CELL_PX}`}
-      className="border-border-strong h-auto w-full max-w-[700px] rounded border"
+      // touch-none: a swipe draws instead of scrolling the page. The board
+      // already fits the width, so losing pinch-zoom on it costs little.
+      className="border-border-strong h-auto w-full max-w-[700px] touch-none rounded border select-none"
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerEnd}
+      onPointerCancel={handlePointerEnd}
+      onLostPointerCapture={handlePointerEnd}
+      onPointerLeave={() => setHover(null)}
     >
       {ALL_CELLS.map((at) => {
         const key = cellKey(at);
@@ -202,13 +541,16 @@ export function Board({ draft, onCell, onEdge, edgesActive }: BoardProps) {
             height={CELL_PX}
             className={
               painted.has(key)
-                ? "fill-cell-painted stroke-grid-line"
-                : "fill-cell-void stroke-grid-line"
+                ? "fill-cell-painted stroke-grid-line outline-none"
+                : "fill-cell-void stroke-grid-line outline-none"
             }
             strokeWidth={1}
-            onClick={() => onCell(at)}
             onKeyDown={(event) => handleCellKeyDown(event, at)}
-            onFocus={() => setFocusedCell(at)}
+            onFocus={(event) => {
+              setFocusedCell(at);
+              showRingIfKeyboard(event, { kind: "cell", at });
+            }}
+            onBlur={() => setRing(null)}
           />
         );
       })}
@@ -251,26 +593,28 @@ export function Board({ draft, onCell, onEdge, edgesActive }: BoardProps) {
         />
       ))}
 
-      {draft.segments.map((segment) => {
-        // {o:"H",x,y} sits between (x,y) and (x,y+1): a horizontal line one
-        // cell down, spanning column x. {o:"V",x,y} sits between (x,y) and
-        // (x+1,y): a vertical line one cell right, spanning row y.
-        const horizontal = segment.o === "H";
-        const x1 = (segment.x + (horizontal ? 0 : 1)) * CELL_PX;
-        const y1 = (segment.y + (horizontal ? 1 : 0)) * CELL_PX;
-        const x2 = (segment.x + 1) * CELL_PX;
-        const y2 = (segment.y + 1) * CELL_PX;
+      {/* The shape's own border: implicit walls (spec §2.3), never stored. */}
+      {outlineEdges(draft.cells).map((edge) => (
+        <line
+          key={`outline-${edgeKey(edge)}`}
+          data-outline={edgeKey(edge)}
+          aria-hidden="true"
+          pointerEvents="none"
+          {...edgeLine(edge)}
+          strokeWidth={4}
+          strokeLinecap="round"
+          className="stroke-wall"
+        />
+      ))}
 
+      {draft.segments.map((segment) => {
         return (
           <line
             key={`seg-${edgeKey(segment)}`}
             data-segment={edgeKey(segment)}
             aria-hidden="true"
             pointerEvents="none"
-            x1={x1}
-            y1={y1}
-            x2={x2}
-            y2={y2}
+            {...edgeLine(segment)}
             strokeWidth={4}
             strokeLinecap="round"
             className={segment.kind === "wall" ? "stroke-wall" : undefined}
@@ -284,7 +628,7 @@ export function Board({ draft, onCell, onEdge, edgesActive }: BoardProps) {
       })}
 
       {edgesActive &&
-        ALL_EDGES.map((edge, index) => {
+        interiorEdges.map((edge, index) => {
           const horizontal = edge.o === "H";
           const key = edgeKey(edge);
           const focused = index === focusedEdgeIndex;
@@ -304,12 +648,45 @@ export function Board({ draft, onCell, onEdge, edgesActive }: BoardProps) {
               width={horizontal ? CELL_PX : EDGE_HIT}
               height={horizontal ? EDGE_HIT : CELL_PX}
               fill="transparent"
-              onClick={() => onEdge(edge)}
+              className="outline-none"
               onKeyDown={(event) => handleEdgeKeyDown(event, edge)}
-              onFocus={() => setFocusedEdgeIndex(index)}
+              onFocus={(event) => {
+                setFocusedEdge(key);
+                showRingIfKeyboard(event, { kind: "edge", edge });
+              }}
+              onBlur={() => setRing(null)}
             />
           );
         })}
+
+      {hover && renderHover(hover)}
+
+      {ring?.kind === "cell" && (
+        <rect
+          data-focus-ring
+          aria-hidden="true"
+          pointerEvents="none"
+          x={ring.at.x * CELL_PX + 2.5}
+          y={ring.at.y * CELL_PX + 2.5}
+          width={CELL_PX - 5}
+          height={CELL_PX - 5}
+          rx={3}
+          fill="none"
+          strokeWidth={3}
+          className="stroke-accent"
+        />
+      )}
+      {ring?.kind === "edge" && (
+        <line
+          data-focus-ring
+          aria-hidden="true"
+          pointerEvents="none"
+          {...edgeLine(ring.edge)}
+          strokeWidth={6}
+          strokeLinecap="round"
+          className="stroke-accent"
+        />
+      )}
     </svg>
   );
 }

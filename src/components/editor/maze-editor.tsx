@@ -9,10 +9,12 @@ import {
   INCOMPLETE_DRAFT_KEY,
   cellsUsed,
   draftToMaze,
+  edgeKey,
   editorReducer,
   gatesPlaced,
   initialEditorState,
   keysPlaced,
+  nextGate,
   validateMaze,
   type DraftMaze,
   type Edge,
@@ -206,7 +208,7 @@ export function MazeEditor({
     if (locked) return;
     switch (tool) {
       case "paint":
-        return dispatch({ type: "paintCell", at });
+        return dispatch({ type: "paintCell", at, limit: cellCount });
       case "erase-cell":
         return dispatch({ type: "eraseCell", at });
       case "start":
@@ -235,13 +237,59 @@ export function MazeEditor({
     if (tool === "erase") return dispatch({ type: "removeSegment", edge });
   }
 
+  // Whether the current wall stroke adds or removes, decided by the first
+  // edge it reaches: a stroke that starts on a wall removes walls.
+  const wallModeRef = useRef<"add" | "remove" | null>(null);
+
+  function onStrokeBegin() {
+    if (locked) return;
+    wallModeRef.current = null;
+    dispatch({ type: "beginStroke" });
+  }
+
+  function onStrokeCell(at: Point) {
+    if (locked) return;
+    if (tool === "paint")
+      return dispatch({ type: "paintCell", at, limit: cellCount });
+    if (tool === "erase-cell") return dispatch({ type: "eraseCell", at });
+    if (tool === "erase") return dispatch({ type: "removeKey", at });
+  }
+
+  function onStrokeEdge(edge: Edge) {
+    if (locked) return;
+    if (tool === "erase") return dispatch({ type: "removeSegment", edge });
+    if (tool !== "wall") return;
+
+    const id = edgeKey(edge);
+    const isWall = state.draft.segments.some(
+      (s) => s.kind === "wall" && edgeKey(s) === id,
+    );
+    wallModeRef.current ??= isWall ? "remove" : "add";
+    if (wallModeRef.current === "add") {
+      return dispatch({ type: "setWall", edge });
+    }
+    // A removing stroke takes walls only; a gate it passes over stays.
+    if (isWall) return dispatch({ type: "removeSegment", edge });
+  }
+
+  function onStrokeEnd() {
+    dispatch({ type: "endStroke" });
+  }
+
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
       <Board
         draft={state.draft}
+        tool={tool}
+        canPaint={cellsUsed(state.draft) < cellCount}
+        nextGate={nextGate(state.draft)}
+        nextKey={nextKeylessGate(state.draft)}
         onCell={onCell}
         onEdge={onEdge}
-        edgesActive={tool === "wall" || tool === "gate" || tool === "erase"}
+        onStrokeBegin={onStrokeBegin}
+        onStrokeCell={onStrokeCell}
+        onStrokeEdge={onStrokeEdge}
+        onStrokeEnd={onStrokeEnd}
       />
 
       <aside className="space-y-6">
