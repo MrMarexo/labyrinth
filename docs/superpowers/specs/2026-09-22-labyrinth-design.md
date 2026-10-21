@@ -533,13 +533,40 @@ offsets and breaks on every layout change.
 Two modes over one board.
 
 **Shape mode** paints and erases cells against the budget, with a live
-`48 / 64 squares` counter and drag-to-paint.
+`48 / 64 squares` counter.
 
 **Detail mode** exposes the palette — wall, gate, key, start, treasure. Walls
-and gates snap to edges; keys, start and treasure snap to cells. Dragging along
-a line of edges lays multiple walls in one gesture. Clicking an existing item
-with the active tool removes it, and an explicit eraser handles the ambiguous
-cases.
+and gates snap to edges; keys, start and treasure snap to cells. Clicking an
+existing item with the active tool removes it, and an explicit eraser handles
+the ambiguous cases.
+
+**Strokes.** Paint, erase-square, wall and the eraser draw with a swipe: press,
+drag, release. Every square or edge the pointer passes over is affected, with
+the samples between pointer events filled in so a fast swipe leaves no gap.
+Painting stops at the budget, for a swipe and a single click alike. A wall
+stroke's first edge decides what the whole stroke does: starting on a wall
+removes walls, starting anywhere else adds them, and revisiting an edge in the
+same stroke never flips it back. Gate, key, start and treasure act on a single
+tap. Each stroke is **one undo step**, however many squares or edges it
+touched; a tap with a stroke tool is a one-edit stroke. The board sets
+`touch-action: none` so a swipe on a phone draws instead of scrolling — the
+board already fits the width, so losing pinch-zoom on it costs little.
+
+**The outline is automatic.** Every edge with exactly one painted side —
+including the frame border and the rim of any unpainted hole — is drawn as a
+wall, because it is one (§2.3), and is recomputed from the painted cells on
+every render. It is never stored, and it is never a target: edges take a wall
+or a gate only when both sides are painted.
+
+**Hover preview.** With a mouse, the target under the pointer shows faintly
+what the active tool would do there: the square paint would fill or erase
+would clear, the edge a wall or the next gate would land on, the wall, gate or
+key the eraser would remove, the spot a key, start or treasure would take. On
+touch there is no hover; the stroke itself is the feedback.
+
+**Focus ring.** The board's own ring marks the focused square or edge, shown
+for keyboard focus only. The browser's outline is turned off on the board:
+drawn around an SVG `<rect>` it is clipped and rounded and cannot be styled.
 
 Required, not optional:
 
@@ -553,11 +580,13 @@ the maze is currently valid. Submit is disabled while invalid and names the
 specific failure. There is deliberately no difficulty score and no advice about
 gate placement (§4.3).
 
-**Known risk:** edge hit targets. A wall is a one-pixel line needing a ~14 px
-invisible hit strip, and the hit test must resolve "nearest edge" or "containing
-cell" depending on the active tool. With pinch-zoom and pan this works on a
-phone; it will not be pleasant on a phone. v1 does not close that gap — a native
-mobile client is the intended answer, out of scope here.
+**Known risk:** edge hit targets on a phone. An edge is resolved as the nearest
+of the containing square's four, within about 0.3 of a square and away from
+the corners, where two edges are equally near. On a phone-width board a square
+is little more than 20 px, so placing one wall by tap is fiddly even though a
+swipe along a line of edges works well. With pinch-zoom off on the board there
+is no zooming in to help; v1 does not close that gap — a native mobile client
+is the intended answer, out of scope here.
 
 ### 10.3 Run view
 
