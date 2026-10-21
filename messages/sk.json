@@ -259,7 +259,7 @@
     "speed": "Rýchlosť",
     "speedOption": "{speed}×",
     "live": "Naživo",
-    "jumpToLive": "Prejsť na živé vysielanie",
+    "jumpToLive": "Späť naživo",
     "step": "Ťah {step} z {length}",
     "back": "Späť na zápas"
   }
