@@ -266,3 +266,116 @@ describe("undo and redo", () => {
     expect(twice.past).toHaveLength(once.past.length);
   });
 });
+
+describe("strokes", () => {
+  it("starts outside a stroke", () => {
+    expect(start().strokeBase).toBeNull();
+  });
+
+  it("makes a whole stroke one undo step", () => {
+    const before = apply(start(), { type: "paintCell", at: { x: 9, y: 9 } });
+    const after = apply(
+      before,
+      { type: "beginStroke" },
+      { type: "paintCell", at: { x: 0, y: 0 } },
+      { type: "paintCell", at: { x: 1, y: 0 } },
+      { type: "paintCell", at: { x: 2, y: 0 } },
+      { type: "endStroke" },
+    );
+    expect(after.draft.cells).toHaveLength(4);
+    expect(after.past).toHaveLength(before.past.length + 1);
+    expect(after.strokeBase).toBeNull();
+
+    const undone = editorReducer(after, { type: "undo" });
+    expect(undone.draft).toBe(before.draft);
+    expect(undone.past).toEqual(before.past);
+  });
+
+  it("records no history for a stroke that changes nothing", () => {
+    const before = apply(start(), { type: "paintCell", at: { x: 0, y: 0 } });
+    const after = apply(
+      before,
+      { type: "beginStroke" },
+      { type: "paintCell", at: { x: 0, y: 0 } },
+      { type: "endStroke" },
+    );
+    expect(after.past).toHaveLength(before.past.length);
+    expect(after.draft).toBe(before.draft);
+    expect(after.strokeBase).toBeNull();
+  });
+
+  it("ignores undo and redo in the middle of a stroke", () => {
+    const mid = apply(
+      start(),
+      { type: "paintCell", at: { x: 5, y: 5 } },
+      { type: "paintCell", at: { x: 6, y: 5 } },
+      { type: "undo" },
+      { type: "beginStroke" },
+      { type: "paintCell", at: { x: 0, y: 0 } },
+    );
+    expect(editorReducer(mid, { type: "undo" })).toBe(mid);
+    expect(editorReducer(mid, { type: "redo" })).toBe(mid);
+  });
+
+  it("does not touch the history until the stroke ends, then clears redo", () => {
+    const undone = apply(
+      start(),
+      { type: "paintCell", at: { x: 5, y: 5 } },
+      { type: "undo" },
+    );
+    const mid = apply(
+      undone,
+      { type: "beginStroke" },
+      { type: "paintCell", at: { x: 0, y: 0 } },
+    );
+    expect(mid.past).toEqual(undone.past);
+
+    const ended = editorReducer(mid, { type: "endStroke" });
+    expect(ended.future).toEqual([]);
+    expect(ended.past).toHaveLength(undone.past.length + 1);
+  });
+
+  it("ending a stroke that never began changes nothing", () => {
+    const state = start();
+    expect(editorReducer(state, { type: "endStroke" })).toBe(state);
+  });
+});
+
+describe("setWall", () => {
+  const edge = { o: "V", x: 1, y: 1 } as const;
+
+  it("adds a wall, and adding it again is a no-op rather than a toggle", () => {
+    const once = editorReducer(start(), { type: "setWall", edge });
+    expect(once.draft.segments).toEqual([{ ...edge, kind: "wall" }]);
+
+    const twice = editorReducer(once, { type: "setWall", edge });
+    expect(twice).toBe(once);
+  });
+
+  it("replaces a gate and releases the gate's key", () => {
+    const next = apply(
+      start(),
+      { type: "placeSegment", edge, kind: "gate" },
+      { type: "placeKey", at: { x: 3, y: 3 }, gate: 1 },
+      { type: "setWall", edge },
+    );
+    expect(next.draft.segments).toEqual([{ ...edge, kind: "wall" }]);
+    expect(next.draft.keys).toEqual([]);
+    expect(gatesPlaced(next.draft)).toBe(0);
+  });
+});
+
+describe("painting against a limit", () => {
+  it("refuses a new square once the limit is reached", () => {
+    const next = apply(
+      start(),
+      { type: "paintCell", at: { x: 0, y: 0 }, limit: 2 },
+      { type: "paintCell", at: { x: 1, y: 0 }, limit: 2 },
+      { type: "paintCell", at: { x: 2, y: 0 }, limit: 2 },
+    );
+    expect(next.draft.cells).toEqual([
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+    ]);
+  });
+});

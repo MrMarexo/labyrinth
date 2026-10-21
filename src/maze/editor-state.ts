@@ -16,22 +16,33 @@ export type EditorState = {
   draft: DraftMaze;
   past: DraftMaze[];
   future: DraftMaze[];
+  /**
+   * The draft as it was when the current stroke began, or null outside a
+   * stroke. Edits inside a stroke change `draft` without touching the
+   * history; `endStroke` then records the whole stroke as one undo step.
+   */
+  strokeBase: DraftMaze | null;
 };
 
 export type EditorAction =
-  | { type: "paintCell"; at: Point }
+  /** `limit` is the square budget: no new square once it is reached. */
+  | { type: "paintCell"; at: Point; limit?: number }
   | { type: "eraseCell"; at: Point }
   | { type: "placeSegment"; edge: Edge; kind: "wall" | "gate" }
   | { type: "removeSegment"; edge: Edge }
+  /** Like `placeSegment` with a wall, but never toggles one off. */
+  | { type: "setWall"; edge: Edge }
   | { type: "placeKey"; at: Point; gate: number }
   | { type: "removeKey"; at: Point }
   | { type: "placeStart"; at: Point }
   | { type: "placeTreasure"; at: Point }
   | { type: "undo" }
-  | { type: "redo" };
+  | { type: "redo" }
+  | { type: "beginStroke" }
+  | { type: "endStroke" };
 
 export function initialEditorState(draft: DraftMaze): EditorState {
-  return { draft, past: [], future: [] };
+  return { draft, past: [], future: [], strokeBase: null };
 }
 
 export function cellsUsed(draft: DraftMaze): number {
@@ -50,10 +61,36 @@ export function editorReducer(
   state: EditorState,
   action: EditorAction,
 ): EditorState {
+  if (action.type === "beginStroke") {
+    if (state.strokeBase !== null) return state;
+    return { ...state, strokeBase: state.draft };
+  }
+
+  if (action.type === "endStroke") {
+    const base = state.strokeBase;
+    if (base === null) return state;
+    if (state.draft === base) return { ...state, strokeBase: null };
+    return {
+      ...state,
+      past: [...state.past, base],
+      future: [],
+      strokeBase: null,
+    };
+  }
+
+  // History can't move under a stroke that is still being drawn.
+  if (
+    (action.type === "undo" || action.type === "redo") &&
+    state.strokeBase !== null
+  ) {
+    return state;
+  }
+
   if (action.type === "undo") {
     const previous = state.past.at(-1);
     if (!previous) return state;
     return {
+      ...state,
       draft: previous,
       past: state.past.slice(0, -1),
       future: [state.draft, ...state.future],
@@ -64,6 +101,7 @@ export function editorReducer(
     const next = state.future[0];
     if (!next) return state;
     return {
+      ...state,
       draft: next,
       past: [...state.past, state.draft],
       future: state.future.slice(1),
@@ -76,13 +114,17 @@ export function editorReducer(
   // square that is already painted would otherwise fill the stack with no-ops.
   if (draft === state.draft) return state;
 
-  return { draft, past: [...state.past, state.draft], future: [] };
+  if (state.strokeBase !== null) return { ...state, draft };
+
+  return { ...state, draft, past: [...state.past, state.draft], future: [] };
 }
 
 function applyEdit(draft: DraftMaze, action: EditorAction): DraftMaze {
   switch (action.type) {
     case "paintCell": {
       if (draft.cells.some((c) => cellKey(c) === cellKey(action.at)))
+        return draft;
+      if (action.limit !== undefined && draft.cells.length >= action.limit)
         return draft;
       return { ...draft, cells: [...draft.cells, action.at] };
     }
@@ -144,6 +186,18 @@ function applyEdit(draft: DraftMaze, action: EditorAction): DraftMaze {
         segments: [...without, { ...action.edge, kind: "gate", gate }],
         keys: releaseKeyForGate(draft.keys, removedGate?.gate),
       };
+    }
+
+    case "setWall": {
+      const existing = draft.segments.find(
+        (s) => edgeKey(s) === edgeKey(action.edge),
+      );
+      if (existing?.kind === "wall") return draft;
+      return applyEdit(draft, {
+        type: "placeSegment",
+        edge: action.edge,
+        kind: "wall",
+      });
     }
 
     case "removeSegment": {
@@ -212,6 +266,11 @@ function releaseKeyForGate(
   gate: number | undefined,
 ): DraftMaze["keys"] {
   return gate === undefined ? keys : keys.filter((k) => k.gate !== gate);
+}
+
+/** The id the gate tool would give its next gate, or null when all are taken. */
+export function nextGate(draft: DraftMaze): number | null {
+  return lowestFreeGate(draft.segments);
 }
 
 /** The smallest gate id not already in use, or null when all 8 are taken. */

@@ -2,7 +2,14 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 
 import type { Direction, Orientation, Point } from "~/maze/format";
-import { cellKey, edgeBetween, edgeKey, step } from "~/maze/geometry";
+import {
+  cellKey,
+  edgeBetween,
+  edgeKey,
+  isInteriorEdge,
+  outlineEdges,
+  step,
+} from "~/maze/geometry";
 
 /** N<->S and E<->W are the only pairs; used to re-cross an edge from the far side. */
 function opposite(dir: Direction): Direction {
@@ -115,5 +122,100 @@ describe("cellKey and edgeKey", () => {
         },
       ),
     );
+  });
+});
+
+describe("outlineEdges", () => {
+  const keys = (cells: Point[]) => outlineEdges(cells).map(edgeKey).sort();
+
+  it("draws four edges around a single square, including the frame border", () => {
+    expect(keys([{ x: 0, y: 0 }])).toEqual(
+      ["H:0,-1", "H:0,0", "V:-1,0", "V:0,0"].sort(),
+    );
+  });
+
+  it("draws six edges around two adjacent squares, and not the one between them", () => {
+    const outline = keys([
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+    ]);
+    expect(outline).toHaveLength(6);
+    expect(outline).not.toContain("V:0,0");
+  });
+
+  it("follows an L-shape", () => {
+    expect(
+      keys([
+        { x: 0, y: 0 },
+        { x: 0, y: 1 },
+        { x: 1, y: 1 },
+      ]),
+    ).toEqual(
+      [
+        "H:0,-1",
+        "V:-1,0",
+        "V:0,0",
+        "V:-1,1",
+        "H:0,1",
+        "H:1,0",
+        "V:1,1",
+        "H:1,1",
+      ].sort(),
+    );
+  });
+
+  it("outlines an unpainted hole inside the shape as well as the outside", () => {
+    const ring: Point[] = [];
+    for (let y = 0; y < 3; y += 1) {
+      for (let x = 0; x < 3; x += 1) {
+        if (x !== 1 || y !== 1) ring.push({ x, y });
+      }
+    }
+    const outline = keys(ring);
+    expect(outline).toHaveLength(16);
+    for (const inner of ["H:1,0", "H:1,1", "V:0,1", "V:1,1"]) {
+      expect(outline).toContain(inner);
+    }
+  });
+
+  it("names each outline edge once, and each has exactly one painted side", () => {
+    fc.assert(
+      fc.property(
+        fc.uniqueArray(
+          fc.record({
+            x: fc.integer({ min: 0, max: 5 }),
+            y: fc.integer({ min: 0, max: 5 }),
+          }),
+          { selector: cellKey, maxLength: 36 },
+        ),
+        (cells) => {
+          const painted = new Set(cells.map(cellKey));
+          const outline = outlineEdges(cells);
+          const names = outline.map(edgeKey);
+          expect(new Set(names).size).toBe(names.length);
+          for (const edge of outline) {
+            const here = cellKey({ x: edge.x, y: edge.y });
+            const there = cellKey(
+              edge.o === "H"
+                ? { x: edge.x, y: edge.y + 1 }
+                : { x: edge.x + 1, y: edge.y },
+            );
+            expect(painted.has(here) !== painted.has(there)).toBe(true);
+            expect(isInteriorEdge(edge, painted)).toBe(false);
+          }
+        },
+      ),
+    );
+  });
+});
+
+describe("isInteriorEdge", () => {
+  const painted = new Set(["0,0", "1,0", "0,1"]);
+
+  it("is true only when both sides are painted", () => {
+    expect(isInteriorEdge({ o: "V", x: 0, y: 0 }, painted)).toBe(true);
+    expect(isInteriorEdge({ o: "H", x: 0, y: 0 }, painted)).toBe(true);
+    expect(isInteriorEdge({ o: "H", x: 1, y: 0 }, painted)).toBe(false);
+    expect(isInteriorEdge({ o: "H", x: 0, y: -1 }, painted)).toBe(false);
   });
 });
