@@ -9,6 +9,10 @@ import {
   keysPlaced,
   type EditorState,
 } from "~/maze/editor-state";
+import { edgeKey } from "~/maze/geometry";
+
+/** A budget wide enough that no test below runs into it by accident. */
+const GATES = 8;
 
 function start(): EditorState {
   return initialEditorState(emptyDraft());
@@ -83,11 +87,23 @@ describe("placing", () => {
     expect(next.draft.start).toEqual({ x: 2, y: 2 });
   });
 
-  it("numbers gates from 1 upward and pairs a key with each", () => {
+  it("places the gate number it is given, and pairs a key with each", () => {
     const next = apply(
       start(),
-      { type: "placeSegment", edge: { o: "H", x: 0, y: 0 }, kind: "gate" },
-      { type: "placeSegment", edge: { o: "H", x: 1, y: 0 }, kind: "gate" },
+      {
+        type: "placeSegment",
+        edge: { o: "H", x: 0, y: 0 },
+        kind: "gate",
+        gate: 1,
+        gateCount: GATES,
+      },
+      {
+        type: "placeSegment",
+        edge: { o: "H", x: 1, y: 0 },
+        kind: "gate",
+        gate: 2,
+        gateCount: GATES,
+      },
     );
     expect(
       next.draft.segments.map((s) => (s.kind === "gate" ? s.gate : null)),
@@ -95,26 +111,17 @@ describe("placing", () => {
     expect(gatesPlaced(next.draft)).toBe(2);
   });
 
-  it("reuses the lowest free gate number after a removal", () => {
-    const next = apply(
-      start(),
-      { type: "placeSegment", edge: { o: "H", x: 0, y: 0 }, kind: "gate" },
-      { type: "placeSegment", edge: { o: "H", x: 1, y: 0 }, kind: "gate" },
-      { type: "removeSegment", edge: { o: "H", x: 0, y: 0 } },
-      { type: "placeSegment", edge: { o: "H", x: 2, y: 0 }, kind: "gate" },
-    );
-    expect(
-      next.draft.segments
-        .map((s) => (s.kind === "gate" ? s.gate : null))
-        .sort(),
-    ).toEqual([1, 2]);
-  });
-
   it("removing a gate removes its key too", () => {
     const next = apply(
       start(),
-      { type: "placeSegment", edge: { o: "H", x: 0, y: 0 }, kind: "gate" },
-      { type: "placeKey", at: { x: 3, y: 3 }, gate: 1 },
+      {
+        type: "placeSegment",
+        edge: { o: "H", x: 0, y: 0 },
+        kind: "gate",
+        gate: 1,
+        gateCount: GATES,
+      },
+      { type: "placeKey", at: { x: 3, y: 3 }, gate: 1, gateCount: GATES },
       { type: "removeSegment", edge: { o: "H", x: 0, y: 0 } },
     );
     expect(next.draft.keys).toEqual([]);
@@ -124,7 +131,13 @@ describe("placing", () => {
     const next = apply(
       start(),
       { type: "placeSegment", edge: { o: "V", x: 1, y: 1 }, kind: "wall" },
-      { type: "placeSegment", edge: { o: "V", x: 1, y: 1 }, kind: "gate" },
+      {
+        type: "placeSegment",
+        edge: { o: "V", x: 1, y: 1 },
+        kind: "gate",
+        gate: 1,
+        gateCount: GATES,
+      },
     );
     expect(next.draft.segments).toHaveLength(1);
     expect(next.draft.segments[0]?.kind).toBe("gate");
@@ -146,9 +159,21 @@ describe("placing", () => {
   it("toggling a gate off takes its key with it", () => {
     const next = apply(
       start(),
-      { type: "placeSegment", edge: { o: "H", x: 0, y: 0 }, kind: "gate" },
-      { type: "placeKey", at: { x: 3, y: 3 }, gate: 1 },
-      { type: "placeSegment", edge: { o: "H", x: 0, y: 0 }, kind: "gate" },
+      {
+        type: "placeSegment",
+        edge: { o: "H", x: 0, y: 0 },
+        kind: "gate",
+        gate: 1,
+        gateCount: GATES,
+      },
+      { type: "placeKey", at: { x: 3, y: 3 }, gate: 1, gateCount: GATES },
+      {
+        type: "placeSegment",
+        edge: { o: "H", x: 0, y: 0 },
+        kind: "gate",
+        gate: 1,
+        gateCount: GATES,
+      },
     );
     expect(next.draft.segments).toEqual([]);
     expect(next.draft.keys).toEqual([]);
@@ -160,10 +185,22 @@ describe("placing", () => {
   it("counts placed keys, including across more than one gate", () => {
     const next = apply(
       start(),
-      { type: "placeSegment", edge: { o: "H", x: 0, y: 0 }, kind: "gate" },
-      { type: "placeSegment", edge: { o: "H", x: 1, y: 0 }, kind: "gate" },
-      { type: "placeKey", at: { x: 3, y: 3 }, gate: 1 },
-      { type: "placeKey", at: { x: 4, y: 4 }, gate: 2 },
+      {
+        type: "placeSegment",
+        edge: { o: "H", x: 0, y: 0 },
+        kind: "gate",
+        gate: 1,
+        gateCount: GATES,
+      },
+      {
+        type: "placeSegment",
+        edge: { o: "H", x: 1, y: 0 },
+        kind: "gate",
+        gate: 2,
+        gateCount: GATES,
+      },
+      { type: "placeKey", at: { x: 3, y: 3 }, gate: 1, gateCount: GATES },
+      { type: "placeKey", at: { x: 4, y: 4 }, gate: 2, gateCount: GATES },
     );
     expect(next.draft.keys).toHaveLength(2);
     expect(keysPlaced(next.draft)).toBe(2);
@@ -172,8 +209,14 @@ describe("placing", () => {
   it("removing a gate drops its key from the count, not just from the array", () => {
     const withKey = apply(
       start(),
-      { type: "placeSegment", edge: { o: "H", x: 0, y: 0 }, kind: "gate" },
-      { type: "placeKey", at: { x: 3, y: 3 }, gate: 1 },
+      {
+        type: "placeSegment",
+        edge: { o: "H", x: 0, y: 0 },
+        kind: "gate",
+        gate: 1,
+        gateCount: GATES,
+      },
+      { type: "placeKey", at: { x: 3, y: 3 }, gate: 1, gateCount: GATES },
     );
     expect(keysPlaced(withKey.draft)).toBe(1);
 
@@ -187,8 +230,14 @@ describe("placing", () => {
   it("removeKey removes an existing key", () => {
     const withKey = apply(
       start(),
-      { type: "placeSegment", edge: { o: "H", x: 0, y: 0 }, kind: "gate" },
-      { type: "placeKey", at: { x: 3, y: 3 }, gate: 1 },
+      {
+        type: "placeSegment",
+        edge: { o: "H", x: 0, y: 0 },
+        kind: "gate",
+        gate: 1,
+        gateCount: GATES,
+      },
+      { type: "placeKey", at: { x: 3, y: 3 }, gate: 1, gateCount: GATES },
     );
     const next = editorReducer(withKey, {
       type: "removeKey",
@@ -355,8 +404,8 @@ describe("setWall", () => {
   it("replaces a gate and releases the gate's key", () => {
     const next = apply(
       start(),
-      { type: "placeSegment", edge, kind: "gate" },
-      { type: "placeKey", at: { x: 3, y: 3 }, gate: 1 },
+      { type: "placeSegment", edge, kind: "gate", gate: 1, gateCount: GATES },
+      { type: "placeKey", at: { x: 3, y: 3 }, gate: 1, gateCount: GATES },
       { type: "setWall", edge },
     );
     expect(next.draft.segments).toEqual([{ ...edge, kind: "wall" }]);
@@ -427,5 +476,134 @@ describe("loading a draft with segments outside the shape", () => {
       segments: [{ o: "V" as const, x: 0, y: 0, kind: "wall" as const }],
     };
     expect(initialEditorState(draft).draft).toBe(draft);
+  });
+});
+
+describe("choosing the gate number", () => {
+  const a = { o: "H", x: 0, y: 0 } as const;
+  const b = { o: "H", x: 1, y: 0 } as const;
+  const gates = (state: EditorState) =>
+    state.draft.segments.flatMap((s) =>
+      s.kind === "gate" ? [{ edge: edgeKey(s), gate: s.gate }] : [],
+    );
+
+  it("placing gate 2 where gate 2 already is elsewhere moves it, keeping its key", () => {
+    const next = apply(
+      start(),
+      { type: "placeSegment", edge: a, kind: "gate", gate: 2, gateCount: 2 },
+      { type: "placeKey", at: { x: 3, y: 3 }, gate: 2, gateCount: 2 },
+      { type: "placeSegment", edge: b, kind: "gate", gate: 2, gateCount: 2 },
+    );
+    expect(gates(next)).toEqual([{ edge: "H:1,0", gate: 2 }]);
+    expect(next.draft.keys).toEqual([{ gate: 2, x: 3, y: 3 }]);
+  });
+
+  it("refuses a gate above the maze's gate count, leaving the draft as it was", () => {
+    const before = apply(start(), {
+      type: "placeSegment",
+      edge: a,
+      kind: "gate",
+      gate: 1,
+      gateCount: 2,
+    });
+    const next = editorReducer(before, {
+      type: "placeSegment",
+      edge: b,
+      kind: "gate",
+      gate: 3,
+      gateCount: 2,
+    });
+    expect(next).toBe(before);
+  });
+
+  it("refuses a gate below 1", () => {
+    const before = start();
+    const next = editorReducer(before, {
+      type: "placeSegment",
+      edge: a,
+      kind: "gate",
+      gate: 0,
+      gateCount: 2,
+    });
+    expect(next).toBe(before);
+  });
+
+  it("refuses any gate in a maze with no gates", () => {
+    const before = start();
+    const next = editorReducer(before, {
+      type: "placeSegment",
+      edge: a,
+      kind: "gate",
+      gate: 1,
+      gateCount: 0,
+    });
+    expect(next).toBe(before);
+  });
+
+  it("refuses a key above the maze's gate count", () => {
+    const before = start();
+    const next = editorReducer(before, {
+      type: "placeKey",
+      at: { x: 3, y: 3 },
+      gate: 3,
+      gateCount: 2,
+    });
+    expect(next).toBe(before);
+  });
+
+  it("accepts a key before its gate is placed", () => {
+    const next = editorReducer(start(), {
+      type: "placeKey",
+      at: { x: 3, y: 3 },
+      gate: 2,
+      gateCount: 2,
+    });
+    expect(next.draft.keys).toEqual([{ gate: 2, x: 3, y: 3 }]);
+  });
+
+  it("clicking gate N onto gate N removes it and releases key N", () => {
+    const next = apply(
+      start(),
+      { type: "placeSegment", edge: a, kind: "gate", gate: 2, gateCount: 2 },
+      { type: "placeKey", at: { x: 3, y: 3 }, gate: 2, gateCount: 2 },
+      { type: "placeSegment", edge: a, kind: "gate", gate: 2, gateCount: 2 },
+    );
+    expect(gates(next)).toEqual([]);
+    expect(next.draft.keys).toEqual([]);
+  });
+
+  it("placing gate 1 over gate 2 removes gate 2 and releases key 2", () => {
+    const next = apply(
+      start(),
+      { type: "placeSegment", edge: a, kind: "gate", gate: 2, gateCount: 2 },
+      { type: "placeKey", at: { x: 3, y: 3 }, gate: 2, gateCount: 2 },
+      { type: "placeKey", at: { x: 4, y: 4 }, gate: 1, gateCount: 2 },
+      { type: "placeSegment", edge: a, kind: "gate", gate: 1, gateCount: 2 },
+    );
+    expect(gates(next)).toEqual([{ edge: "H:0,0", gate: 1 }]);
+    expect(next.draft.keys).toEqual([{ gate: 1, x: 4, y: 4 }]);
+  });
+
+  it("moving gate 1 onto gate 2's edge leaves one gate there and releases key 2", () => {
+    const next = apply(
+      start(),
+      { type: "placeSegment", edge: a, kind: "gate", gate: 1, gateCount: 2 },
+      { type: "placeSegment", edge: b, kind: "gate", gate: 2, gateCount: 2 },
+      { type: "placeKey", at: { x: 3, y: 3 }, gate: 2, gateCount: 2 },
+      { type: "placeSegment", edge: b, kind: "gate", gate: 1, gateCount: 2 },
+    );
+    expect(gates(next)).toEqual([{ edge: "H:1,0", gate: 1 }]);
+    expect(next.draft.keys).toEqual([]);
+  });
+
+  it("erasing a square keeps a key whose gate is not placed yet", () => {
+    const next = apply(
+      start(),
+      { type: "paintCell", at: { x: 0, y: 0 } },
+      { type: "paintCell", at: { x: 3, y: 3 } },
+      { type: "placeKey", at: { x: 3, y: 3 }, gate: 2, gateCount: 2 },
+      { type: "eraseCell", at: { x: 0, y: 0 } },
+    );
+    expect(next.draft.keys).toEqual([{ gate: 2, x: 3, y: 3 }]);
   });
 });

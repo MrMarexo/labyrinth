@@ -21,6 +21,7 @@ import {
   type Point,
   type Tool,
 } from "~/maze";
+import { KeyIcon, StartIcon, TreasureIcon } from "~/components/maze-icons";
 import { gateColour } from "./gate-colours";
 import {
   cellUnder,
@@ -106,10 +107,11 @@ export type BoardProps = {
   tool: Tool;
   /** False once the square budget is spent, so paint previews nothing. */
   canPaint: boolean;
-  /** The gate id the gate tool would place next, or null when none is free. */
-  nextGate: number | null;
-  /** The gate the key tool would place a key for, or null when none. */
-  nextKey: number | null;
+  /**
+   * The gate or key number the gate or key tool places, or null when the
+   * maze has no gates to number.
+   */
+  gate: number | null;
   /** The maze can no longer be edited, so nothing is previewed. */
   locked: boolean;
   /** A single activation: a tap, or Enter/Space on a focused target. */
@@ -132,8 +134,7 @@ export function Board({
   draft,
   tool,
   canPaint,
-  nextGate,
-  nextKey,
+  gate,
   locked,
   onCell,
   onEdge,
@@ -414,12 +415,15 @@ export function Board({
         strokeWidth: 4,
         strokeLinecap: "round",
       } as const;
-      const existing = segmentAt.get(key)?.kind;
-      // A tap with the same kind of segment removes it (spec §10.2), so the
-      // preview says "remove", not "place".
+      const existing = segmentAt.get(key);
+      // A tap with the same segment removes it (spec §10.2), so the preview
+      // says "remove", not "place". For a gate, "the same" is the same
+      // number: gate 1 over gate 2 replaces it.
       const removes =
-        (tool === "wall" && existing === "wall") ||
-        (tool === "gate" && existing === "gate") ||
+        (tool === "wall" && existing?.kind === "wall") ||
+        (tool === "gate" &&
+          existing?.kind === "gate" &&
+          existing.gate === gate) ||
         (tool === "erase" && existing !== undefined);
       if (removes) {
         return (
@@ -434,13 +438,9 @@ export function Board({
       if (tool === "wall") {
         return <line {...line} opacity={0.4} className="stroke-wall" />;
       }
-      if (tool === "gate" && nextGate !== null) {
+      if (tool === "gate" && gate !== null) {
         return (
-          <line
-            {...line}
-            opacity={0.5}
-            style={{ stroke: gateColour(nextGate) }}
-          />
+          <line {...line} opacity={0.5} style={{ stroke: gateColour(gate) }} />
         );
       }
       return null;
@@ -450,6 +450,7 @@ export function Board({
     const key = cellKey(at);
     const isPainted = painted.has(key);
     const cell = { ...common, "data-hover-cell": key } as const;
+    const icon = { ...cell, x: at.x, y: at.y, size: CELL_PX } as const;
     const square = {
       ...cell,
       x: at.x * CELL_PX,
@@ -480,39 +481,13 @@ export function Board({
           />
         ) : null;
       case "key":
-        return isPainted && nextKey !== null ? (
-          <circle
-            {...cell}
-            cx={cx}
-            cy={cy}
-            r={CELL_PX * 0.18}
-            opacity={0.5}
-            style={{ fill: gateColour(nextKey) }}
-          />
+        return isPainted && gate !== null ? (
+          <KeyIcon {...icon} gate={gate} opacity={0.5} />
         ) : null;
       case "start":
-        return isPainted ? (
-          <circle
-            {...cell}
-            cx={cx}
-            cy={cy}
-            r={CELL_PX * 0.3}
-            opacity={0.4}
-            className="fill-accent"
-          />
-        ) : null;
+        return isPainted ? <StartIcon {...icon} opacity={0.4} /> : null;
       case "treasure":
-        return isPainted ? (
-          <rect
-            {...cell}
-            x={(at.x + 0.25) * CELL_PX}
-            y={(at.y + 0.25) * CELL_PX}
-            width={CELL_PX * 0.5}
-            height={CELL_PX * 0.5}
-            opacity={0.4}
-            className="fill-danger"
-          />
-        ) : null;
+        return isPainted ? <TreasureIcon {...icon} opacity={0.4} /> : null;
       default:
         return null;
     }
@@ -596,40 +571,34 @@ export function Board({
       })}
 
       {draft.start && (
-        <circle
+        <StartIcon
           data-start
-          aria-hidden="true"
           pointerEvents="none"
-          cx={(draft.start.x + 0.5) * CELL_PX}
-          cy={(draft.start.y + 0.5) * CELL_PX}
-          r={CELL_PX * 0.3}
-          className="fill-accent"
+          x={draft.start.x}
+          y={draft.start.y}
+          size={CELL_PX}
         />
       )}
 
       {draft.treasure && (
-        <rect
+        <TreasureIcon
           data-treasure
-          aria-hidden="true"
           pointerEvents="none"
-          x={(draft.treasure.x + 0.25) * CELL_PX}
-          y={(draft.treasure.y + 0.25) * CELL_PX}
-          width={CELL_PX * 0.5}
-          height={CELL_PX * 0.5}
-          className="fill-danger"
+          x={draft.treasure.x}
+          y={draft.treasure.y}
+          size={CELL_PX}
         />
       )}
 
       {draft.keys.map((key) => (
-        <circle
+        <KeyIcon
           key={`key-${key.gate}`}
           data-key={key.gate}
-          aria-hidden="true"
           pointerEvents="none"
-          cx={(key.x + 0.5) * CELL_PX}
-          cy={(key.y + 0.5) * CELL_PX}
-          r={CELL_PX * 0.18}
-          style={{ fill: gateColour(key.gate) }}
+          x={key.x}
+          y={key.y}
+          size={CELL_PX}
+          gate={key.gate}
         />
       ))}
 
@@ -652,6 +621,7 @@ export function Board({
           <line
             key={`seg-${edgeKey(segment)}`}
             data-segment={edgeKey(segment)}
+            data-gate={segment.kind === "gate" ? segment.gate : undefined}
             aria-hidden="true"
             pointerEvents="none"
             {...edgeLine(segment)}

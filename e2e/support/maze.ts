@@ -11,11 +11,18 @@ export async function signUp(page: Page): Promise<void> {
   await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
 }
 
-export async function signUpAndOpenNewMaze(page: Page): Promise<void> {
+/** `gates` is the new maze's gate count; the form's default (2) if omitted. */
+export async function signUpAndOpenNewMaze(
+  page: Page,
+  options: { gates?: number } = {},
+): Promise<void> {
   await signUp(page);
   await page.goto("/en/labyrinths");
   await page.getByRole("button", { name: "New labyrinth" }).click();
   await page.getByLabel("Name").fill("Test maze");
+  if (options.gates !== undefined) {
+    await page.getByLabel("Gates").fill(String(options.gates));
+  }
   await page.getByRole("button", { name: "Create" }).click();
   await expect(page.locator("svg[data-board]")).toBeVisible();
 }

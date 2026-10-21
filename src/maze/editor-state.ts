@@ -1,5 +1,5 @@
 import type { DraftMaze } from "./draft";
-import { MAX_GATES, type Orientation, type Point } from "./format";
+import type { Orientation, Point } from "./format";
 import { cellKey, edgeKey, isInteriorEdge, step, type Edge } from "./geometry";
 
 export type Tool =
@@ -28,11 +28,23 @@ export type EditorAction =
   /** `limit` is the square budget: no new square once it is reached. */
   | { type: "paintCell"; at: Point; limit?: number }
   | { type: "eraseCell"; at: Point }
-  | { type: "placeSegment"; edge: Edge; kind: "wall" | "gate" }
+  | { type: "placeSegment"; edge: Edge; kind: "wall" }
+  /**
+   * Places gate `gate`, moving it if it is already elsewhere. `gateCount` is
+   * the maze's gate budget: an id outside 1..gateCount is refused.
+   */
+  | {
+      type: "placeSegment";
+      edge: Edge;
+      kind: "gate";
+      gate: number;
+      gateCount: number;
+    }
   | { type: "removeSegment"; edge: Edge }
   /** Like `placeSegment` with a wall, but never toggles one off. */
   | { type: "setWall"; edge: Edge }
-  | { type: "placeKey"; at: Point; gate: number }
+  /** Refused for an id outside 1..gateCount, like a gate. */
+  | { type: "placeKey"; at: Point; gate: number; gateCount: number }
   | { type: "removeKey"; at: Point }
   | { type: "placeStart"; at: Point }
   | { type: "placeTreasure"; at: Point }
@@ -169,8 +181,12 @@ function applyEdit(draft: DraftMaze, action: EditorAction): DraftMaze {
       // hold a wall with nothing on one side and a start in empty space.
       const cells = draft.cells.filter((c) => cellKey(c) !== gone);
       const segments = draft.segments.filter((s) => !touches(s, action.at));
-      const survivingGates = new Set(
-        segments.filter((s) => s.kind === "gate").map((s) => s.gate),
+      // Only the keys of gates this erase removed: a key placed before its
+      // gate has no gate to lose, and stays.
+      const removedGates = new Set(
+        draft.segments.flatMap((s) =>
+          s.kind === "gate" && touches(s, action.at) ? [s.gate] : [],
+        ),
       );
 
       return {
@@ -178,7 +194,7 @@ function applyEdit(draft: DraftMaze, action: EditorAction): DraftMaze {
         cells,
         segments,
         keys: draft.keys.filter(
-          (k) => cellKey(k) !== gone && survivingGates.has(k.gate),
+          (k) => cellKey(k) !== gone && !removedGates.has(k.gate),
         ),
         start:
           draft.start && cellKey(draft.start) === gone ? null : draft.start,
@@ -193,30 +209,44 @@ function applyEdit(draft: DraftMaze, action: EditorAction): DraftMaze {
       const id = edgeKey(action.edge);
       const existing = draft.segments.find((s) => edgeKey(s) === id);
 
+      if (action.kind === "gate" && !inBudget(action.gate, action.gateCount))
+        return draft;
+
       // Spec §10.2: the active tool toggles. Clicking a wall with the wall
-      // tool removes it; clicking it with the gate tool replaces it.
-      if (existing?.kind === action.kind) {
+      // tool removes it, and so does clicking gate N with gate N; clicking
+      // it with any other segment replaces it.
+      const same =
+        action.kind === "wall"
+          ? existing?.kind === "wall"
+          : existing?.kind === "gate" && existing.gate === action.gate;
+      if (same) {
         return applyEdit(draft, { type: "removeSegment", edge: action.edge });
       }
 
       const without = draft.segments.filter((s) => edgeKey(s) !== id);
-      const removedGate = existing?.kind === "gate" ? existing : undefined;
+      const keys = releaseKeyForGate(
+        draft.keys,
+        existing?.kind === "gate" ? existing.gate : undefined,
+      );
 
       if (action.kind === "wall") {
         return {
           ...draft,
           segments: [...without, { ...action.edge, kind: "wall" }],
-          keys: releaseKeyForGate(draft.keys, removedGate?.gate),
+          keys,
         };
       }
 
-      const gate = lowestFreeGate(without);
-      if (gate === null) return draft;
-
+      // Each gate id appears once, so placing gate N elsewhere moves it. Its
+      // key stays: the gate it opens still exists.
+      const { gate } = action;
       return {
         ...draft,
-        segments: [...without, { ...action.edge, kind: "gate", gate }],
-        keys: releaseKeyForGate(draft.keys, removedGate?.gate),
+        segments: [
+          ...without.filter((s) => s.kind !== "gate" || s.gate !== gate),
+          { ...action.edge, kind: "gate", gate },
+        ],
+        keys,
       };
     }
 
@@ -248,6 +278,7 @@ function applyEdit(draft: DraftMaze, action: EditorAction): DraftMaze {
     }
 
     case "placeKey": {
+      if (!inBudget(action.gate, action.gateCount)) return draft;
       const at = cellKey(action.at);
       return {
         ...draft,
@@ -300,18 +331,7 @@ function releaseKeyForGate(
   return gate === undefined ? keys : keys.filter((k) => k.gate !== gate);
 }
 
-/** The id the gate tool would give its next gate, or null when all are taken. */
-export function nextGate(draft: DraftMaze): number | null {
-  return lowestFreeGate(draft.segments);
-}
-
-/** The smallest gate id not already in use, or null when all 8 are taken. */
-function lowestFreeGate(segments: DraftMaze["segments"]): number | null {
-  const used = new Set(
-    segments.filter((s) => s.kind === "gate").map((s) => s.gate),
-  );
-  for (let id = 1; id <= MAX_GATES; id += 1) {
-    if (!used.has(id)) return id;
-  }
-  return null;
+/** Whether `gate` is an id this maze's gate budget allows. */
+function inBudget(gate: number, gateCount: number): boolean {
+  return Number.isInteger(gate) && gate >= 1 && gate <= gateCount;
 }

@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import { useRef, type KeyboardEvent } from "react";
 
 import type { Tool } from "~/maze";
+import { gateColour } from "./gate-colours";
 
 export type DetailToolsProps = {
   tool: Tool;
@@ -11,6 +12,11 @@ export type DetailToolsProps = {
   gates: number;
   gateBudget: number;
   keys: number;
+  /** The gate or key number the gate and key tools place. */
+  chosen: number | null;
+  onChoose: (gate: number) => void;
+  /** Numbers the active tool has already placed. */
+  placed: ReadonlySet<number>;
 };
 
 /** The six tools this palette offers, in display and arrow-key order. */
@@ -29,6 +35,9 @@ export function DetailTools({
   gates,
   gateBudget,
   keys,
+  chosen,
+  onChoose,
+  placed,
 }: DetailToolsProps) {
   const t = useTranslations("editor");
   const buttonRefs = useRef(new Map<Tool, HTMLButtonElement>());
@@ -115,6 +124,16 @@ export function DetailTools({
         })}
       </div>
 
+      {(tool === "gate" || tool === "key") && gateBudget > 0 && (
+        <NumberPicker
+          kind={tool}
+          count={gateBudget}
+          chosen={chosen}
+          onChoose={onChoose}
+          placed={placed}
+        />
+      )}
+
       <p data-gates className="text-sm">
         {t("gates", { gates, gateBudget })}
       </p>
@@ -129,4 +148,107 @@ function buttonClass(active: boolean): string {
   return active
     ? "bg-accent text-on-accent rounded px-3 py-2 text-sm"
     : "border-border-strong rounded border px-3 py-2 text-sm";
+}
+
+type NumberPickerProps = {
+  kind: "gate" | "key";
+  count: number;
+  chosen: number | null;
+  onChoose: (gate: number) => void;
+  placed: ReadonlySet<number>;
+};
+
+/**
+ * Which gate, or which gate's key, the active tool places: one radio per
+ * number the maze allows, 1 to `count`. The same radiogroup pattern as the
+ * palettes above.
+ */
+function NumberPicker({
+  kind,
+  count,
+  chosen,
+  onChoose,
+  placed,
+}: NumberPickerProps) {
+  const t = useTranslations("editor");
+  const buttonRefs = useRef(new Map<number, HTMLButtonElement>());
+  const numbers = Array.from({ length: count }, (_, i) => i + 1);
+
+  const activeIndex = chosen === null ? -1 : numbers.indexOf(chosen);
+  const tabStopIndex = activeIndex === -1 ? 0 : activeIndex;
+
+  function labelFor(n: number): string {
+    if (kind === "gate") {
+      return placed.has(n)
+        ? t("gateOptionPlaced", { gate: n })
+        : t("gateOption", { gate: n });
+    }
+    return placed.has(n)
+      ? t("keyOptionPlaced", { gate: n })
+      : t("keyOption", { gate: n });
+  }
+
+  function handleKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
+    let nextIndex: number;
+    switch (event.key) {
+      case "ArrowRight":
+      case "ArrowDown":
+        nextIndex = (tabStopIndex + 1) % numbers.length;
+        break;
+      case "ArrowLeft":
+      case "ArrowUp":
+        nextIndex = (tabStopIndex - 1 + numbers.length) % numbers.length;
+        break;
+      default:
+        return;
+    }
+    event.preventDefault();
+    const next = numbers[nextIndex]!;
+    onChoose(next);
+    buttonRefs.current.get(next)?.focus();
+  }
+
+  const hook = kind === "gate" ? "data-gate-option" : "data-key-option";
+
+  return (
+    <div
+      role="radiogroup"
+      aria-label={kind === "gate" ? t("gatePickerLabel") : t("keyPickerLabel")}
+      className="flex flex-wrap gap-2"
+    >
+      {numbers.map((n, index) => {
+        const active = chosen === n;
+        return (
+          <button
+            key={n}
+            ref={(el) => {
+              if (el) buttonRefs.current.set(n, el);
+              else buttonRefs.current.delete(n);
+            }}
+            type="button"
+            role="radio"
+            {...{ [hook]: n }}
+            aria-checked={active}
+            aria-label={labelFor(n)}
+            tabIndex={index === tabStopIndex ? 0 : -1}
+            onClick={() => onChoose(n)}
+            onKeyDown={handleKeyDown}
+            className={`${buttonClass(active)} inline-flex items-center gap-1.5`}
+          >
+            <svg aria-hidden="true" viewBox="0 0 10 10" className="size-3">
+              <circle
+                data-swatch
+                cx={5}
+                cy={5}
+                r={5}
+                style={{ fill: gateColour(n) }}
+              />
+            </svg>
+            <span>{n}</span>
+            {placed.has(n) && <span aria-hidden="true">✓</span>}
+          </button>
+        );
+      })}
+    </div>
+  );
 }

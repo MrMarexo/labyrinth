@@ -1,25 +1,7 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
+import { cell, centre, drag } from "./support/board";
 import { signUpAndOpenNewMaze } from "./support/maze";
-
-async function centre(target: Locator): Promise<{ x: number; y: number }> {
-  const box = await target.boundingBox();
-  if (!box) throw new Error("target has no box");
-  return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
-}
-
-/** Press on the centre of `from`, move to the centre of `to`, release. */
-async function drag(page: Page, from: Locator, to: Locator): Promise<void> {
-  const a = await centre(from);
-  const b = await centre(to);
-  await page.mouse.move(a.x, a.y);
-  await page.mouse.down();
-  await page.mouse.move(b.x, b.y, { steps: 8 });
-  await page.mouse.up();
-}
-
-const cell = (page: Page, x: number, y: number) =>
-  page.locator(`[data-cell="${x},${y}"]`);
 
 test.describe("drawing with a swipe", () => {
   test("a drag paints every square it crosses, and one Undo takes back the whole drag", async ({

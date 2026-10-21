@@ -14,7 +14,6 @@ import {
   gatesPlaced,
   initialEditorState,
   keysPlaced,
-  nextGate,
   validateMaze,
   type DraftMaze,
   type Edge,
@@ -25,7 +24,7 @@ import { api } from "~/trpc/react";
 import { Board } from "./board";
 import { DetailTools } from "./detail-tools";
 import { ShapeTools } from "./shape-tools";
-import { ValidationPanel } from "./validation-panel";
+import { ValidationPanel, type SaveState } from "./validation-panel";
 
 const AUTOSAVE_MS = 800;
 
@@ -56,6 +55,9 @@ export function MazeEditor({
     initialEditorState,
   );
   const [tool, setTool] = useState<Tool>("paint");
+  // The gate or key number the gate and key tools place. Set to the default
+  // each time one of those tools is activated, then only by the author.
+  const [chosen, setChosen] = useState<number | null>(null);
   const saveDraft = api.maze.saveDraft.useMutation();
 
   // `locked` and `saveError` are read from render; everything else here is
@@ -63,6 +65,11 @@ export function MazeEditor({
   // updating it never itself triggers a render.
   const [locked, setLocked] = useState(false);
   const [saveError, setSaveError] = useState<TranslatableIssue | null>(null);
+  // Render-side mirrors of the pipeline's bookkeeping, for the save status:
+  // `lastSentRef` and `savingRef` below stay the source of truth for what
+  // gets sent, but a ref changing never re-renders.
+  const [savedDraft, setSavedDraft] = useState<DraftMaze>(initial);
+  const [inFlight, setInFlight] = useState(false);
 
   // The draft last known to match what the server has. Updated only on a
   // *successful* save (never optimistically before the response), so a
@@ -89,12 +96,16 @@ export function MazeEditor({
 
   function send(draft: DraftMaze) {
     savingRef.current = true;
+    if (mountedRef.current) setInFlight(true);
     saveDraft.mutate(
       { id, data: draft },
       {
         onSuccess: () => {
           lastSentRef.current = draft;
-          if (mountedRef.current) setSaveError(null);
+          if (mountedRef.current) {
+            setSaveError(null);
+            setSavedDraft(draft);
+          }
           // The live draft can have moved on while this request was in
           // flight — most sharply when undo pops the history stack back
           // onto the very object `lastSentRef` already pointed at, which
@@ -132,6 +143,7 @@ export function MazeEditor({
         },
         onSettled: () => {
           savingRef.current = false;
+          if (mountedRef.current) setInFlight(false);
           // Deliberately unguarded by `mountedRef`: a queued send must still
           // reach the server after the author has navigated away, or it is
           // simply lost. Only the UI feedback above is skipped post-unmount.
@@ -207,6 +219,23 @@ export function MazeEditor({
       : validation.issues
     : [{ key: INCOMPLETE_DRAFT_KEY }];
 
+  // "saved" only once the server holds exactly the live draft: not while the
+  // debounce is pending, and not while any request is still in flight, since
+  // even a draft equal to the saved one (an undo back onto it) is about to be
+  // overwritten by that request and then corrected by the recheck.
+  const saveState: SaveState = saveError
+    ? "error"
+    : state.draft !== savedDraft || inFlight
+      ? "saving"
+      : "saved";
+
+  function selectTool(next: Tool) {
+    setTool(next);
+    if (next === "gate" || next === "key") {
+      setChosen(defaultNumber(next, state.draft, gateCount));
+    }
+  }
+
   function onCell(at: Point) {
     if (locked) return;
     switch (tool) {
@@ -218,12 +247,10 @@ export function MazeEditor({
         return dispatch({ type: "placeStart", at });
       case "treasure":
         return dispatch({ type: "placeTreasure", at });
-      case "key": {
-        const gate = nextKeylessGate(state.draft);
-        return gate === null
+      case "key":
+        return chosen === null
           ? undefined
-          : dispatch({ type: "placeKey", at, gate });
-      }
+          : dispatch({ type: "placeKey", at, gate: chosen, gateCount });
       case "erase":
         return dispatch({ type: "removeKey", at });
       default:
@@ -235,8 +262,15 @@ export function MazeEditor({
     if (locked) return;
     if (tool === "wall")
       return dispatch({ type: "placeSegment", edge, kind: "wall" });
-    if (tool === "gate")
-      return dispatch({ type: "placeSegment", edge, kind: "gate" });
+    if (tool === "gate" && chosen !== null) {
+      return dispatch({
+        type: "placeSegment",
+        edge,
+        kind: "gate",
+        gate: chosen,
+        gateCount,
+      });
+    }
     if (tool === "erase") return dispatch({ type: "removeSegment", edge });
   }
 
@@ -285,8 +319,7 @@ export function MazeEditor({
         draft={state.draft}
         tool={tool}
         canPaint={cellsUsed(state.draft) < cellCount}
-        nextGate={nextGate(state.draft)}
-        nextKey={nextKeylessGate(state.draft)}
+        gate={chosen}
         locked={locked}
         onCell={onCell}
         onEdge={onEdge}
@@ -299,16 +332,19 @@ export function MazeEditor({
       <aside className="space-y-6">
         <ShapeTools
           tool={tool}
-          onTool={setTool}
+          onTool={selectTool}
           used={cellsUsed(state.draft)}
           budget={cellCount}
         />
         <DetailTools
           tool={tool}
-          onTool={setTool}
+          onTool={selectTool}
           gates={gatesPlaced(state.draft)}
           gateBudget={gateCount}
           keys={keysPlaced(state.draft)}
+          chosen={chosen}
+          onChoose={setChosen}
+          placed={placedNumbers(tool, state.draft)}
         />
 
         {saveError && (
@@ -351,18 +387,38 @@ export function MazeEditor({
           </button>
         </div>
 
-        <ValidationPanel issues={issues} valid={validation?.ok === true} />
+        <ValidationPanel
+          issues={issues}
+          valid={validation?.ok === true}
+          saveState={saveState}
+        />
       </aside>
     </div>
   );
 }
 
-/** The lowest gate id that has no key yet, so the key tool knows what to place. */
-function nextKeylessGate(draft: DraftMaze): number | null {
-  const withKeys = new Set(draft.keys.map((k) => k.gate));
-  const gates = draft.segments
-    .filter((s) => s.kind === "gate")
-    .map((s) => s.gate)
-    .sort((a, b) => a - b);
-  return gates.find((g) => !withKeys.has(g)) ?? null;
+/** The gate ids that already have a gate, or a key with the key tool. */
+function placedNumbers(tool: Tool, draft: DraftMaze): ReadonlySet<number> {
+  return new Set(
+    tool === "key"
+      ? draft.keys.map((k) => k.gate)
+      : draft.segments.flatMap((s) => (s.kind === "gate" ? [s.gate] : [])),
+  );
+}
+
+/**
+ * The number the gate or key tool starts on: the lowest one not yet placed
+ * for that tool, or 1 when every one is. Null when the maze has no gates.
+ */
+function defaultNumber(
+  tool: "gate" | "key",
+  draft: DraftMaze,
+  gateCount: number,
+): number | null {
+  if (gateCount < 1) return null;
+  const placed = placedNumbers(tool, draft);
+  for (let n = 1; n <= gateCount; n += 1) {
+    if (!placed.has(n)) return n;
+  }
+  return 1;
 }

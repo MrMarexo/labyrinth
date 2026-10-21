@@ -93,7 +93,8 @@ test.describe("gate colours", () => {
   test("gates render as distinct hues, in both themes", async ({
     page,
   }, testInfo) => {
-    await signUpAndOpenNewMaze(page);
+    // Eight gates need a maze that allows eight.
+    await signUpAndOpenNewMaze(page, { gates: 8 });
 
     // Paint two full rows so the gates and wall placed below sit on a real
     // boundary rather than empty void, matching how they would actually look.
@@ -104,7 +105,8 @@ test.describe("gate colours", () => {
 
     // All eight gate hues, side by side along the row boundary.
     await page.getByRole("radio", { name: "Gate" }).click();
-    for (const x of [0, 2, 4, 6, 8, 10, 12, 14]) {
+    for (const [index, x] of [0, 2, 4, 6, 8, 10, 12, 14].entries()) {
+      await page.locator(`[data-gate-option="${index + 1}"]`).click();
       await page.locator(`[data-edge="V:${x},0"]`).click();
     }
     await expect(page.locator('[data-segment^="V:"]')).toHaveCount(8);
