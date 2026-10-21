@@ -5,9 +5,13 @@ on:
     - cron: "0 3 * * *"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   smoke:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     env:
       SKIP_ENV_VALIDATION: "true"
       PUSHER_APP_ID: ${{ secrets.PUSHER_APP_ID }}
