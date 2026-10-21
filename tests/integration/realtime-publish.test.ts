@@ -15,6 +15,7 @@ import {
   gatedMazeDraft,
 } from "../fixtures/maze";
 import { runningMatch, signedIn } from "./players";
+import { sweepAll } from "./support";
 
 type Event = { channel: string; event: string; data: unknown };
 let events: Event[] = [];
@@ -92,7 +93,7 @@ describe("publishing", () => {
     expect(on(matchChannel(created.id))).toHaveLength(2);
   });
 
-  it("pings the match when the sweep closes it", async () => {
+  it("closing an expired match publishes nothing by itself", async () => {
     const { host, matchId } = await runningMatch();
     await host.run.move({ matchId, seq: 1, dir: "S" });
     const [row] = await db.select().from(match).where(eq(match.id, matchId));
@@ -104,7 +105,20 @@ describe("publishing", () => {
         new Date(row!.deadlineAt.getTime() + 1),
       ),
     ).toBe(true);
-    expect(on(matchChannel(matchId))).toHaveLength(1);
+    // The sweep publishes for the whole batch at once, after its loop.
+    expect(events).toEqual([]);
+  });
+
+  it("pings the match when the sweep closes it", async () => {
+    const { host, matchId } = await runningMatch();
+    await host.run.move({ matchId, seq: 1, dir: "S" });
+    const [row] = await db.select().from(match).where(eq(match.id, matchId));
+    events = [];
+    // Other suites' due matches in the shared database are pinged too.
+    await sweepAll(db, new Date(row!.deadlineAt.getTime() + 1));
+    expect(on(matchChannel(matchId))).toEqual([
+      { channel: matchChannel(matchId), event: EVENTS.changed, data: {} },
+    ]);
   });
 
   it("a publisher that throws does not fail the move", async () => {

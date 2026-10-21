@@ -31,7 +31,9 @@ import { publishMatchChanged } from "~/server/realtime/events";
 // whatever the production network adds. Ordering by `deadlineAt` ascending
 // means the oldest expiries always drain first, so a steady trickle of new
 // ones can never starve a backlog from ever being cleared — the cron's
-// 15-minute cadence just takes more runs to catch up.
+// 15-minute cadence just takes more runs to catch up. The batch's
+// match-changed pings go out concurrently after the loop, so publishing adds
+// at most one `PUBLISH_TIMEOUT_MS` (2s) to the batch, not 2s per match.
 const SWEEP_BATCH_LIMIT = 50;
 
 /**
@@ -45,14 +47,15 @@ const SWEEP_BATCH_LIMIT = 50;
  * decision is made on the committed state: a match that is no longer open,
  * or whose expiry outcome is now `none`, is left untouched.
  *
- * Returns whether the match was closed.
+ * Returns whether the match was closed. It publishes nothing: the caller
+ * announces the closed matches after commit (see `sweepExpiredMatches`).
  */
 export async function closeIfExpired(
   db: typeof Database,
   matchId: string,
   now: Date,
 ): Promise<boolean> {
-  const closed = await db.transaction(async (tx) => {
+  return db.transaction(async (tx) => {
     const [row] = await tx
       .select()
       .from(match)
@@ -102,9 +105,6 @@ export async function closeIfExpired(
 
     return true;
   });
-
-  if (closed) await publishMatchChanged(matchId);
-  return closed;
 }
 
 /**
@@ -134,13 +134,16 @@ export async function sweepExpiredMatches(
 
   if (due.length === 0) return { closed: 0, capped: false };
 
-  let closed = 0;
+  const closed: string[] = [];
 
   for (const row of due) {
-    if (await closeIfExpired(db, row.id, now)) closed += 1;
+    if (await closeIfExpired(db, row.id, now)) closed.push(row.id);
   }
+
+  // Concurrently, so the batch spends at most one publish timeout on them.
+  await Promise.all(closed.map(publishMatchChanged));
 
   // A full batch means there may be more due matches than this call fetched;
   // the next invocation picks up where this one left off, oldest first.
-  return { closed, capped: due.length === SWEEP_BATCH_LIMIT };
+  return { closed: closed.length, capped: due.length === SWEEP_BATCH_LIMIT };
 }
