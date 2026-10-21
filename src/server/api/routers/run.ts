@@ -227,12 +227,20 @@ export const runRouter = createTRPCRouter({
       // After commit (spec §8): a publish inside the transaction could
       // announce a move that rolls back, and would hold the row lock across
       // a network call. A replayed seq was announced the first time.
+      // A finished run pings the match too, even when the match goes on: a
+      // watcher whose move event was dropped would otherwise stay "live".
+      // Awaited, not fired off: the move queue sends one move at a time, so
+      // this keeps each runner's published moves in seq order.
       if (outcome.fresh) {
-        await publishMove(input.matchId, me, {
-          seq: input.seq,
-          delta: outcome.delta,
-        });
-        if (outcome.matchOver) await publishMatchChanged(input.matchId);
+        await Promise.all([
+          publishMove(input.matchId, me, {
+            seq: input.seq,
+            delta: outcome.delta,
+          }),
+          outcome.matchOver || outcome.delta.finished
+            ? publishMatchChanged(input.matchId)
+            : undefined,
+        ]);
       }
       return { delta: outcome.delta, matchOver: outcome.matchOver };
     }),

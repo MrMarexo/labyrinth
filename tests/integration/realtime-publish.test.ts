@@ -54,19 +54,25 @@ describe("publishing", () => {
     expect(on(runChannel(matchId, hostId))).toEqual([]);
   });
 
-  it("pings the match when a move completes it", async () => {
+  it("pings the match once when each run finishes", async () => {
     const { host, guest, matchId } = await runningMatch();
+    const ping = {
+      channel: matchChannel(matchId),
+      event: EVENTS.changed,
+      data: {},
+    };
     events = [];
+    // The first finish does not end the match, but a watcher still needs
+    // telling: the move event alone may be dropped.
     for (const [i, dir] of GATED_MAZE_ROUTE.entries()) {
       await host.run.move({ matchId, seq: i + 1, dir });
     }
-    expect(on(matchChannel(matchId))).toEqual([]);
+    expect(on(matchChannel(matchId))).toEqual([ping]);
+    // The second finish both finishes a run and ends the match: one ping.
     for (const [i, dir] of GATED_MAZE_ROUTE.entries()) {
       await guest.run.move({ matchId, seq: i + 1, dir });
     }
-    expect(on(matchChannel(matchId))).toEqual([
-      { channel: matchChannel(matchId), event: EVENTS.changed, data: {} },
-    ]);
+    expect(on(matchChannel(matchId))).toEqual([ping, ping]);
   });
 
   it("pings the match on a give-up", async () => {
