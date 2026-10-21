@@ -234,7 +234,7 @@ function WatchPlayer({
             type="button"
             data-jump-live
             onClick={() => dispatch({ type: "jumpToLive" })}
-            className="border-border-strong rounded border px-3 py-2 text-sm"
+            className="border-border-strong min-h-11 rounded border px-3 py-2 text-sm"
           >
             {t("jumpToLive")}
           </button>
@@ -362,8 +362,8 @@ function SpeedPicker({
             onKeyDown={handleKeyDown}
             className={
               active
-                ? "bg-accent text-on-accent rounded px-3 py-2 text-sm"
-                : "border-border-strong rounded border px-3 py-2 text-sm"
+                ? "bg-accent text-on-accent min-h-11 rounded px-3 py-2 text-sm"
+                : "border-border-strong min-h-11 rounded border px-3 py-2 text-sm"
             }
           >
             {t("speedOption", { speed: option })}

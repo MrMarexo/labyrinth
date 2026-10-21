@@ -197,11 +197,13 @@ export function RunView({
             )}
           </div>
         </div>
-        {watchers >= 1 && (
-          <span data-watchers={watchers} className="text-muted text-sm">
-            {t("watching", { count: watchers })}
-          </span>
-        )}
+        <span aria-live="polite">
+          {watchers >= 1 && (
+            <span data-watchers={watchers} className="text-muted text-sm">
+              {t("watching", { count: watchers })}
+            </span>
+          )}
+        </span>
         {pending && <span data-run-pending hidden />}
       </div>
 
