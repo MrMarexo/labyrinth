@@ -560,9 +560,17 @@ or a gate only when both sides are painted.
 
 **Hover preview.** With a mouse, the target under the pointer shows faintly
 what the active tool would do there: the square paint would fill or erase
-would clear, the edge a wall or the next gate would land on, the wall, gate or
+would clear, the edge a wall or the chosen gate would land on, the wall, gate or
 key the eraser would remove, the spot a key, start or treasure would take. On
 touch there is no hover; the stroke itself is the feedback.
+
+**Gate and key numbers.** With the gate or key tool active, the panel offers
+one numbered, colour-swatched choice per gate the maze allows, 1 to its gate
+count, each marked when already placed. Activating the tool selects the
+lowest number not yet placed (or 1 when all are); after that only the author
+changes it. Placing gate N where gate N already is elsewhere moves it, and
+the editor never accepts a gate or key numbered outside 1 to the gate count.
+A key may go down before its gate.
 
 **Focus ring.** The board's own ring marks the focused square or edge, shown
 for keyboard focus only. The browser's outline is turned off on the board:
@@ -573,6 +581,9 @@ Required, not optional:
 - **Undo / redo.** Nobody places sixty walls without a mistake.
 - **Draft autosave** to the maze row. Losing a half-drawn labyrinth to a page
   refresh is the kind of thing that ends someone's interest in an app.
+  A status line says "Saving…" with a spinner until the server holds the
+  live draft, then "Saved" — or, once the maze is also valid, that it is
+  saved and ready to be used in a game.
 
 The side panel runs the validator continuously and reports only facts, never
 judgement: squares used against the budget, gates and keys placed, and whether
