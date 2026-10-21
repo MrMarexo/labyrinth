@@ -25,6 +25,16 @@ const pusher = pusherConfigured
     })
   : null;
 
+const pusherClientConfigured = Boolean(
+  env.NEXT_PUBLIC_PUSHER_KEY && env.NEXT_PUBLIC_PUSHER_CLUSTER,
+);
+
+if (pusherConfigured !== pusherClientConfigured) {
+  console.warn(
+    "[realtime] Pusher is half-configured: set all four PUSHER_* variables and both NEXT_PUBLIC_PUSHER_* ones, or none, or the client and server will disagree about the transport.",
+  );
+}
+
 if (!pusher && process.env.VERCEL) {
   console.warn(
     "[realtime] No Pusher keys: live updates are off on this deployment; clients fall back to polling.",
