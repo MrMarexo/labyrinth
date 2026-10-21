@@ -17,7 +17,12 @@ const KEEP_ALIVE_MS = 25_000;
  * transports would be two places for a subscription rule to drift.
  */
 export async function GET(request: Request) {
-  if (pusherConfigured) return new Response("Not found", { status: 404 });
+  // On Vercel without keys the bus reaches only whichever instance a publish
+  // lands on, and each open stream holds a function until it times out. A 404
+  // stops EventSource retrying, so clients poll instead.
+  if (pusherConfigured || process.env.VERCEL) {
+    return new Response("Not found", { status: 404 });
+  }
 
   const session = await getSession(request.headers);
   if (!session) return new Response("Unauthorized", { status: 401 });

@@ -47,6 +47,21 @@ describe("GET /api/realtime/stream", () => {
     expect(res.status).toBe(403);
   });
 
+  it("is switched off on Vercel without Pusher keys", async () => {
+    const { hostId, hostCookie, matchId } = await runningMatch();
+    const previous = process.env.VERCEL;
+    process.env.VERCEL = "1";
+    try {
+      const res = await stream(
+        streamRequest(runChannel(matchId, hostId), hostCookie),
+      );
+      expect(res.status).toBe(404);
+    } finally {
+      if (previous === undefined) delete process.env.VERCEL;
+      else process.env.VERCEL = previous;
+    }
+  });
+
   it("streams events published on the channel, and presence", async () => {
     const { hostId, hostCookie, matchId } = await runningMatch();
     const channel = runChannel(matchId, hostId);

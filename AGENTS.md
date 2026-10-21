@@ -122,8 +122,8 @@ database than the app reads.
 
 Without `PUSHER_*` variables, the server uses an in-process bus that reaches
 browsers only through `/api/realtime/stream` on the same Node process. That is
-fine for `pnpm dev`, `pnpm start` and `pnpm e2e`. On a serverless deployment it
-reaches nobody, and clients fall back to the 60s poll.
+fine for `pnpm dev`, `pnpm start` and `pnpm e2e`. On Vercel without keys the
+stream route is switched off, and clients fall back to the 60s poll.
 
 For production, set `PUSHER_APP_ID`, `PUSHER_KEY`, `PUSHER_SECRET` and
 `PUSHER_CLUSTER`, plus `NEXT_PUBLIC_PUSHER_KEY` and `NEXT_PUBLIC_PUSHER_CLUSTER`,
