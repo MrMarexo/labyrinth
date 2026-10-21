@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 
 import { CELL_PX } from "~/components/editor/board";
 import { gateColour } from "~/components/editor/gate-colours";
+import { KeyIcon, StartIcon, TreasureIcon } from "~/components/maze-icons";
 import {
   cellKey,
   edgeKey,
@@ -103,33 +104,15 @@ export function RunBoard({ map, at, heldKeys, bump, pending }: RunBoardProps) {
             height={CELL_PX}
             className="fill-cell-painted stroke-grid-line"
           />
-          {c.treasure && (
-            <circle
-              cx={(c.x + 0.5) * CELL_PX}
-              cy={(c.y + 0.5) * CELL_PX}
-              r={CELL_PX * 0.3}
-              className="fill-danger"
-            />
-          )}
+          {c.treasure && <TreasureIcon x={c.x} y={c.y} size={CELL_PX} />}
           {c.key !== undefined && (
-            <circle
-              cx={(c.x + 0.5) * CELL_PX}
-              cy={(c.y + 0.5) * CELL_PX}
-              r={CELL_PX * 0.15}
-              style={{ fill: gateColour(c.key) }}
-            />
+            <KeyIcon x={c.x} y={c.y} size={CELL_PX} gate={c.key} />
           )}
         </g>
       ))}
 
-      <circle
-        aria-hidden="true"
-        cx={0.5 * CELL_PX}
-        cy={0.5 * CELL_PX}
-        r={CELL_PX * 0.4}
-        strokeWidth={2}
-        className="stroke-accent fill-none"
-      />
+      {/* The run starts at the origin: discovered coordinates are relative. */}
+      <StartIcon x={0} y={0} size={CELL_PX} />
 
       {map.segments.map((s) =>
         drawSegment(s, `seg-${edgeKey(s)}`, { strokeWidth: 4, hook: true }),

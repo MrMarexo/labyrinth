@@ -2,6 +2,7 @@
 
 import { CELL_PX } from "~/components/editor/board";
 import { gateColour } from "~/components/editor/gate-colours";
+import { KeyIcon, StartIcon, TreasureIcon } from "~/components/maze-icons";
 import { edgeKey, type Maze, type Point } from "~/maze";
 
 export type ResultMazeProps = {
@@ -54,27 +55,16 @@ export function ResultMaze({ maze, path, label, which }: ResultMazeProps) {
           />
         ))}
 
-        <circle
-          cx={(maze.start.x + 0.5) * CELL_PX}
-          cy={(maze.start.y + 0.5) * CELL_PX}
-          r={CELL_PX * 0.3}
-          className="fill-accent"
-        />
-        <rect
-          x={(maze.treasure.x + 0.25) * CELL_PX}
-          y={(maze.treasure.y + 0.25) * CELL_PX}
-          width={CELL_PX * 0.5}
-          height={CELL_PX * 0.5}
-          className="fill-danger"
-        />
+        <StartIcon x={maze.start.x} y={maze.start.y} size={CELL_PX} />
+        <TreasureIcon x={maze.treasure.x} y={maze.treasure.y} size={CELL_PX} />
 
         {maze.keys.map((k) => (
-          <circle
+          <KeyIcon
             key={`key-${k.gate}`}
-            cx={(k.x + 0.5) * CELL_PX}
-            cy={(k.y + 0.5) * CELL_PX}
-            r={CELL_PX * 0.18}
-            style={{ fill: gateColour(k.gate) }}
+            x={k.x}
+            y={k.y}
+            size={CELL_PX}
+            gate={k.gate}
           />
         ))}
 

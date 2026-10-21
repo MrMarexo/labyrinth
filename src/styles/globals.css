@@ -41,6 +41,7 @@
   --cell-void: oklch(97% 0 0);
   --grid-line: oklch(88% 0 0);
   --wall: oklch(25% 0 0);
+  --treasure: oklch(70% 0.15 85);
 }
 
 :root[data-theme="dark"] {
@@ -61,6 +62,7 @@
   --cell-void: oklch(21% 0 0);
   --grid-line: oklch(27% 0 0);
   --wall: oklch(88% 0 0);
+  --treasure: oklch(78% 0.14 85);
 }
 
 @theme inline {
@@ -76,6 +78,7 @@
   --color-cell-void: var(--cell-void);
   --color-grid-line: var(--grid-line);
   --color-wall: var(--wall);
+  --color-treasure: var(--treasure);
 }
 
 body {
