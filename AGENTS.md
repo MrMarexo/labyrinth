@@ -6,18 +6,18 @@ plans live in `docs/superpowers/plans/`.
 
 ## Commands
 
-| Command                 | What it does                                                |
-| ----------------------- | ----------------------------------------------------------- |
-| `pnpm dev`              | Development server                                          |
-| `pnpm typecheck`        | `tsc --noEmit`                                              |
-| `pnpm lint`             | ESLint                                                      |
-| `pnpm format`           | Prettier, writing in place                                  |
-| `pnpm test`             | Vitest unit tests (Node environment, no database)           |
-| `pnpm test:integration` | Vitest against a real Neon branch — needs `DATABASE_URL`    |
-| `pnpm test:smoke`       | Nightly Pusher smoke test — skips itself without `PUSHER_*` |
-| `pnpm e2e`              | Playwright, desktop and mobile projects                     |
-| `pnpm db:generate`      | Generate a migration from the schema                        |
-| `pnpm db:migrate`       | Apply migrations                                            |
+| Command                 | What it does                                               |
+| ----------------------- | ---------------------------------------------------------- |
+| `pnpm dev`              | Development server                                         |
+| `pnpm typecheck`        | `tsc --noEmit`                                             |
+| `pnpm lint`             | ESLint                                                     |
+| `pnpm format`           | Prettier, writing in place                                 |
+| `pnpm test`             | Vitest unit tests (Node environment, no database)          |
+| `pnpm test:integration` | Vitest against a real Neon branch — needs `DATABASE_URL`   |
+| `pnpm test:smoke`       | Pusher smoke; skips without `PUSHER_*` (shell, not `.env`) |
+| `pnpm e2e`              | Playwright, desktop and mobile projects                    |
+| `pnpm db:generate`      | Generate a migration from the schema                       |
+| `pnpm db:migrate`       | Apply migrations                                           |
 
 Use pnpm. Never `npm install`.
 
@@ -128,7 +128,9 @@ stream route is switched off, and clients fall back to the 60s poll.
 For production, set `PUSHER_APP_ID`, `PUSHER_KEY`, `PUSHER_SECRET` and
 `PUSHER_CLUSTER`, plus `NEXT_PUBLIC_PUSHER_KEY` and `NEXT_PUBLIC_PUSHER_CLUSTER`,
 in Vercel. Add the four server ones as GitHub repository secrets for the nightly
-smoke test.
+smoke test. Never put them in `.env`: the integration and e2e suites assume no
+keys. To run the smoke test locally, pass them through the shell:
+`PUSHER_APP_ID=… PUSHER_KEY=… PUSHER_SECRET=… PUSHER_CLUSTER=… pnpm test:smoke`.
 
 ## Testing
 
