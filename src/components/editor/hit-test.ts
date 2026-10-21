@@ -49,7 +49,10 @@ export function nearestInteriorEdge(
 
 /**
  * Bresenham's line from `a` to `b`, both included, so a swipe faster than
- * the pointer's sample rate still leaves no gap between squares.
+ * the pointer's sample rate still leaves no gap between squares. Made
+ * 4-connected: where the line steps diagonally, the square beside it (x
+ * first) is visited too, because two squares that touch only at a corner are
+ * not connected under the game's rules.
  */
 export function cellsBetween(a: Point, b: Point): Point[] {
   const cells: Point[] = [];
@@ -64,11 +67,14 @@ export function cellsBetween(a: Point, b: Point): Point[] {
     cells.push({ x, y });
     if (x === b.x && y === b.y) return cells;
     const twice = 2 * error;
-    if (twice >= dy) {
+    const stepX = twice >= dy;
+    const stepY = twice <= dx;
+    if (stepX) {
       error += dy;
       x += sx;
     }
-    if (twice <= dx) {
+    if (stepY) {
+      if (stepX) cells.push({ x, y });
       error += dx;
       y += sy;
     }

@@ -73,6 +73,13 @@ describe("cellsBetween", () => {
     ]);
   });
 
+  it("steps through a shared side on a diagonal, never only a corner", () => {
+    const line = cellsBetween({ x: 0, y: 0 }, { x: 2, y: 2 });
+    expect(line[0]).toEqual({ x: 0, y: 0 });
+    expect(line.at(-1)).toEqual({ x: 2, y: 2 });
+    expect(line).toHaveLength(5);
+  });
+
   it("leaves no gap between consecutive squares, whatever the direction", () => {
     const point = fc.record({
       x: fc.integer({ min: -3, max: 18 }),
@@ -86,7 +93,9 @@ describe("cellsBetween", () => {
         for (let i = 1; i < line.length; i += 1) {
           const dx = Math.abs(line[i]!.x - line[i - 1]!.x);
           const dy = Math.abs(line[i]!.y - line[i - 1]!.y);
-          expect(Math.max(dx, dy)).toBe(1);
+          // 4-connected: squares touching only at a corner are not
+          // connected under the game's rules.
+          expect(dx + dy).toBe(1);
         }
       }),
     );
