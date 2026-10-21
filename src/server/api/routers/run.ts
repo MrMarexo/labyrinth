@@ -58,8 +58,8 @@ export function factsFor(p: PlayerRow): RunFacts {
 export function assertRunOpen(row: MatchRow, now: Date) {
   if (isTerminal(row.status)) refuse("errors.matchOver");
   if (row.status !== "running") refuse("errors.runNotUnlocked");
-  // The sweep runs every 15 minutes; between a deadline passing and the
-  // sweep closing the match, nothing may change it.
+  // The sweep runs once a day (vercel.json); between a deadline passing and
+  // the sweep closing the match, nothing may change it.
   if (now.getTime() >= row.deadlineAt.getTime()) refuse("errors.matchExpired");
 }
 

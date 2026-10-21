@@ -482,7 +482,10 @@ fell through to "neither has moved", which would abandon an actively-playing
 match at a fixed 24h from the unlocking and record fault against nobody.
 
 A scheduled sweep evaluates these, so a stale match closes on its own rather
-than waiting for someone to open it.
+than waiting for someone to open it. It runs once a day — the finest schedule
+Vercel's Hobby plan accepts — so a match closes up to a day after its deadline.
+Nothing can change a match whose deadline has passed in the meantime: moves and
+give-ups past it are refused.
 
 The deadline a running player sees is the match's single `deadlineAt`, so it
 moves with the opponent's run: a player can tell from it that the opponent has

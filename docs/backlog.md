@@ -24,6 +24,13 @@ so this file is the standing list. When a phase picks one up, delete it here.
 
 ## Technical
 
+- **The expiry sweep runs once a day** (Phase 5). Vercel's Hobby plan rejects
+  any finer cron, and the original 15-minute schedule blocked every deploy. An
+  expired match therefore closes up to ~24h late — including the finisher's
+  win in §9.1 row 7 — and each run closes at most 50. If that delay matters,
+  call `/api/cron/sweep` with `CRON_SECRET` from a scheduled GitHub workflow
+  every 15 minutes, or move to Vercel Pro.
+
 - **ICU pluralisation across every counted string, in both locales** (Phase 2,
   carried through Phase 3). Slovak distinguishes one / two-to-four / five-plus.
   `3ee8a98` fixed match sizes and gate counts; audit the rest of both catalogues

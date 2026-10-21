@@ -30,8 +30,9 @@ import { publishMatchChanged } from "~/server/realtime/events";
 // headroom for connection setup and the batch select below, on top of
 // whatever the production network adds. Ordering by `deadlineAt` ascending
 // means the oldest expiries always drain first, so a steady trickle of new
-// ones can never starve a backlog from ever being cleared — the cron's
-// 15-minute cadence just takes more runs to catch up. The batch's
+// ones can never starve a backlog from ever being cleared — the cron's daily
+// cadence (Vercel Hobby allows nothing finer) just takes more runs to catch
+// up. The batch's
 // match-changed pings go out concurrently after the loop, so publishing adds
 // at most one `PUBLISH_TIMEOUT_MS` (2s) to the batch, not 2s per match.
 const SWEEP_BATCH_LIMIT = 50;
