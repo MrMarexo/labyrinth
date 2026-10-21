@@ -5,14 +5,6 @@ reason and the phase that deferred it. A deferral that lives only in a per-phase
 plan is one nobody finds again — Phase 2 learned that, and Phase 3 repeated it —
 so this file is the standing list. When a phase picks one up, delete it here.
 
-## Waiting on a later phase
-
-- **Live lobby updates** (Phase 3). The lobby neither polls nor subscribes; a
-  player refreshes to see their opponent's submission land. Joins the realtime
-  layer in Phase 5.
-- **Live "opponent gave up" push** (Phase 4). Until the realtime layer exists the
-  run view learns of it by polling and by its next move being refused. Phase 5.
-
 ## Product, not yet scheduled
 
 - **Rematch, and reusing a maze from a finished match's result screen**
@@ -58,3 +50,13 @@ so this file is the standing list. When a phase picks one up, delete it here.
 - **Rolling back to pre-Phase-4 code after runs exist**. The old sweep ignores
   `lastMoveAt` and `finishedAt` and would abandon active runs at row 4; the
   expand-only migration rule covers forward deploys only.
+- **Pusher keys are not configured** (Phase 5). Production has no live updates
+  until a Pusher app exists and its six variables are set (AGENTS.md, Realtime).
+- **`pusher-js` ships to every client** (Phase 5), even when Pusher is not
+  configured. A dynamic import inside `useChannel` would drop it from the bundle.
+- **`e2e/run.spec.ts` still describes the result reaching the host "on its next
+  poll" with a 30s wait** (Phase 5). Pushes now deliver it in seconds, so tighten
+  the wording and timeout when next touching that file.
+- **The Pusher half of `useChannel` is untested in the app** (Phase 5). Only the
+  nightly smoke test touches real Pusher, and it does not go through
+  `useChannel`. A preview-deployment e2e with keys would cover it.

@@ -509,8 +509,8 @@ row of §9.1.
 
 The opponent learns of it from the result screen: their next move is refused
 with `MatchOver`, and an open run view polls the match status and switches over
-on its own. Live push arrives with the realtime layer (§8); until then the poll
-is the notification.
+on its own. Since Phase 5 the match channel's ping delivers it at once (§8); the
+poll remains as the fallback for a dropped connection.
 
 A player who has already found the treasure cannot give up — there is nothing
 left to concede.

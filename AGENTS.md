@@ -6,17 +6,18 @@ plans live in `docs/superpowers/plans/`.
 
 ## Commands
 
-| Command                 | What it does                                             |
-| ----------------------- | -------------------------------------------------------- |
-| `pnpm dev`              | Development server                                       |
-| `pnpm typecheck`        | `tsc --noEmit`                                           |
-| `pnpm lint`             | ESLint                                                   |
-| `pnpm format`           | Prettier, writing in place                               |
-| `pnpm test`             | Vitest unit tests (Node environment, no database)        |
-| `pnpm test:integration` | Vitest against a real Neon branch — needs `DATABASE_URL` |
-| `pnpm e2e`              | Playwright, desktop and mobile projects                  |
-| `pnpm db:generate`      | Generate a migration from the schema                     |
-| `pnpm db:migrate`       | Apply migrations                                         |
+| Command                 | What it does                                                |
+| ----------------------- | ----------------------------------------------------------- |
+| `pnpm dev`              | Development server                                          |
+| `pnpm typecheck`        | `tsc --noEmit`                                              |
+| `pnpm lint`             | ESLint                                                      |
+| `pnpm format`           | Prettier, writing in place                                  |
+| `pnpm test`             | Vitest unit tests (Node environment, no database)           |
+| `pnpm test:integration` | Vitest against a real Neon branch — needs `DATABASE_URL`    |
+| `pnpm test:smoke`       | Nightly Pusher smoke test — skips itself without `PUSHER_*` |
+| `pnpm e2e`              | Playwright, desktop and mobile projects                     |
+| `pnpm db:generate`      | Generate a migration from the schema                        |
+| `pnpm db:migrate`       | Apply migrations                                            |
 
 Use pnpm. Never `npm install`.
 
@@ -77,6 +78,11 @@ quietly rather than loudly.
     reachable only from `src/server/**`. Everything under `src/app/` and
     `src/components/` goes through a tRPC procedure. Layouts are exempt because
     they read the session directly via `~/server/auth`.
+12. **Every realtime subscription is decided by `canSubscribe`**
+    (`src/server/realtime/access.ts`), which applies `maySubscribe`
+    (`src/match/watch.ts`). The Pusher auth route and the local stream route
+    both call it; a third transport must too. Publishing happens after the
+    transaction commits, through `publishSafely`, and never fails the caller.
 
 ## Schema notes
 
@@ -111,6 +117,18 @@ Keep `.env` hand-maintained, pointing at your own Neon `dev` branch. Both
 drizzle-kit for migrations) must name the same branch; one of each is worse
 than both wrong, because migrations would then run against a different
 database than the app reads.
+
+### Realtime
+
+Without `PUSHER_*` variables, the server uses an in-process bus that reaches
+browsers only through `/api/realtime/stream` on the same Node process. That is
+fine for `pnpm dev`, `pnpm start` and `pnpm e2e`. On a serverless deployment it
+reaches nobody, and clients fall back to the 60s poll.
+
+For production, set `PUSHER_APP_ID`, `PUSHER_KEY`, `PUSHER_SECRET` and
+`PUSHER_CLUSTER`, plus `NEXT_PUBLIC_PUSHER_KEY` and `NEXT_PUBLIC_PUSHER_CLUSTER`,
+in Vercel. Add the four server ones as GitHub repository secrets for the nightly
+smoke test.
 
 ## Testing
 
