@@ -47,6 +47,9 @@ export function MazeEditor({
   // reducer's initial draft must be seeded from this exact same `initial`
   // object, never a copy of it — the guard is a reference-equality check,
   // and a copy here would make it fire on the very first render.
+  // `initialEditorState` keeps that promise for a clean draft. For a legacy
+  // draft with segments outside the shape it returns a cleaned copy, and
+  // the guard then fires once on purpose: one autosave persists the cleanup.
   const [state, dispatch] = useReducer(
     editorReducer,
     initial,
@@ -284,6 +287,7 @@ export function MazeEditor({
         canPaint={cellsUsed(state.draft) < cellCount}
         nextGate={nextGate(state.draft)}
         nextKey={nextKeylessGate(state.draft)}
+        locked={locked}
         onCell={onCell}
         onEdge={onEdge}
         onStrokeBegin={onStrokeBegin}

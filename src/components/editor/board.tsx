@@ -110,6 +110,8 @@ export type BoardProps = {
   nextGate: number | null;
   /** The gate the key tool would place a key for, or null when none. */
   nextKey: number | null;
+  /** The maze can no longer be edited, so nothing is previewed. */
+  locked: boolean;
   /** A single activation: a tap, or Enter/Space on a focused target. */
   onCell: (at: Point) => void;
   onEdge: (edge: Edge) => void;
@@ -132,6 +134,7 @@ export function Board({
   canPaint,
   nextGate,
   nextKey,
+  locked,
   onCell,
   onEdge,
   onStrokeBegin,
@@ -169,8 +172,10 @@ export function Board({
   // Edges mount and unmount with the active tool; start the group over at
   // its first member each time it reappears, rather than keeping a stop that
   // may not even render the same way (e.g. a wall placed while away).
+  // A ring on an edge must not outlive the edge rects unmounting with it.
   useEffect(() => {
     if (edgesActive) setFocusedEdge(null);
+    else setRing((current) => (current?.kind === "edge" ? null : current));
   }, [edgesActive]);
 
   // Our own focus ring, drawn only for keyboard focus. The browser's outline
@@ -180,6 +185,28 @@ export function Board({
   const [hover, setHover] = useState<Target | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const strokeRef = useRef<Stroke | null>(null);
+
+  /** Closes the open stroke, if any. Safe to call more than once. */
+  function finishStroke() {
+    if (!strokeRef.current) return;
+    strokeRef.current = null;
+    document.documentElement.classList.remove("select-none");
+    onStrokeEnd();
+  }
+  // Read by the window listener below, which is attached once.
+  const finishStrokeRef = useRef(finishStroke);
+  finishStrokeRef.current = finishStroke;
+
+  // A release the board never hears (the window lost focus mid-swipe) must
+  // not leave a stroke open, or undo would stay disabled indefinitely.
+  useEffect(() => {
+    const onBlur = () => finishStrokeRef.current();
+    window.addEventListener("blur", onBlur);
+    return () => {
+      window.removeEventListener("blur", onBlur);
+      finishStrokeRef.current();
+    };
+  }, []);
 
   function showRingIfKeyboard(
     event: FocusEvent<SVGRectElement> | KeyboardEvent<SVGRectElement>,
@@ -326,6 +353,9 @@ export function Board({
     // pointer leaves the board. The press itself has already been dispatched
     // to the rect under it, so the browser still focuses that rect.
     strokeRef.current = { pointerId: event.pointerId, last: p };
+    // A swipe that strays off the board would otherwise select page text.
+    // Not preventDefault on the press: that would stop the rect taking focus.
+    document.documentElement.classList.add("select-none");
     try {
       svgRef.current?.setPointerCapture(event.pointerId);
     } catch {
@@ -339,6 +369,11 @@ export function Board({
   function handlePointerMove(event: PointerEvent<SVGSVGElement>) {
     const stroke = strokeRef.current;
     if (stroke?.pointerId === event.pointerId) {
+      // No button down means the release was missed; the stroke is over.
+      if (event.buttons === 0) {
+        finishStroke();
+        return;
+      }
       const p = toBoard(event);
       if (!p) return;
       strokeAlong(stroke.last, p);
@@ -355,10 +390,8 @@ export function Board({
   }
 
   function handlePointerEnd(event: PointerEvent<SVGSVGElement>) {
-    const stroke = strokeRef.current;
-    if (stroke?.pointerId !== event.pointerId) return;
-    strokeRef.current = null;
-    onStrokeEnd();
+    if (strokeRef.current?.pointerId !== event.pointerId) return;
+    finishStroke();
   }
 
   /**
@@ -381,6 +414,23 @@ export function Board({
         strokeWidth: 4,
         strokeLinecap: "round",
       } as const;
+      const existing = segmentAt.get(key)?.kind;
+      // A tap with the same kind of segment removes it (spec §10.2), so the
+      // preview says "remove", not "place".
+      const removes =
+        (tool === "wall" && existing === "wall") ||
+        (tool === "gate" && existing === "gate") ||
+        (tool === "erase" && existing !== undefined);
+      if (removes) {
+        return (
+          <line
+            {...line}
+            strokeWidth={6}
+            opacity={0.6}
+            className="stroke-danger"
+          />
+        );
+      }
       if (tool === "wall") {
         return <line {...line} opacity={0.4} className="stroke-wall" />;
       }
@@ -390,16 +440,6 @@ export function Board({
             {...line}
             opacity={0.5}
             style={{ stroke: gateColour(nextGate) }}
-          />
-        );
-      }
-      if (tool === "erase" && segmentAt.has(key)) {
-        return (
-          <line
-            {...line}
-            strokeWidth={6}
-            opacity={0.6}
-            className="stroke-danger"
           />
         );
       }
@@ -659,7 +699,7 @@ export function Board({
           );
         })}
 
-      {hover && renderHover(hover)}
+      {hover && !locked && renderHover(hover)}
 
       {ring?.kind === "cell" && (
         <rect

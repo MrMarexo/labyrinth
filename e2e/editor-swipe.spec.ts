@@ -64,6 +64,33 @@ test.describe("drawing with a swipe", () => {
     await expect(page.locator("[data-segment]")).toHaveCount(2);
     await expect(page.locator('[data-segment="H:1,0"]')).toHaveCount(1);
     await expect(page.locator('[data-segment="H:2,0"]')).toHaveCount(1);
+
+    // The removing stroke was one undo step: one Undo brings back both walls.
+    await page.getByRole("button", { name: "Undo" }).click();
+    await expect(page.locator("[data-segment]")).toHaveCount(4);
+    // And the laying stroke was one too: one more Undo clears all four.
+    await page.getByRole("button", { name: "Undo" }).click();
+    await expect(page.locator("[data-segment]")).toHaveCount(0);
+    await expect(page.locator("[data-budget]")).toHaveText("12 / 36 squares");
+  });
+
+  test("one eraser drag removes every wall it passes over", async ({
+    page,
+  }) => {
+    await signUpAndOpenNewMaze(page);
+    await drag(page, cell(page, 0, 0), cell(page, 5, 0));
+    await drag(page, cell(page, 0, 1), cell(page, 5, 1));
+
+    await page.getByRole("radio", { name: "Wall" }).click();
+    const edge = (name: string) => page.locator(`[data-edge="${name}"]`);
+    await drag(page, edge("H:0,0"), edge("H:5,0"));
+    await expect(page.locator("[data-segment]")).toHaveCount(6);
+
+    await page.getByRole("radio", { name: "Erase", exact: true }).click();
+    await drag(page, edge("H:1,0"), edge("H:4,0"));
+    await expect(page.locator("[data-segment]")).toHaveCount(2);
+    await expect(page.locator('[data-segment="H:0,0"]')).toHaveCount(1);
+    await expect(page.locator('[data-segment="H:5,0"]')).toHaveCount(1);
   });
 
   test("painting stops at the square budget", async ({ page }) => {
@@ -115,6 +142,27 @@ test.describe("hover preview", () => {
     await page.mouse.move(1, 1);
     await expect(page.locator("[data-hover]")).toHaveCount(0);
   });
+
+  test("over an existing wall, the wall tool previews a removal", async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name === "mobile", "no hover on touch");
+    await signUpAndOpenNewMaze(page);
+    await drag(page, cell(page, 0, 0), cell(page, 1, 0));
+    await page.getByRole("radio", { name: "Wall" }).click();
+    const edge = page.locator('[data-edge="V:0,0"]');
+
+    const at = await centre(edge);
+    await page.mouse.move(at.x, at.y);
+    const preview = page.locator('[data-hover="wall"]');
+    await expect(preview).toHaveAttribute("data-hover-edge", "V:0,0");
+    await expect(preview).not.toHaveClass(/stroke-danger/);
+
+    await edge.click();
+    await expect(page.locator('[data-segment="V:0,0"]')).toHaveCount(1);
+    await page.mouse.move(at.x, at.y + 2);
+    await expect(preview).toHaveClass(/stroke-danger/);
+  });
 });
 
 test.describe("focus ring", () => {
@@ -137,6 +185,11 @@ test.describe("focus ring", () => {
     expect(outline).toBe("none");
 
     await page.keyboard.press("Tab");
+    await expect(page.locator("[data-focus-ring]")).toHaveCount(0);
+
+    // Keyboard only: focus a click gives draws no ring.
+    await cell(page, 4, 4).click();
+    await expect(cell(page, 4, 4)).toBeFocused();
     await expect(page.locator("[data-focus-ring]")).toHaveCount(0);
   });
 });
