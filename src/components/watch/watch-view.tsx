@@ -11,6 +11,7 @@ import {
 } from "react";
 
 import { isTypingTarget } from "~/components/keyboard";
+import { POLL_MS } from "~/components/realtime/poll";
 import { useChannel } from "~/components/realtime/use-channel";
 import { ResultMaze } from "~/components/run/result-maze";
 import { RunBoard, type Bump } from "~/components/run/run-board";
@@ -53,12 +54,20 @@ export function WatchView({
   const t = useTranslations("watch");
   const te = useTranslations();
 
+  // No retry, so a refusal (watchNotYet, replayNotReady, notYours) shows at
+  // once. The poll covers a live replay when realtime is down or absent.
   const { data, error, refetch } = api.run.replay.useQuery(
     { matchId, whose },
-    { retry: false, refetchOnWindowFocus: false },
+    {
+      retry: false,
+      refetchOnWindowFocus: false,
+      refetchInterval: (query) => (query.state.data?.live ? POLL_MS : false),
+    },
   );
 
-  if (error) {
+  // A failed refetch keeps the last replay on screen; the next refetch or
+  // poll tries again.
+  if (error && !data) {
     const issue = resolveErrorKey(te, error, "errors.unknown");
     return (
       <div className="space-y-4">

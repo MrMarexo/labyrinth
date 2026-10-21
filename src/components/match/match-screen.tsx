@@ -1,17 +1,12 @@
 "use client";
 
+import { POLL_MS } from "~/components/realtime/poll";
 import { useChannel } from "~/components/realtime/use-channel";
 import { MatchLobby } from "~/components/match/match-lobby";
 import { MatchResult } from "~/components/run/match-result";
 import { RunView } from "~/components/run/run-view";
 import { EVENTS, isTerminal } from "~/match";
 import { api, type RouterOutputs } from "~/trpc/react";
-
-/**
- * The fallback for a dropped connection: pings on the match channel are the
- * notification (spec §8), and this catches what a lost connection missed.
- */
-const POLL_MS = 60_000;
 
 /**
  * One URL for the whole match (spec §10.3.1): the lobby until the runs
