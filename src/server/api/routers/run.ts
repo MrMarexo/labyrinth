@@ -77,6 +77,18 @@ async function mazeToSolve(tx: DbClient, opponent: PlayerRow): Promise<Maze> {
   return mazeSchema.parse(row!.data);
 }
 
+/** Looks up display names once; an unknown id reads as "". */
+async function displayNames(
+  db: DbClient,
+  ids: string[],
+): Promise<(id: string) => string> {
+  const rows = await db
+    .select({ id: user.id, name: user.name })
+    .from(user)
+    .where(inArray(user.id, ids));
+  return (id) => rows.find((r) => r.id === id)?.name ?? "";
+}
+
 export const runRouter = createTRPCRouter({
   /**
    * The runner's own view. Reads `runState.view` and never touches
@@ -321,16 +333,10 @@ export const runRouter = createTRPCRouter({
       const you = players.find((p) => p.userId === me)!;
       const them = players.find((p) => p.userId !== me) ?? null;
 
-      const names = await ctx.db
-        .select({ id: user.id, name: user.name })
-        .from(user)
-        .where(
-          inArray(
-            user.id,
-            players.map((p) => p.userId),
-          ),
-        );
-      const nameOf = (id: string) => names.find((n) => n.id === id)?.name ?? "";
+      const nameOf = await displayNames(
+        ctx.db,
+        players.map((p) => p.userId),
+      );
 
       const score = (p: PlayerRow) => ({
         displayName: nameOf(p.userId),
@@ -439,20 +445,20 @@ export const runRouter = createTRPCRouter({
       const runner = input.whose === "opponent" ? them : you;
       const author = input.whose === "opponent" ? you : them;
 
-      const [mazeRow] = await ctx.db
-        .select({ data: maze.data })
-        .from(maze)
-        .where(eq(maze.id, author.mazeId!));
-      const log = await ctx.db
-        .select({ seq: move.seq, delta: move.delta })
-        .from(move)
-        .where(and(eq(move.matchId, row.id), eq(move.runnerId, runner.userId)))
-        .orderBy(asc(move.seq));
-      const names = await ctx.db
-        .select({ id: user.id, name: user.name })
-        .from(user)
-        .where(inArray(user.id, [runner.userId, author.userId]));
-      const nameOf = (id: string) => names.find((n) => n.id === id)?.name ?? "";
+      const [[mazeRow], log, nameOf] = await Promise.all([
+        ctx.db
+          .select({ data: maze.data })
+          .from(maze)
+          .where(eq(maze.id, author.mazeId!)),
+        ctx.db
+          .select({ seq: move.seq, delta: move.delta })
+          .from(move)
+          .where(
+            and(eq(move.matchId, row.id), eq(move.runnerId, runner.userId)),
+          )
+          .orderBy(asc(move.seq)),
+        displayNames(ctx.db, [runner.userId, author.userId]),
+      ]);
 
       const live =
         !isTerminal(row.status) &&
