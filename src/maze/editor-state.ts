@@ -1,6 +1,6 @@
 import type { DraftMaze } from "./draft";
 import { MAX_GATES, type Orientation, type Point } from "./format";
-import { cellKey, edgeKey, step, type Edge } from "./geometry";
+import { cellKey, edgeKey, isInteriorEdge, step, type Edge } from "./geometry";
 
 export type Tool =
   | "paint"
@@ -42,7 +42,39 @@ export type EditorAction =
   | { type: "endStroke" };
 
 export function initialEditorState(draft: DraftMaze): EditorState {
-  return { draft, past: [], future: [], strokeBase: null };
+  return {
+    draft: dropSegmentsOutsideShape(draft),
+    past: [],
+    future: [],
+    strokeBase: null,
+  };
+}
+
+/**
+ * The editor used to accept a wall or gate on any edge, including one with a
+ * void square on one side. The validator rejects those (`segmentOutsideShape`)
+ * and the board no longer offers them as targets, so a draft holding one
+ * could never be fixed. They are dropped on load, along with any dropped
+ * gate's key, so the cleanup doesn't just trade one error for
+ * `keyWithoutGate`.
+ *
+ * Returns `draft` itself when nothing is dropped. The editor's autosave skips
+ * a draft that is reference-equal to the one it loaded, so a clean draft is
+ * never written back, while a cleaned one is saved once, persisting the fix.
+ * It is not an undo step: there is no history before the load.
+ */
+function dropSegmentsOutsideShape(draft: DraftMaze): DraftMaze {
+  const painted = new Set(draft.cells.map(cellKey));
+  const segments = draft.segments.filter((s) => isInteriorEdge(s, painted));
+  if (segments.length === draft.segments.length) return draft;
+
+  let keys = draft.keys;
+  for (const dropped of draft.segments) {
+    if (dropped.kind === "gate" && !isInteriorEdge(dropped, painted)) {
+      keys = releaseKeyForGate(keys, dropped.gate);
+    }
+  }
+  return { ...draft, segments, keys };
 }
 
 export function cellsUsed(draft: DraftMaze): number {

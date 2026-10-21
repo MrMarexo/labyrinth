@@ -379,3 +379,53 @@ describe("painting against a limit", () => {
     ]);
   });
 });
+
+describe("loading a draft with segments outside the shape", () => {
+  const cells = [
+    { x: 0, y: 0 },
+    { x: 1, y: 0 },
+  ];
+
+  it("drops a wall on an outline edge", () => {
+    const state = initialEditorState({
+      ...emptyDraft(),
+      cells,
+      segments: [
+        { o: "V", x: 0, y: 0, kind: "wall" },
+        { o: "H", x: 0, y: 0, kind: "wall" },
+      ],
+    });
+    expect(state.draft.segments).toEqual([
+      { o: "V", x: 0, y: 0, kind: "wall" },
+    ]);
+    expect(state.past).toEqual([]);
+  });
+
+  it("drops a gate on an outline edge and releases its key", () => {
+    const state = initialEditorState({
+      ...emptyDraft(),
+      cells,
+      segments: [
+        { o: "V", x: 0, y: 0, kind: "gate", gate: 1 },
+        { o: "H", x: 1, y: 0, kind: "gate", gate: 2 },
+      ],
+      keys: [
+        { gate: 1, x: 0, y: 0 },
+        { gate: 2, x: 1, y: 0 },
+      ],
+    });
+    expect(state.draft.segments).toEqual([
+      { o: "V", x: 0, y: 0, kind: "gate", gate: 1 },
+    ]);
+    expect(state.draft.keys).toEqual([{ gate: 1, x: 0, y: 0 }]);
+  });
+
+  it("hands back the very same draft when nothing needs dropping", () => {
+    const draft = {
+      ...emptyDraft(),
+      cells,
+      segments: [{ o: "V" as const, x: 0, y: 0, kind: "wall" as const }],
+    };
+    expect(initialEditorState(draft).draft).toBe(draft);
+  });
+});
