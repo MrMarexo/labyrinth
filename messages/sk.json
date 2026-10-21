@@ -30,7 +30,10 @@
     "signUpSubmit": "Registrovať sa",
     "signInSubmit": "Prihlásiť sa",
     "haveAccount": "Už máte účet?",
-    "needAccount": "Nemáte účet?"
+    "needAccount": "Nemáte účet?",
+    "passwordHint": "Aspoň {min, plural, one {# znak} few {# znaky} other {# znakov}}.",
+    "showPassword": "Zobraziť heslo",
+    "hidePassword": "Skryť heslo"
   },
   "errors": {
     "watchNotYet": "Najprv dokončite svoj vlastný beh.",
@@ -60,7 +63,9 @@
     "mazeSettingsMismatch": "Veľkosť tohto bludiska nezodpovedá tomuto zápasu.",
     "mazeAlreadyFaced": "Váš súper toto bludisko už hral.",
     "alreadySubmitted": "Bludisko ste už odoslali.",
-    "matchNotDrawing": "Tento zápas už bludiská neprijíma."
+    "matchNotDrawing": "Tento zápas už bludiská neprijíma.",
+    "fieldRequired": "Toto pole je povinné.",
+    "emailInvalid": "Zadajte platnú e-mailovú adresu."
   },
   "play": {
     "title": "Vaše hry",

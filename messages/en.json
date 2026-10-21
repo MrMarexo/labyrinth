@@ -30,7 +30,10 @@
     "signUpSubmit": "Sign up",
     "signInSubmit": "Sign in",
     "haveAccount": "Already have an account?",
-    "needAccount": "Need an account?"
+    "needAccount": "Need an account?",
+    "passwordHint": "{min, plural, one {At least # character.} other {At least # characters.}}",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password"
   },
   "errors": {
     "watchNotYet": "Finish your own run first.",
@@ -60,7 +63,9 @@
     "mazeSettingsMismatch": "That labyrinth does not match this match's size.",
     "mazeAlreadyFaced": "Your opponent has already played that labyrinth.",
     "alreadySubmitted": "You have already submitted a labyrinth.",
-    "matchNotDrawing": "This match is not accepting labyrinths."
+    "matchNotDrawing": "This match is not accepting labyrinths.",
+    "fieldRequired": "This field is required.",
+    "emailInvalid": "Enter a valid email address."
   },
   "play": {
     "title": "Your games",

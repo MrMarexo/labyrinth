@@ -15,7 +15,7 @@ test.describe("authentication", () => {
     await page.goto("/en/sign-up");
     await page.getByLabel("Name").fill("Test Person");
     await page.getByLabel("Email").fill(email);
-    await page.getByLabel("Password").fill(PASSWORD);
+    await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
     await page.getByRole("button", { name: "Sign up" }).click();
 
     await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
@@ -25,10 +25,65 @@ test.describe("authentication", () => {
 
     await page.goto("/en/sign-in");
     await page.getByLabel("Email").fill(email);
-    await page.getByLabel("Password").fill(PASSWORD);
+    await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
     await page.getByRole("button", { name: "Sign in" }).click();
 
     await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
+  });
+
+  test("sign-up states the password rule and refuses a short password", async ({
+    page,
+  }) => {
+    await page.goto("/en/sign-up");
+    const password = page.getByLabel("Password", { exact: true });
+    await expect(password).toHaveAccessibleDescription(
+      "At least 10 characters.",
+    );
+
+    await page.getByLabel("Name").fill("Test Person");
+    await page.getByLabel("Email").fill(uniqueEmail());
+    await password.fill("too-short");
+    await page.getByRole("button", { name: "Sign up" }).click();
+
+    // Our own message, not the browser's validation bubble, and nothing sent.
+    await expect(page.locator("[data-password-error]")).toHaveText(
+      "Password must be at least 10 characters.",
+    );
+    await expect(password).toHaveAttribute("aria-invalid", "true");
+    await expect(page).toHaveURL(/\/en\/sign-up$/);
+    await expect(page.getByRole("button", { name: "Sign out" })).toHaveCount(0);
+  });
+
+  test("sign-in refuses a short password before sending it", async ({
+    page,
+  }) => {
+    const requests: string[] = [];
+    page.on("request", (r) => {
+      if (r.url().includes("/api/auth/sign-in")) requests.push(r.url());
+    });
+    await page.goto("/sk/sign-in");
+    await page.getByLabel("E-mail").fill(uniqueEmail());
+    await page.getByLabel("Heslo", { exact: true }).fill("kratke");
+    await page.getByRole("button", { name: "Prihlásiť sa" }).click();
+
+    await expect(page.locator("[data-password-error]")).toHaveText(
+      "Heslo musí mať aspoň 10 znakov.",
+    );
+    expect(requests).toEqual([]);
+  });
+
+  test("the eye button shows and hides the password", async ({ page }) => {
+    await page.goto("/en/sign-in");
+    const password = page.getByLabel("Password", { exact: true });
+    await password.fill("correct-horse-battery");
+    await expect(password).toHaveAttribute("type", "password");
+
+    await page.getByRole("button", { name: "Show password" }).click();
+    await expect(password).toHaveAttribute("type", "text");
+    await expect(password).toHaveValue("correct-horse-battery");
+
+    await page.getByRole("button", { name: "Hide password" }).click();
+    await expect(password).toHaveAttribute("type", "password");
   });
 
   test("a wrong password shows a translated error", async ({ page }) => {
@@ -37,7 +92,7 @@ test.describe("authentication", () => {
     await page.goto("/en/sign-up");
     await page.getByLabel("Name").fill("Test Person");
     await page.getByLabel("Email").fill(email);
-    await page.getByLabel("Password").fill(PASSWORD);
+    await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
     await page.getByRole("button", { name: "Sign up" }).click();
     await page.getByRole("button", { name: "Sign out" }).click();
     // Wait for the sign-out to land. The (auth) layout now bounces a
@@ -47,7 +102,7 @@ test.describe("authentication", () => {
 
     await page.goto("/sk/sign-in");
     await page.getByLabel("E-mail").fill(email);
-    await page.getByLabel("Heslo").fill("definitely-not-it");
+    await page.getByLabel("Heslo", { exact: true }).fill("definitely-not-it");
     await page.getByRole("button", { name: "Prihlásiť sa" }).click();
 
     await expect(page.locator("form").getByRole("alert")).toHaveText(

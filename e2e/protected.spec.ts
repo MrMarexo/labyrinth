@@ -14,7 +14,7 @@ test.describe("protected area", () => {
     await page.goto("/en/sign-up");
     await page.getByLabel("Name").fill("Test Person");
     await page.getByLabel("Email").fill(uniqueEmail());
-    await page.getByLabel("Password").fill(PASSWORD);
+    await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
     await page.getByRole("button", { name: "Sign up" }).click();
     // The session cookie lands asynchronously; wait for it before navigating,
     // or /en/play races the sign-up and the (app) layout redirects to
@@ -48,7 +48,7 @@ test.describe("language preference", () => {
     await page.goto("/sk/sign-up");
     await page.getByLabel("Meno").fill("Test Person");
     await page.getByLabel("E-mail").fill(uniqueEmail());
-    await page.getByLabel("Heslo").fill(PASSWORD);
+    await page.getByLabel("Heslo", { exact: true }).fill(PASSWORD);
     await page.getByRole("button", { name: "Registrovať sa" }).click();
 
     await expect(
@@ -76,7 +76,7 @@ test.describe("language preference", () => {
     await page.goto("/sk/sign-up");
     await page.getByLabel("Meno").fill("Test Person");
     await page.getByLabel("E-mail").fill(email);
-    await page.getByLabel("Heslo").fill(PASSWORD);
+    await page.getByLabel("Heslo", { exact: true }).fill(PASSWORD);
     await page.getByRole("button", { name: "Registrovať sa" }).click();
 
     await expect(
@@ -93,7 +93,7 @@ test.describe("language preference", () => {
 
     await page.goto("/en/sign-in");
     await page.getByLabel("Email").fill(email);
-    await page.getByLabel("Password").fill(PASSWORD);
+    await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
     await page.getByRole("button", { name: "Sign in" }).click();
 
     await expect(page).toHaveURL(/\/sk$/);
@@ -108,7 +108,7 @@ test.describe("language preference", () => {
     await page.goto("/en/sign-up");
     await page.getByLabel("Name").fill("Test Person");
     await page.getByLabel("Email").fill(email);
-    await page.getByLabel("Password").fill(PASSWORD);
+    await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
     await page.getByRole("button", { name: "Sign up" }).click();
     await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
 
@@ -127,7 +127,7 @@ test.describe("language preference", () => {
 
     await page.goto("/en/sign-in");
     await page.getByLabel("Email").fill(email);
-    await page.getByLabel("Password").fill(PASSWORD);
+    await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
     await page.getByRole("button", { name: "Sign in" }).click();
 
     await expect(page).toHaveURL(/\/sk$/);

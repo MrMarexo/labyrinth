@@ -34,6 +34,58 @@ function textField(data: FormData, name: string): string {
   return typeof value === "string" ? value : "";
 }
 
+type Field = "name" | "email" | "password";
+type FieldErrorKey = "fieldRequired" | "emailInvalid" | "passwordTooShort";
+type FieldErrors = Partial<Record<Field, FieldErrorKey>>;
+
+/**
+ * The form's own checks, run before anything is sent. The browser's built-in
+ * validation is off (`noValidate`): its bubble is in the browser's language,
+ * not the app's, and it skips `minLength` on values a password manager fills
+ * in, so a short saved password went straight through. The server enforces
+ * the same length (`minPasswordLength` in `~/server/auth`) as the backstop.
+ *
+ * Sign-in checks the length too: no account's password is shorter, so a short
+ * one cannot be right and there is no point sending it.
+ */
+function validate(
+  mode: "sign-in" | "sign-up",
+  values: Record<Field, string>,
+): FieldErrors {
+  const errors: FieldErrors = {};
+  if (mode === "sign-up" && !values.name.trim()) errors.name = "fieldRequired";
+  if (!values.email.trim()) errors.email = "fieldRequired";
+  else if (!/^\S+@\S+\.\S+$/.test(values.email)) errors.email = "emailInvalid";
+  if (!values.password) errors.password = "fieldRequired";
+  else if (values.password.length < MIN_PASSWORD_LENGTH) {
+    errors.password = "passwordTooShort";
+  }
+  return errors;
+}
+
+const INPUT_CLASS =
+  "border-border-strong bg-bg w-full rounded border px-3 py-2 aria-[invalid=true]:border-danger";
+
+function EyeIcon({ crossed }: { crossed: boolean }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      width="20"
+      height="20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
+      <circle cx="12" cy="12" r="3" />
+      {crossed && <path d="M3 3l18 18" />}
+    </svg>
+  );
+}
+
 export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
   const t = useTranslations("auth");
   const tError = useTranslations("errors");
@@ -43,16 +95,35 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
   const queryClient = useQueryClient();
 
   const [errorKey, setErrorKey] = useState<ErrorMessageKey | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [pending, setPending] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setPending(true);
     setErrorKey(null);
 
     const data = new FormData(event.currentTarget);
     const email = textField(data, "email");
     const password = textField(data, "password");
+
+    const errors = validate(mode, {
+      name: textField(data, "name"),
+      email,
+      password,
+    });
+    setFieldErrors(errors);
+    const firstInvalid = (["name", "email", "password"] as const).find(
+      (field) => errors[field],
+    );
+    if (firstInvalid) {
+      event.currentTarget
+        .querySelector<HTMLInputElement>(`[name="${firstInvalid}"]`)
+        ?.focus();
+      return;
+    }
+
+    setPending(true);
 
     const result =
       mode === "sign-up"
@@ -105,8 +176,33 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
     router.refresh();
   }
 
+  function fieldError(field: Field) {
+    const key = fieldErrors[field];
+    if (!key) return null;
+    return (
+      <p
+        id={`${field}-error`}
+        data-password-error={field === "password" ? "" : undefined}
+        className="text-danger text-sm"
+      >
+        {tError(key, { min: MIN_PASSWORD_LENGTH })}
+      </p>
+    );
+  }
+
+  function describedBy(field: Field, hint?: string) {
+    const ids = [hint, fieldErrors[field] ? `${field}-error` : undefined];
+    return ids.filter(Boolean).join(" ") || undefined;
+  }
+
+  const passwordHint = mode === "sign-up" ? "password-hint" : undefined;
+
   return (
-    <form onSubmit={onSubmit} className="mx-auto max-w-sm space-y-4 p-8">
+    <form
+      onSubmit={onSubmit}
+      noValidate
+      className="mx-auto max-w-sm space-y-4 p-8"
+    >
       <h1 className="text-2xl font-bold">
         {mode === "sign-up" ? t("signUpTitle") : t("signInTitle")}
       </h1>
@@ -118,41 +214,74 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
       )}
 
       {mode === "sign-up" && (
-        <label className="block space-y-1">
-          <span className="text-sm">{t("name")}</span>
+        <div className="space-y-1">
+          <label htmlFor="name" className="block text-sm">
+            {t("name")}
+          </label>
           <input
+            id="name"
             name="name"
             required
             autoComplete="name"
-            className="border-border-strong bg-bg w-full rounded border px-3 py-2"
+            aria-invalid={fieldErrors.name ? true : undefined}
+            aria-describedby={describedBy("name")}
+            className={INPUT_CLASS}
           />
-        </label>
+          {fieldError("name")}
+        </div>
       )}
 
-      <label className="block space-y-1">
-        <span className="text-sm">{t("email")}</span>
+      <div className="space-y-1">
+        <label htmlFor="email" className="block text-sm">
+          {t("email")}
+        </label>
         <input
+          id="email"
           name="email"
           type="email"
           required
           autoComplete="email"
-          className="border-border-strong bg-bg w-full rounded border px-3 py-2"
+          aria-invalid={fieldErrors.email ? true : undefined}
+          aria-describedby={describedBy("email")}
+          className={INPUT_CLASS}
         />
-      </label>
+        {fieldError("email")}
+      </div>
 
-      <label className="block space-y-1">
-        <span className="text-sm">{t("password")}</span>
-        <input
-          name="password"
-          type="password"
-          required
-          minLength={MIN_PASSWORD_LENGTH}
-          autoComplete={
-            mode === "sign-up" ? "new-password" : "current-password"
-          }
-          className="border-border-strong bg-bg w-full rounded border px-3 py-2"
-        />
-      </label>
+      <div className="space-y-1">
+        <label htmlFor="password" className="block text-sm">
+          {t("password")}
+        </label>
+        <div className="relative">
+          <input
+            id="password"
+            name="password"
+            type={showPassword ? "text" : "password"}
+            required
+            autoComplete={
+              mode === "sign-up" ? "new-password" : "current-password"
+            }
+            aria-invalid={fieldErrors.password ? true : undefined}
+            aria-describedby={describedBy("password", passwordHint)}
+            className={`${INPUT_CLASS} pr-11`}
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword((shown) => !shown)}
+            aria-label={showPassword ? t("hidePassword") : t("showPassword")}
+            aria-controls="password"
+            className="text-muted hover:text-fg absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r"
+          >
+            <EyeIcon crossed={showPassword} />
+          </button>
+        </div>
+        {passwordHint && (
+          <p id={passwordHint} className="text-muted text-sm">
+            {t("passwordHint", { min: MIN_PASSWORD_LENGTH })}
+          </p>
+        )}
+        {fieldError("password")}
+      </div>
 
       <button
         type="submit"

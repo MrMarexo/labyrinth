@@ -6,7 +6,7 @@ export async function signUp(page: Page): Promise<void> {
   await page.goto("/en/sign-up");
   await page.getByLabel("Name").fill("Test Person");
   await page.getByLabel("Email").fill(uniqueEmail());
-  await page.getByLabel("Password").fill(PASSWORD);
+  await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
   await page.getByRole("button", { name: "Sign up" }).click();
   await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
 }
