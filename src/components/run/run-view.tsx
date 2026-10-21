@@ -4,6 +4,7 @@ import { useFormatter, useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 
 import { gateColour } from "~/components/editor/gate-colours";
+import { isTypingTarget } from "~/components/keyboard";
 import { useChannel } from "~/components/realtime/use-channel";
 import { RunBoard, type Bump } from "~/components/run/run-board";
 import { useMoveQueue } from "~/components/run/use-move-queue";
@@ -39,14 +40,6 @@ const DPAD: { dir: Direction; label: string; area: string; arrow: string }[] = [
   { dir: "E", label: "moveE", area: "col-start-3 row-start-2", arrow: "→" },
   { dir: "S", label: "moveS", area: "col-start-2 row-start-3", arrow: "↓" },
 ];
-
-function isTypingTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  return (
-    target.isContentEditable ||
-    ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)
-  );
-}
 
 export function RunView({
   matchId,

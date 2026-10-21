@@ -10,6 +10,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
 
+import { isTypingTarget } from "~/components/keyboard";
 import { useChannel } from "~/components/realtime/use-channel";
 import { ResultMaze } from "~/components/run/result-maze";
 import { RunBoard, type Bump } from "~/components/run/run-board";
@@ -31,14 +32,6 @@ import { api, type RouterOutputs } from "~/trpc/react";
 
 type Whose = "opponent" | "mine";
 type Replay = RouterOutputs["run"]["replay"];
-
-function isTypingTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  return (
-    target.isContentEditable ||
-    ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)
-  );
-}
 
 /** Space on a focused control already activates that control. */
 function isControlTarget(target: EventTarget | null): boolean {
