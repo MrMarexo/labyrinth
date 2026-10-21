@@ -128,13 +128,12 @@ describe("publishing", () => {
 });
 
 describe("match.get channels", () => {
-  it("names the match channel and both run channels", async () => {
-    const { host, hostId, guestId, matchId } = await runningMatch();
+  it("names the match channel and your own run channel only", async () => {
+    const { host, hostId, matchId } = await runningMatch();
     const got = await host.match.get({ id: matchId });
     expect(got.channels).toEqual({
       match: matchChannel(matchId),
       yourRun: runChannel(matchId, hostId),
-      opponentRun: runChannel(matchId, guestId),
     });
   });
 });

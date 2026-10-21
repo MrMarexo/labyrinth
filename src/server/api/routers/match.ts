@@ -278,7 +278,6 @@ export const matchRouter = createTRPCRouter({
         channels: {
           match: matchChannel(row.id),
           yourRun: runChannel(row.id, you.userId),
-          opponentRun: them ? runChannel(row.id, them.userId) : null,
         },
       };
     }),
