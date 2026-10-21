@@ -37,6 +37,9 @@ function pusherClient(): Pusher | null {
  * event stream otherwise (spec §8.1). Handlers are read through a ref, so
  * they may change every render without resubscribing; the effect depends on
  * `channel` alone, so a refetch from `onCatchUp` cannot resubscribe.
+ * `onCatchUp` fires once per (re)subscription: on Pusher's
+ * `subscription_succeeded`, which pusher-js re-fires after a reconnect, and
+ * on each EventSource `open`.
  *
  * Subscribing to the same channel from two components on one page is not
  * supported: with Pusher, the first to unmount unsubscribes both. No page
@@ -61,25 +64,24 @@ export function useChannel(channel: string | null, handlers: Handlers): void {
       const members = () =>
         latest.current.onMembers?.((sub as PresenceChannel).members.count);
       const catchUp = () => latest.current.onCatchUp?.();
+      // pusher-js resubscribes every channel after a reconnect and fires
+      // subscription_succeeded again, so this one binding covers the first
+      // open and every reconnect alike.
       sub.bind("pusher:subscription_succeeded", catchUp);
-      if (channel.startsWith("presence-")) {
+      const presence = channel.startsWith("presence-");
+      if (presence) {
         sub.bind("pusher:subscription_succeeded", members);
         sub.bind("pusher:member_added", members);
         sub.bind("pusher:member_removed", members);
       }
-      // The first "connected" is covered by subscription_succeeded; every
-      // later one is a reconnect, after which the caller must catch up.
-      let connectedOnce = client.connection.state === "connected";
-      const onState = ({ current }: { current: string }) => {
-        if (current !== "connected") return;
-        if (connectedOnce) catchUp();
-        connectedOnce = true;
-      };
-      client.connection.bind("state_change", onState);
       return () => {
         sub.unbind_global(relay);
         sub.unbind("pusher:subscription_succeeded", catchUp);
-        client.connection.unbind("state_change", onState);
+        if (presence) {
+          sub.unbind("pusher:subscription_succeeded", members);
+          sub.unbind("pusher:member_added", members);
+          sub.unbind("pusher:member_removed", members);
+        }
         client.unsubscribe(channel);
       };
     }
