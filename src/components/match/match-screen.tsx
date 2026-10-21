@@ -46,7 +46,7 @@ export function MatchScreen({
     onEvent: (event) => {
       if (event === EVENTS.changed) refresh();
     },
-    onReconnect: refresh,
+    onCatchUp: refresh,
   });
 
   const ran = data.you.hasSubmitted && (data.opponent?.hasSubmitted ?? false);

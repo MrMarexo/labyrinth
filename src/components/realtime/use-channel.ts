@@ -10,8 +10,11 @@ type Handlers = {
   onEvent?: (event: string, data: unknown) => void;
   /** Distinct users on a presence channel, including you. */
   onMembers?: (count: number) => void;
-  /** The connection came back: anything published meanwhile was missed. */
-  onReconnect?: () => void;
+  /**
+   * The subscription opened, first time or after a reconnect: anything
+   * published before it was missed, so refetch from the server.
+   */
+  onCatchUp?: () => void;
 };
 
 let pusher: Pusher | null = null;
@@ -32,7 +35,8 @@ function pusherClient(): Pusher | null {
 /**
  * One realtime subscription, over Pusher when it is configured and the local
  * event stream otherwise (spec §8.1). Handlers are read through a ref, so
- * they may change every render without resubscribing.
+ * they may change every render without resubscribing; the effect depends on
+ * `channel` alone, so a refetch from `onCatchUp` cannot resubscribe.
  *
  * Subscribing to the same channel from two components on one page is not
  * supported: with Pusher, the first to unmount unsubscribes both. No page
@@ -56,22 +60,25 @@ export function useChannel(channel: string | null, handlers: Handlers): void {
       sub.bind_global(relay);
       const members = () =>
         latest.current.onMembers?.((sub as PresenceChannel).members.count);
+      const catchUp = () => latest.current.onCatchUp?.();
+      sub.bind("pusher:subscription_succeeded", catchUp);
       if (channel.startsWith("presence-")) {
         sub.bind("pusher:subscription_succeeded", members);
         sub.bind("pusher:member_added", members);
         sub.bind("pusher:member_removed", members);
       }
-      // The first "connected" is the initial connection; every later one is
-      // a reconnect, after which the caller must catch up from the server.
+      // The first "connected" is covered by subscription_succeeded; every
+      // later one is a reconnect, after which the caller must catch up.
       let connectedOnce = client.connection.state === "connected";
       const onState = ({ current }: { current: string }) => {
         if (current !== "connected") return;
-        if (connectedOnce) latest.current.onReconnect?.();
+        if (connectedOnce) catchUp();
         connectedOnce = true;
       };
       client.connection.bind("state_change", onState);
       return () => {
         sub.unbind_global(relay);
+        sub.unbind("pusher:subscription_succeeded", catchUp);
         client.connection.unbind("state_change", onState);
         client.unsubscribe(channel);
       };
@@ -80,13 +87,9 @@ export function useChannel(channel: string | null, handlers: Handlers): void {
     const source = new EventSource(
       `/api/realtime/stream?channel=${encodeURIComponent(channel)}`,
     );
-    let opened = false;
-    source.onopen = () => {
-      // EventSource reconnects by itself; every open after the first is a
-      // reconnect, and the caller must catch up from the server.
-      if (opened) latest.current.onReconnect?.();
-      opened = true;
-    };
+    // EventSource reconnects by itself; every open, the first included, may
+    // follow events the caller missed.
+    source.onopen = () => latest.current.onCatchUp?.();
     const forward = (event: string) => (message: MessageEvent<string>) =>
       latest.current.onEvent?.(event, JSON.parse(message.data) as unknown);
     const onMove = forward(EVENTS.move);

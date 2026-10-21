@@ -128,7 +128,7 @@ function WatchPlayer({
       setMoves((m) => mergeMoves(m, [move]));
       if (move.delta.finished) setLive(false);
     },
-    onReconnect: () => void refetch(),
+    onCatchUp: () => void refetch(),
   });
 
   // A run that ends without a finishing move (a give-up, or expiry) is
@@ -137,7 +137,7 @@ function WatchPlayer({
     onEvent: (event) => {
       if (event === EVENTS.changed) void refetch();
     },
-    onReconnect: () => void refetch(),
+    onCatchUp: () => void refetch(),
   });
 
   // A move published between the first fetch and the subscription is never
