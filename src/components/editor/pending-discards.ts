@@ -12,7 +12,27 @@ export function trackDiscard(discard: Promise<unknown>): void {
   discard.then(forget, forget);
 }
 
-/** Resolves once every tracked discard has settled, whichever way. */
+/**
+ * How long to wait for leaves before going ahead anyway. A leave includes
+ * the editor's flush, and a hung save must not stall the caller forever.
+ * Going ahead early is safe for "Draw a new one": `draftForMatch` reuses
+ * only drafts that are empty on the server, so at worst it hands back an
+ * empty draft that is then discarded, never one with squares in it.
+ */
+export const DISCARD_WAIT_CAP_MS = 4000;
+
+/**
+ * Resolves once every tracked leave has settled, whichever way, or after
+ * `DISCARD_WAIT_CAP_MS`, whichever comes first.
+ */
 export async function discardsSettled(): Promise<void> {
-  await Promise.allSettled([...pending]);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const cap = new Promise<void>((resolve) => {
+    timer = setTimeout(resolve, DISCARD_WAIT_CAP_MS);
+  });
+  try {
+    await Promise.race([Promise.allSettled([...pending]), cap]);
+  } finally {
+    clearTimeout(timer);
+  }
 }

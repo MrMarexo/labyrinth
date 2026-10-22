@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
+  DISCARD_WAIT_CAP_MS,
   discardsSettled,
   trackDiscard,
 } from "~/components/editor/pending-discards";
@@ -35,11 +36,35 @@ describe("pending discards", () => {
   it("forgets a discard once it has settled", async () => {
     trackDiscard(Promise.resolve());
     await discardsSettled();
-    let done = false;
-    const waiting = discardsSettled().then(() => (done = true));
-    await Promise.resolve();
-    await Promise.resolve();
-    expect(done).toBe(true);
-    await waiting;
+    // With nothing left to wait on, it resolves without any time passing:
+    // not held to the cap.
+    vi.useFakeTimers();
+    try {
+      let done = false;
+      const waiting = discardsSettled().then(() => (done = true));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(done).toBe(true);
+      await waiting;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("the wait's cap", () => {
+  it("gives up on a leave that never settles, after the cap", async () => {
+    vi.useFakeTimers();
+    try {
+      trackDiscard(new Promise<void>(() => undefined));
+      let done = false;
+      const waiting = discardsSettled().then(() => (done = true));
+      await vi.advanceTimersByTimeAsync(DISCARD_WAIT_CAP_MS - 1);
+      expect(done).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      await waiting;
+      expect(done).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
