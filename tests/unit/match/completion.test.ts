@@ -67,22 +67,46 @@ describe("resolveCompletion", () => {
     ).toEqual({ kind: "complete", winnerId: "b", endReason: "finished" });
   });
 
-  it("breaks a penalty tie on moves", () => {
+  it("calls equal penalties a draw, whatever the moves", () => {
     expect(
-      resolveCompletion([finished("a", 2, 12, 10), finished("b", 2, 14, 1)]),
-    ).toEqual({ kind: "complete", winnerId: "a", endReason: "finished" });
+      resolveCompletion([finished("a", 2, 12, 10), finished("b", 2, 14, 10)]),
+    ).toEqual({ kind: "complete", winnerId: null, endReason: "finished" });
   });
 
-  it("breaks a penalty and move tie on elapsed time", () => {
+  it("calls equal penalties a draw, whatever the time", () => {
     expect(
       resolveCompletion([finished("a", 2, 12, 900), finished("b", 2, 12, 800)]),
-    ).toEqual({ kind: "complete", winnerId: "b", endReason: "finished" });
+    ).toEqual({ kind: "complete", winnerId: null, endReason: "finished" });
+  });
+
+  it("calls equal penalties a draw when moves and time both differ", () => {
+    expect(
+      resolveCompletion([finished("a", 0, 40, 100), finished("b", 0, 11, 9)]),
+    ).toEqual({ kind: "complete", winnerId: null, endReason: "finished" });
   });
 
   it("completes a perfect tie with no winner", () => {
     expect(
       resolveCompletion([finished("a", 2, 12, 800), finished("b", 2, 12, 800)]),
     ).toEqual({ kind: "complete", winnerId: null, endReason: "finished" });
+  });
+
+  it("decides on penalties alone, for any two finished runs", () => {
+    const arbFinished = (userId: string) =>
+      fc
+        .tuple(fc.nat(5), fc.nat(50), fc.nat(5000))
+        .map(([p, m, t]) => finished(userId, p, m, t));
+    fc.assert(
+      fc.property(arbFinished("a"), arbFinished("b"), (a, b) => {
+        const expected =
+          a.penalties < b.penalties ? "a" : a.penalties > b.penalties ? "b" : null;
+        expect(resolveCompletion([a, b])).toEqual({
+          kind: "complete",
+          winnerId: expected,
+          endReason: "finished",
+        });
+      }),
+    );
   });
 
   it("awards a give-up to the opponent who has not moved at all", () => {
@@ -163,16 +187,19 @@ describe("resolveCompletion", () => {
 });
 
 describe("decidingField", () => {
-  it("names the first field that differs", () => {
+  it("is penalties when they differ", () => {
     expect(decidingField(finished("a", 1, 9, 9), finished("b", 2, 9, 9))).toBe(
       "penalties",
     );
-    expect(decidingField(finished("a", 2, 9, 9), finished("b", 2, 8, 9))).toBe(
-      "moves",
-    );
-    expect(decidingField(finished("a", 2, 8, 7), finished("b", 2, 8, 9))).toBe(
-      "time",
-    );
+  });
+
+  it("is null when penalties are level, however moves and time differ", () => {
+    expect(
+      decidingField(finished("a", 2, 9, 9), finished("b", 2, 8, 9)),
+    ).toBeNull();
+    expect(
+      decidingField(finished("a", 2, 8, 7), finished("b", 2, 8, 9)),
+    ).toBeNull();
   });
 
   it("is null for a perfect tie, or when either run is unfinished", () => {

@@ -54,14 +54,10 @@ export function MatchResult({ matchId }: { matchId: string }) {
       break;
   }
 
+  // Bumps are the only score (spec §2.6); moves and time are shown, never
+  // ranked.
   const decidedByText =
-    decidedBy === "penalties"
-      ? t("decidedByPenalties")
-      : decidedBy === "moves"
-        ? t("decidedByMoves")
-        : decidedBy === "time"
-          ? t("decidedByTime")
-          : null;
+    decidedBy === "penalties" ? t("decidedByPenalties") : null;
 
   const rows: { who: "you" | "opponent"; label: string; score: Score }[] = [
     { who: "you", label: t("you"), score: you },
@@ -73,8 +69,6 @@ export function MatchResult({ matchId }: { matchId: string }) {
       score: opponent,
     });
   }
-  const bold = (column: "penalties" | "moves" | "time") =>
-    decidedBy === column ? "font-bold" : undefined;
 
   return (
     <section
@@ -113,17 +107,15 @@ export function MatchResult({ matchId }: { matchId: string }) {
               </th>
               <td
                 data-penalties={score.penalties}
-                className={`pr-6 ${bold("penalties") ?? ""}`}
+                className={`pr-6 ${decidedBy === "penalties" ? "font-bold" : ""}`}
               >
                 {score.penalties}
               </td>
-              <td className={`pr-6 ${bold("moves") ?? ""}`}>{score.moves}</td>
-              <td className={bold("time")}>
+              <td className="pr-6">{score.moves}</td>
+              <td>
                 {score.elapsedMs === null
                   ? t("didNotFinish")
-                  : formatElapsed(score.elapsedMs, {
-                      tenths: decidedBy === "time",
-                    })}
+                  : formatElapsed(score.elapsedMs)}
               </td>
             </tr>
           ))}

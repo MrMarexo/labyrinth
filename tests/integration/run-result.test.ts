@@ -132,6 +132,31 @@ describe("run.result", () => {
     expect(forGuest.mazes!.theirs.path).toEqual(forHost.mazes!.yours.path);
   });
 
+  it("calls equal bumps a draw, however many more moves one run took", async () => {
+    const { host, guest, matchId } = await runningMatch();
+    await walk(host, matchId, GATED_MAZE_ROUTE);
+    // A detour south and back: two more moves, no more bumps.
+    await walk(guest, matchId, ["S", "N", ...GATED_MAZE_ROUTE]);
+
+    const [row] = await db.select().from(match).where(eq(match.id, matchId));
+    expect(row).toMatchObject({
+      status: "complete",
+      endReason: "finished",
+      winnerId: null,
+    });
+    for (const caller of [host, guest]) {
+      expect(await caller.run.result({ matchId })).toMatchObject({
+        outcome: "none",
+        reason: "tie",
+        decidedBy: null,
+      });
+    }
+    expect(await host.run.result({ matchId })).toMatchObject({
+      you: { penalties: 1, moves: 11 },
+      opponent: { penalties: 1, moves: 13 },
+    });
+  });
+
   it("names who gave up", async () => {
     const { host, guest, matchId } = await runningMatch();
     await guest.run.giveUp({ matchId });

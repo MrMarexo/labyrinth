@@ -14,13 +14,17 @@ export type RunFacts = {
   moves: number;
 };
 
-export type DecidingField = "penalties" | "moves" | "time";
+/**
+ * Spec §2.6: bumps (stored as `penalties`) are the only score. Moves and
+ * time are recorded and shown, and never decide anything.
+ */
+export type DecidingField = "penalties";
 
 export type Completion =
   | { kind: "none" }
   | {
       kind: "complete";
-      /** Null only for a perfect tie (spec §2.6). */
+      /** Null for a draw: equal penalties (spec §2.6). */
       winnerId: string | null;
       endReason: "finished" | "forfeit";
     };
@@ -35,22 +39,18 @@ export function elapsedMs(run: RunFacts): number | null {
   return run.finishedAt.getTime() - run.startedAt.getTime();
 }
 
-/** Negative when `a` ranks ahead, positive when `b` does, zero for a tie. */
+/**
+ * Negative when `a` ranks ahead, positive when `b` does, zero for a draw.
+ * Fewest bumps wins; there is no tiebreak (spec §2.6).
+ */
 function compareFinished(a: RunFacts, b: RunFacts): number {
-  return (
-    a.penalties - b.penalties ||
-    a.moves - b.moves ||
-    elapsedMs(a)! - elapsedMs(b)!
-  );
+  return a.penalties - b.penalties;
 }
 
-/** Which tiebreaker settled it, for the result screen's "decided on …" line. */
+/** What settled it, for the result screen; null for a draw or no finish. */
 export function decidingField(a: RunFacts, b: RunFacts): DecidingField | null {
   if (elapsedMs(a) === null || elapsedMs(b) === null) return null;
-  if (a.penalties !== b.penalties) return "penalties";
-  if (a.moves !== b.moves) return "moves";
-  if (elapsedMs(a) !== elapsedMs(b)) return "time";
-  return null;
+  return a.penalties !== b.penalties ? "penalties" : null;
 }
 
 /**
