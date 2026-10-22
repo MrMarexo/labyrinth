@@ -118,11 +118,13 @@ test.describe("appearance", () => {
     await openSettings(page);
     await page.getByRole("combobox", { name: "Theme" }).selectOption("light");
     await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
-    const light = await rgbOf(button, "backgroundColor");
-    for (const channel of light) expect(channel).toBeLessThan(80);
-    for (const channel of await rgbOf(button, "color")) {
-      expect(channel).toBeGreaterThan(200);
-    }
+    // Polled: the colours transition over 150ms.
+    await expect
+      .poll(async () => Math.max(...(await rgbOf(button, "backgroundColor"))))
+      .toBeLessThan(80);
+    await expect
+      .poll(async () => Math.min(...(await rgbOf(button, "color"))))
+      .toBeGreaterThan(200);
   });
 });
 
