@@ -2,13 +2,25 @@ import { CELL_PX } from "~/components/editor/board";
 import { gateColour } from "~/components/editor/gate-colours";
 import { KeyIcon, StartIcon, TreasureIcon } from "~/components/maze-icons";
 import { mazeViewBox } from "~/lib/maze-view-box";
-import { edgeKey, type Maze } from "~/maze";
+import { edgeKey, outlineEdges, type Edge, type Maze } from "~/maze";
+
+/** Endpoints of the line an edge is drawn as, in board pixels. */
+function edgeLine(edge: Edge) {
+  const horizontal = edge.o === "H";
+  return {
+    x1: (edge.x + (horizontal ? 0 : 1)) * CELL_PX,
+    y1: (edge.y + (horizontal ? 1 : 0)) * CELL_PX,
+    x2: (edge.x + 1) * CELL_PX,
+    y2: (edge.y + 1) * CELL_PX,
+  };
+}
 
 /**
  * A whole maze, read-only, in board units: the painted cells (a void square
- * is just background), the start, the treasure, the keys, then the walls and
- * gates on top. Shared by the result screen and the lobby's previews, so the
- * two can never draw a maze differently.
+ * is just background), the start, the treasure, the keys, then the shape's
+ * outline, walls and gates on top. Shared by the result screen, the replay,
+ * the lobby's previews and the read-only labyrinth page, so none of them can
+ * draw a maze differently.
  */
 export function MazeDrawing({ maze }: { maze: Maze }) {
   return (
@@ -38,24 +50,28 @@ export function MazeDrawing({ maze }: { maze: Maze }) {
         />
       ))}
 
-      {maze.segments.map((s) => {
-        const horizontal = s.o === "H";
-        return (
-          <line
-            key={`seg-${edgeKey(s)}`}
-            x1={(s.x + (horizontal ? 0 : 1)) * CELL_PX}
-            y1={(s.y + (horizontal ? 1 : 0)) * CELL_PX}
-            x2={(s.x + 1) * CELL_PX}
-            y2={(s.y + 1) * CELL_PX}
-            strokeWidth={4}
-            strokeLinecap="round"
-            className={s.kind === "wall" ? "stroke-wall" : undefined}
-            style={
-              s.kind === "gate" ? { stroke: gateColour(s.gate) } : undefined
-            }
-          />
-        );
-      })}
+      {/* The shape's own border: implicit walls (spec §2.3), never stored. */}
+      {outlineEdges(maze.cells).map((edge) => (
+        <line
+          key={`outline-${edgeKey(edge)}`}
+          data-outline={edgeKey(edge)}
+          {...edgeLine(edge)}
+          strokeWidth={4}
+          strokeLinecap="round"
+          className="stroke-wall"
+        />
+      ))}
+
+      {maze.segments.map((s) => (
+        <line
+          key={`seg-${edgeKey(s)}`}
+          {...edgeLine(s)}
+          strokeWidth={4}
+          strokeLinecap="round"
+          className={s.kind === "wall" ? "stroke-wall" : undefined}
+          style={s.kind === "gate" ? { stroke: gateColour(s.gate) } : undefined}
+        />
+      ))}
     </>
   );
 }

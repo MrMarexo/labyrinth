@@ -32,6 +32,8 @@ test.describe("the lobby's maze picker", () => {
     await expect(preview).toHaveCount(1);
     await expect(preview).toHaveAttribute("aria-hidden", "true");
     await expect(preview.locator(".lucide-trophy")).toHaveCount(1);
+    // The shape's outer walls are drawn, not just its squares.
+    expect(await preview.locator("[data-outline]").count()).toBeGreaterThan(0);
     await expect(option).not.toContainText("Draft");
     await expect(
       host.getByRole("button", { name: "Draw a new one" }),
@@ -85,6 +87,42 @@ test.describe("the lobby's maze picker", () => {
     await expect(
       host.getByRole("button", { name: "Draw a new one" }),
     ).toBeVisible();
+    // Nothing to use, so no use button: drawing a new one is the only way on.
+    await expect(
+      host.getByRole("button", { name: "Use this labyrinth" }),
+    ).toHaveCount(0);
+    expect(
+      await host
+        .locator("[data-draw-new]")
+        .evaluate((el) => getComputedStyle(el).cursor),
+    ).toBe("pointer");
+  });
+
+  test("drawing a new one twice reuses the same empty labyrinth", async ({
+    players,
+  }) => {
+    const host = await players({ name: "Seed", cellCount: 64, gateCount: 0 });
+    const guest = await players({ name: "Other", cellCount: 36, gateCount: 0 });
+    const code = await createMatch(host, { cells: 36, gates: 0 });
+    const matchUrl = host.url();
+    await join(guest, code);
+
+    await host.reload();
+    await host.getByRole("button", { name: "Draw a new one" }).click();
+    await expect(host).toHaveURL(/\/en\/labyrinths\/[^/?]+\?match=/);
+    const first = new URL(host.url()).pathname;
+
+    // A full page load away, so the editor never gets to discard it on the
+    // way out: the empty draft is still there to be reused.
+    await host.goto(matchUrl);
+    await host.getByRole("button", { name: "Draw a new one" }).click();
+    await expect(host).toHaveURL(/\/en\/labyrinths\/[^/?]+\?match=/);
+    expect(new URL(host.url()).pathname).toBe(first);
+
+    await host.goto("/en/labyrinths");
+    await expect(
+      host.getByRole("link", { name: `Labyrinth for match ${code}` }),
+    ).toHaveCount(1);
   });
 
   test("draws a new labyrinth from the match and uses it there", async ({
