@@ -79,3 +79,29 @@ body {
   background-color: var(--bg);
   color: var(--fg);
 }
+
+/*
+ * Tailwind v4 dropped the pointer cursor from buttons; put it back for
+ * everything clickable, and give the HTML controls a short colour transition
+ * so hover and selection changes don't snap. Board squares (SVG role=button)
+ * get the cursor but no transition — a swipe repaints dozens of them.
+ */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="radio"]:not([aria-disabled="true"]),
+  summary,
+  select:not(:disabled) {
+    cursor: pointer;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    button,
+    a,
+    select {
+      transition-property: color, background-color, border-color, opacity;
+      transition-duration: 150ms;
+      transition-timing-function: ease-out;
+    }
+  }
+}

@@ -69,7 +69,7 @@ export function MazePreview({ maze }: { maze: Maze }) {
     <svg
       aria-hidden="true"
       viewBox={mazeViewBox(maze.cells, CELL_PX)}
-      className="border-border bg-cell-void size-16 shrink-0 rounded border sm:size-20"
+      className="bg-cell-void aspect-square w-full rounded"
     >
       <MazeDrawing maze={maze} />
     </svg>

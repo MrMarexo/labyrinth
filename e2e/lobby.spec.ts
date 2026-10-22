@@ -36,6 +36,31 @@ test.describe("the lobby's maze picker", () => {
     await expect(
       host.getByRole("button", { name: "Draw a new one" }),
     ).toBeVisible();
+
+    // A tile, not a full-width row: about as wide as its preview, with the
+    // name above it.
+    const tile = await option.boundingBox();
+    const thumb = await preview.boundingBox();
+    const name = await option.locator("[data-maze-name]").boundingBox();
+    expect(tile!.width).toBeLessThan(thumb!.width * 1.5);
+    expect(name!.y + name!.height).toBeLessThanOrEqual(thumb!.y + 1);
+
+    // Selecting only changes the border; the tile is never filled.
+    await option.click();
+    await expect(option).toHaveAttribute("aria-checked", "true");
+    expect(
+      await option.evaluate((el) => getComputedStyle(el).backgroundColor),
+    ).toBe("rgba(0, 0, 0, 0)");
+
+    // Buttons show a pointer.
+    expect(await option.evaluate((el) => getComputedStyle(el).cursor)).toBe(
+      "pointer",
+    );
+    expect(
+      await host
+        .getByRole("button", { name: "Draw a new one" })
+        .evaluate((el) => getComputedStyle(el).cursor),
+    ).toBe("pointer");
   });
 
   test("explains an empty list, and still offers a new one", async ({

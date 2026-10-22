@@ -74,7 +74,7 @@ export function MazePicker({ match, selected, onSelect }: MazePickerProps) {
       <div
         role="radiogroup"
         aria-labelledby="maze-picker-heading"
-        className="flex flex-col gap-2"
+        className="flex flex-wrap gap-3"
       >
         {data.map((m, index) => {
           const active = m.id === selected;
@@ -94,8 +94,10 @@ export function MazePicker({ match, selected, onSelect }: MazePickerProps) {
               onKeyDown={handleKeyDown}
               className={optionClass(active)}
             >
+              <span data-maze-name className="w-full truncate">
+                {m.name}
+              </span>
               {preview(m.data)}
-              <span>{m.name}</span>
             </button>
           );
         })}
@@ -158,9 +160,15 @@ function DrawNew({ match }: { match: MazePickerProps["match"] }) {
   );
 }
 
+/**
+ * A square tile the width of its preview, name on top. Selection is the
+ * border alone — an accent outline, never a fill — so the preview stays
+ * readable either way.
+ */
 function optionClass(active: boolean): string {
-  const base = "flex items-center gap-3 rounded px-3 py-2 text-left text-sm";
+  const base =
+    "flex w-32 flex-col gap-2 rounded-lg border-2 p-2 text-left text-sm sm:w-36";
   return active
-    ? `${base} bg-accent text-on-accent`
-    : `${base} border-border-strong border`;
+    ? `${base} border-accent`
+    : `${base} border-border hover:border-border-strong`;
 }
