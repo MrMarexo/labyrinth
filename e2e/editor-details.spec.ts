@@ -252,7 +252,7 @@ test.describe("save status", () => {
 });
 
 test.describe("icons", () => {
-  test("the start is an S marker and the treasure a trophy", async ({
+  test("the start is a stairwell door and the treasure a trophy, both uncoloured", async ({
     page,
   }) => {
     await signUpAndOpenNewMaze(page);
@@ -263,12 +263,17 @@ test.describe("icons", () => {
     await page.getByRole("radio", { name: "Treasure", exact: true }).click();
     await cell(page, 3, 0).click();
 
-    await expect(page.locator("[data-start]")).toHaveText("S");
-    await expect(page.locator("[data-start] text")).toHaveCount(1);
+    const start = page.locator("[data-start]");
+    await expect(start.locator("svg.lucide-door-stairwell")).toHaveCount(1);
+    await expect(start.locator("circle, text")).toHaveCount(0);
     const treasure = page.locator("[data-treasure]");
     await expect(treasure).toHaveCount(1);
     expect(await treasure.evaluate((el) => el.tagName)).toBe("g");
-    expect(await treasure.locator("rect, path").count()).toBeGreaterThan(1);
     await expect(treasure.locator("svg.lucide-trophy")).toHaveCount(1);
+    // Only keys and gates carry colour: the start and the treasure are drawn
+    // in the text colour.
+    for (const icon of [start, treasure]) {
+      await expect(icon.locator("svg.lucide")).toHaveClass(/text-fg/);
+    }
   });
 });

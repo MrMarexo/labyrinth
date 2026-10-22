@@ -22,10 +22,13 @@ test.describe("the run", () => {
       "data-runner-at",
       "0,0",
     );
-    // The runner is a person, drawn on its own backdrop.
+    // The runner is a person icon alone, with no disc behind it.
     await expect(
       host.locator("[data-runner-at] svg.lucide-person-standing"),
-    ).toHaveCount(1);
+    ).not.toHaveCount(0);
+    // (The person glyph draws its own head as a circle, so look only for a
+    // disc directly under the runner group.)
+    await expect(host.locator("[data-runner-at] > circle")).toHaveCount(0);
 
     const route = [...GATED_MAZE_ROUTE];
     // Down onto the key, then into the wall.
@@ -77,6 +80,15 @@ test.describe("the run", () => {
     await expect(
       host.locator('[data-result-maze="yours"] [data-path]'),
     ).toHaveAttribute("data-points-count", "11");
+    // Paths are a quiet neutral line, and each full maze shows the runner
+    // where the path ends — the same person icon as the run board.
+    for (const which of ["theirs", "yours"]) {
+      const maze = host.locator(`[data-result-maze="${which}"]`);
+      await expect(maze.locator("[data-path]")).toHaveClass(/stroke-fg/);
+      await expect(
+        maze.locator("[data-path-end] svg.lucide-person-standing"),
+      ).not.toHaveCount(0);
+    }
   });
 
   test("giving up ends the match for both players", async ({

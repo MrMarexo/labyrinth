@@ -1,4 +1,4 @@
-import { KeyRound, Trophy } from "lucide-react";
+import { DoorStairwell, Key, PersonStanding, Trophy } from "lucide-react";
 import type { SVGProps } from "react";
 
 import { gateColour } from "~/components/editor/gate-colours";
@@ -35,7 +35,7 @@ export function KeyIcon({
 }: IconProps & { gate: number }) {
   return (
     <g {...rest} aria-hidden="true">
-      <KeyRound
+      <Key
         {...glyphBox(x, y, size)}
         aria-hidden="true"
         strokeWidth={2.5}
@@ -46,44 +46,56 @@ export function KeyIcon({
 }
 
 export function StartIcon({ x, y, size, ...rest }: IconProps) {
-  const cx = (x + 0.5) * size;
-  const cy = (y + 0.5) * size;
   return (
     <g {...rest} aria-hidden="true">
-      <circle cx={cx} cy={cy} r={size * 0.3} className="fill-accent" />
-      <text
-        x={cx}
-        y={cy}
-        textAnchor="middle"
-        dominantBaseline="central"
-        // At phone width the editor board draws a 40px square in about 20px;
-        // this keeps the S near 10px there rather than 7.
-        fontSize={size * 0.48}
-        fontWeight={700}
-        className="fill-on-accent select-none"
-      >
-        S
-      </text>
+      <DoorStairwell
+        {...glyphBox(x, y, size)}
+        aria-hidden="true"
+        strokeWidth={2.5}
+        className="text-fg"
+      />
     </g>
   );
 }
 
-/** The cup of lucide's `Trophy` (lucide-react 1.52.0), in its 24-unit box. */
-const TROPHY_CUP = "M6 9a6 6 0 0 0 12 0V3a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1z";
-
 export function TreasureIcon({ x, y, size, ...rest }: IconProps) {
   return (
     <g {...rest} aria-hidden="true">
-      {/* The cup alone, filled, under the outline: lucide's own cup path,
-          since filling the whole icon would also fill the open handles. */}
-      <svg {...glyphBox(x, y, size)} viewBox="0 0 24 24" aria-hidden="true">
-        <path d={TROPHY_CUP} className="fill-treasure" />
-      </svg>
       <Trophy
         {...glyphBox(x, y, size)}
         aria-hidden="true"
         strokeWidth={2.5}
-        className="text-treasure-line"
+        className="text-fg"
+      />
+    </g>
+  );
+}
+
+/**
+ * The runner: a person, no disc. A thick stroke in the background colour is
+ * drawn under the glyph so the figure stays readable on top of the start
+ * door and on any square, without a circle behind it.
+ */
+export function RunnerIcon({ x, y, size, ...rest }: IconProps) {
+  const box = {
+    x: (x + 0.1) * size,
+    y: (y + 0.1) * size,
+    width: size * 0.8,
+    height: size * 0.8,
+  };
+  return (
+    <g {...rest} aria-hidden="true">
+      <PersonStanding
+        {...box}
+        aria-hidden="true"
+        strokeWidth={5}
+        className="text-bg"
+      />
+      <PersonStanding
+        {...box}
+        aria-hidden="true"
+        strokeWidth={2.5}
+        className="text-fg"
       />
     </g>
   );

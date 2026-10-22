@@ -2,6 +2,7 @@
 
 import { CELL_PX } from "~/components/editor/board";
 import { MazeDrawing } from "~/components/maze-drawing";
+import { RunnerIcon } from "~/components/maze-icons";
 import { mazeViewBox } from "~/lib/maze-view-box";
 import type { Maze, Point } from "~/maze";
 
@@ -41,17 +42,12 @@ export function ResultMaze({ maze, path, label, which }: ResultMazeProps) {
           strokeWidth={3}
           strokeLinejoin="round"
           strokeLinecap="round"
-          className="stroke-accent"
-          opacity={0.75}
+          // A quiet neutral trail: only keys and gates carry colour.
+          className="stroke-fg"
+          opacity={0.35}
         />
         {last && (
-          <circle
-            cx={(last.x + 0.5) * CELL_PX}
-            cy={(last.y + 0.5) * CELL_PX}
-            r={CELL_PX * 0.4}
-            strokeWidth={2}
-            className="stroke-accent fill-none"
-          />
+          <RunnerIcon data-path-end x={last.x} y={last.y} size={CELL_PX} />
         )}
       </svg>
     </figure>

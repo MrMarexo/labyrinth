@@ -34,6 +34,12 @@ test.describe("watching and replay", () => {
     await expect(
       host.locator("[data-watch-runner-view] [data-runner-at]"),
     ).toHaveAttribute("data-runner-at", "0,2");
+    // The full-maze view shows the runner too, with the same person icon.
+    await expect(
+      host.locator(
+        "[data-watch-maze-view] [data-path-end] svg.lucide-person-standing",
+      ),
+    ).not.toHaveCount(0);
 
     // Leaving clears the badge.
     await host.goto("/en/matches");

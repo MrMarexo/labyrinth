@@ -38,10 +38,6 @@
   --cell-void: oklch(97% 0 0);
   --grid-line: oklch(88% 0 0);
   --wall: oklch(25% 0 0);
-  --treasure: oklch(70% 0.15 85);
-  /* The trophy's outline: 3:1+ against --cell-painted, which --treasure
-     alone is not in the light theme. */
-  --treasure-line: oklch(50% 0.12 75);
 }
 
 :root[data-theme="dark"] {
@@ -62,8 +58,6 @@
   --cell-void: oklch(21% 0 0);
   --grid-line: oklch(27% 0 0);
   --wall: oklch(88% 0 0);
-  --treasure: oklch(78% 0.14 85);
-  --treasure-line: oklch(78% 0.14 85);
 }
 
 @theme inline {
@@ -79,8 +73,6 @@
   --color-cell-void: var(--cell-void);
   --color-grid-line: var(--grid-line);
   --color-wall: var(--wall);
-  --color-treasure: var(--treasure);
-  --color-treasure-line: var(--treasure-line);
 }
 
 body {

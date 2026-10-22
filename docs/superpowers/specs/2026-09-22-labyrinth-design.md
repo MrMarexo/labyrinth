@@ -732,6 +732,13 @@ Tailwind v4 CSS custom properties with `data-theme` on `html`. Tri-state
 system / light / dark, persisted, with the standard inline script to prevent a
 flash of the wrong theme. Maze colours are tokens, so the board themes itself.
 
+On every board, **only keys and gates carry colour** — each pair its own hue,
+so a key is matched to its gate at a glance. Everything else is drawn in the
+neutral text colour: the start (a stairwell door), the treasure (a trophy),
+the runner (a standing person, with no disc behind it), and the path on the
+result and replay boards, which is a faint line rather than an accent one.
+Icons are Lucide's.
+
 The language and theme controls live together behind one settings button in
 the header (a gear icon), for signed-in and signed-out visitors alike. It
 opens a labelled panel; Escape closes it and returns focus to the button, and
