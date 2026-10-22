@@ -80,7 +80,10 @@ export const createTRPCRouter = t.router;
 const timingMiddleware = t.middleware(async ({ next, path }) => {
   const start = Date.now();
 
-  if (t._config.isDev) {
+  // Not for `run.move`: a move is one request per key press with no
+  // waterfall to expose, and the delay would be the slowest part of a move
+  // in development (100–500ms against a ~140ms server answer).
+  if (t._config.isDev && path !== "run.move") {
     // artificial delay in dev
     const waitMs = Math.floor(Math.random() * 400) + 100;
     await new Promise((resolve) => setTimeout(resolve, waitMs));

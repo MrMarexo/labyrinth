@@ -21,12 +21,14 @@ import {
   heldKeys,
   mazeSchema,
   pathFrom,
+  withPassages,
   type Maze,
   type Point,
 } from "~/maze";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { match, matchPlayer, maze, move, user } from "~/server/db/schema";
 import {
+  lockedForMove,
   notYours,
   participantRows,
   type DbClient,
@@ -64,17 +66,34 @@ export function assertRunOpen(row: MatchRow, now: Date) {
 }
 
 /**
+ * Parsed mazes by id, for `run.move`. A submitted maze can be neither saved
+ * nor removed (`maze.saveDraft`, `maze.remove`), and a run only ever solves
+ * a submitted one, so an entry can never go stale. Server memory only; the
+ * cap keeps a long-lived process from growing without bound.
+ */
+const solvingCache = new Map<string, Maze>();
+const SOLVING_CACHE_MAX = 500;
+
+/**
  * The maze this runner is solving: the opponent's. **This reads
  * `maze.data` on a runner-reachable path** — the one sanctioned place
  * besides `run.result` (see `routers/AGENTS.md`). What it returns must never
  * leave the server; `run.move` hands it only to the reducer.
  */
 async function mazeToSolve(tx: DbClient, opponent: PlayerRow): Promise<Maze> {
+  const id = opponent.mazeId!;
+  const cached = solvingCache.get(id);
+  if (cached) return cached;
   const [row] = await tx
     .select({ data: maze.data })
     .from(maze)
-    .where(eq(maze.id, opponent.mazeId!));
-  return mazeSchema.parse(row!.data);
+    .where(eq(maze.id, id));
+  const parsed = mazeSchema.parse(row!.data);
+  if (solvingCache.size >= SOLVING_CACHE_MAX) {
+    solvingCache.delete(solvingCache.keys().next().value!);
+  }
+  solvingCache.set(id, parsed);
+  return parsed;
 }
 
 /** Looks up display names once; an unknown id reads as "". */
@@ -114,7 +133,7 @@ export const runRouter = createTRPCRouter({
       return {
         status: found.row.status,
         at: view.at,
-        map: view.map,
+        map: withPassages(view.map),
         heldKeys: heldKeys(view.map),
         penalties: you.runState?.state.penalties ?? 0,
         moves,
@@ -137,27 +156,15 @@ export const runRouter = createTRPCRouter({
       const me = ctx.session.user.id;
 
       const outcome = await ctx.db.transaction(async (tx) => {
-        const found = await participantRows(tx, input.matchId, me, {
-          lock: true,
-        });
+        const found = await lockedForMove(tx, input.matchId, me, input.seq);
         if (!found) notYours();
-        const { row, players } = found;
+        const { row, players, stored } = found;
 
         // §7.2, and before every other check: a retry gets what the first
         // attempt got, even if that attempt finished the run or the match.
-        const [stored] = await tx
-          .select({ delta: move.delta })
-          .from(move)
-          .where(
-            and(
-              eq(move.matchId, row.id),
-              eq(move.runnerId, me),
-              eq(move.seq, input.seq),
-            ),
-          );
         if (stored) {
           return {
-            delta: stored.delta,
+            delta: stored,
             matchOver: isTerminal(row.status),
             fresh: false as const,
           };
@@ -176,16 +183,6 @@ export const runRouter = createTRPCRouter({
 
         const { run, delta, outcome } = advanceRun(current, solving, input.dir);
 
-        await tx.insert(move).values({
-          matchId: row.id,
-          runnerId: me,
-          seq: input.seq,
-          dir: input.dir,
-          outcome,
-          delta,
-          createdAt: now,
-        });
-
         const updated: PlayerRow = {
           ...you,
           runState: run,
@@ -193,41 +190,60 @@ export const runRouter = createTRPCRouter({
           lastMoveAt: now,
           finishedAt: delta.finished ? now : null,
         };
-        await tx
-          .update(matchPlayer)
-          .set({
-            runState: updated.runState,
-            startedAt: updated.startedAt,
-            lastMoveAt: updated.lastMoveAt,
-            finishedAt: updated.finishedAt,
-          })
-          .where(
-            and(eq(matchPlayer.matchId, row.id), eq(matchPlayer.userId, me)),
-          );
-
         const seated = players.map((p) => (p.userId === me ? updated : p));
         const completion = resolveCompletion(seated.map(factsFor));
 
-        if (completion.kind === "complete") {
-          await tx
-            .update(match)
-            .set({
-              status: "complete",
-              winnerId: completion.winnerId,
-              endReason: completion.endReason,
-              lastActivityAt: now,
+        // The move row, the run state and the match in one statement: data-
+        // modifying CTEs all run, on rows this transaction already holds
+        // locked, and a failure in any of them fails the whole statement —
+        // so nothing about atomicity changes, only the round trips.
+        const logged = tx.$with("logged").as(
+          tx
+            .insert(move)
+            .values({
+              matchId: row.id,
+              runnerId: me,
+              seq: input.seq,
+              dir: input.dir,
+              outcome,
+              delta,
+              createdAt: now,
             })
-            .where(eq(match.id, row.id));
-        } else {
-          const next = { ...row, lastActivityAt: now };
-          await tx
-            .update(match)
+            .returning({ id: move.id }),
+        );
+        const ran = tx.$with("ran").as(
+          tx
+            .update(matchPlayer)
             .set({
-              lastActivityAt: now,
-              deadlineAt: deadlineFor(situationFor(next, seated))!,
+              runState: updated.runState,
+              startedAt: updated.startedAt,
+              lastMoveAt: updated.lastMoveAt,
+              finishedAt: updated.finishedAt,
             })
-            .where(eq(match.id, row.id));
-        }
+            .where(
+              and(eq(matchPlayer.matchId, row.id), eq(matchPlayer.userId, me)),
+            )
+            .returning({ userId: matchPlayer.userId }),
+        );
+        await tx
+          .with(logged, ran)
+          .update(match)
+          .set(
+            completion.kind === "complete"
+              ? {
+                  status: "complete",
+                  winnerId: completion.winnerId,
+                  endReason: completion.endReason,
+                  lastActivityAt: now,
+                }
+              : {
+                  lastActivityAt: now,
+                  deadlineAt: deadlineFor(
+                    situationFor({ ...row, lastActivityAt: now }, seated),
+                  )!,
+                },
+          )
+          .where(eq(match.id, row.id));
 
         return {
           delta,

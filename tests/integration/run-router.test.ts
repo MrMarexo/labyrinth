@@ -32,7 +32,7 @@ describe("run.get", () => {
     expect(await host.run.get({ matchId })).toEqual({
       status: "running",
       at: { x: 0, y: 0 },
-      map: { cells: [{ x: 0, y: 0 }], segments: [] },
+      map: { cells: [{ x: 0, y: 0 }], segments: [], passages: [] },
       heldKeys: [],
       penalties: 0,
       moves: 0,
@@ -40,6 +40,41 @@ describe("run.get", () => {
       finished: false,
       gaveUp: false,
     });
+  });
+
+  it("lists the passages walked through, and not the bumps", async () => {
+    const { host, matchId } = await runningMatch();
+    await walk(host, matchId, ["S", "N", "N"]);
+    expect((await host.run.get({ matchId })).map.passages).toEqual([
+      { o: "H", x: 0, y: 0 },
+    ]);
+  });
+
+  it("reads a run stored before passages were recorded", async () => {
+    const { host, hostId, matchId } = await runningMatch();
+    await walk(host, matchId, ["S"]);
+    const where = and(
+      eq(matchPlayer.matchId, matchId),
+      eq(matchPlayer.userId, hostId),
+    );
+    const [player] = await db.select().from(matchPlayer).where(where);
+    const stored = player!.runState!;
+    const legacyMap = {
+      cells: stored.view.map.cells,
+      segments: stored.view.map.segments,
+    };
+    await db
+      .update(matchPlayer)
+      .set({
+        runState: { ...stored, view: { ...stored.view, map: legacyMap } },
+      } as never)
+      .where(where);
+
+    expect((await host.run.get({ matchId })).map.passages).toEqual([]);
+    await host.run.move({ matchId, seq: 2, dir: "S" });
+    expect((await host.run.get({ matchId })).map.passages).toEqual([
+      { o: "H", x: 0, y: 1 },
+    ]);
   });
 
   it("refuses someone who is not in the match", async () => {
