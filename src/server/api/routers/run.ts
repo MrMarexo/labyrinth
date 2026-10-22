@@ -140,6 +140,8 @@ export const runRouter = createTRPCRouter({
         nextSeq: moves + 1,
         finished: you.finishedAt !== null,
         gaveUp: you.gaveUpAt !== null,
+        /** The runner's own time, once they reach the treasure (§2.6). */
+        elapsedMs: elapsedMs(factsFor(you)),
       };
     }),
 

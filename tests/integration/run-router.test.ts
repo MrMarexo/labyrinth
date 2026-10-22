@@ -39,7 +39,23 @@ describe("run.get", () => {
       nextSeq: 1,
       finished: false,
       gaveUp: false,
+      elapsedMs: null,
     });
+  });
+
+  it("reports the runner's own time once they finish", async () => {
+    const { host, matchId } = await runningMatch();
+    await walk(host, matchId, GATED_MAZE_ROUTE.slice(0, -1));
+    expect((await host.run.get({ matchId })).elapsedMs).toBeNull();
+    await host.run.move({
+      matchId,
+      seq: GATED_MAZE_ROUTE.length,
+      dir: GATED_MAZE_ROUTE.at(-1)!,
+    });
+    const finished = await host.run.get({ matchId });
+    expect(finished.finished).toBe(true);
+    expect(finished.elapsedMs).toEqual(expect.any(Number));
+    expect(finished.elapsedMs).toBeGreaterThanOrEqual(0);
   });
 
   it("lists the passages walked through, and not the bumps", async () => {
