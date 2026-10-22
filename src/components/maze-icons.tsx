@@ -68,14 +68,22 @@ export function StartIcon({ x, y, size, ...rest }: IconProps) {
   );
 }
 
+/** The cup of lucide's `Trophy` (lucide-react 1.52.0), in its 24-unit box. */
+const TROPHY_CUP = "M6 9a6 6 0 0 0 12 0V3a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1z";
+
 export function TreasureIcon({ x, y, size, ...rest }: IconProps) {
   return (
     <g {...rest} aria-hidden="true">
+      {/* The cup alone, filled, under the outline: lucide's own cup path,
+          since filling the whole icon would also fill the open handles. */}
+      <svg {...glyphBox(x, y, size)} viewBox="0 0 24 24" aria-hidden="true">
+        <path d={TROPHY_CUP} className="fill-treasure" />
+      </svg>
       <Trophy
         {...glyphBox(x, y, size)}
         aria-hidden="true"
         strokeWidth={2.5}
-        className="text-treasure"
+        className="text-treasure-line"
       />
     </g>
   );
