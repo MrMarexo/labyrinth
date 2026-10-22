@@ -1,3 +1,4 @@
+import { KeyRound, Trophy } from "lucide-react";
 import type { SVGProps } from "react";
 
 import { gateColour } from "~/components/editor/gate-colours";
@@ -15,6 +16,16 @@ export type IconProps = Omit<SVGProps<SVGGElement>, "x" | "y"> & {
   size: number;
 };
 
+/** A lucide glyph's box inside its square: 70% of it, centred. */
+function glyphBox(x: number, y: number, size: number) {
+  return {
+    x: (x + 0.15) * size,
+    y: (y + 0.15) * size,
+    width: size * 0.7,
+    height: size * 0.7,
+  };
+}
+
 export function KeyIcon({
   x,
   y,
@@ -22,23 +33,14 @@ export function KeyIcon({
   gate,
   ...rest
 }: IconProps & { gate: number }) {
-  const cx = (x + 0.5) * size;
-  const cy = (y + 0.5) * size;
-  const u = size / 40;
   return (
-    <g
-      {...rest}
-      aria-hidden="true"
-      fill="none"
-      strokeWidth={3.5 * u}
-      strokeLinecap="round"
-      style={{ stroke: gateColour(gate) }}
-    >
-      {/* The bow, then the shaft, then two teeth hanging off its end. */}
-      <circle cx={cx - 7 * u} cy={cy} r={5 * u} />
-      <line x1={cx - 2 * u} y1={cy} x2={cx + 12 * u} y2={cy} />
-      <line x1={cx + 8 * u} y1={cy} x2={cx + 8 * u} y2={cy + 5 * u} />
-      <line x1={cx + 12 * u} y1={cy} x2={cx + 12 * u} y2={cy + 5 * u} />
+    <g {...rest} aria-hidden="true">
+      <KeyRound
+        {...glyphBox(x, y, size)}
+        aria-hidden="true"
+        strokeWidth={2.5}
+        style={{ color: gateColour(gate) }}
+      />
     </g>
   );
 }
@@ -67,31 +69,13 @@ export function StartIcon({ x, y, size, ...rest }: IconProps) {
 }
 
 export function TreasureIcon({ x, y, size, ...rest }: IconProps) {
-  const left = x * size;
-  const top = y * size;
-  const u = size / 40;
   return (
-    <g {...rest} aria-hidden="true" strokeWidth={1.5 * u}>
-      {/* Body, then the rounded lid on top of it, then the latch. */}
-      <rect
-        x={left + 9 * u}
-        y={top + 19 * u}
-        width={22 * u}
-        height={12 * u}
-        rx={1.5 * u}
-        className="fill-treasure stroke-wall"
-      />
-      <path
-        d={`M ${left + 9 * u} ${top + 19 * u} V ${top + 15 * u} Q ${left + 9 * u} ${top + 10 * u} ${left + 14 * u} ${top + 10 * u} H ${left + 26 * u} Q ${left + 31 * u} ${top + 10 * u} ${left + 31 * u} ${top + 15 * u} V ${top + 19 * u} Z`}
-        className="fill-treasure stroke-wall"
-      />
-      <rect
-        x={left + 18 * u}
-        y={top + 16 * u}
-        width={4 * u}
-        height={6 * u}
-        rx={1 * u}
-        className="fill-treasure-ink"
+    <g {...rest} aria-hidden="true">
+      <Trophy
+        {...glyphBox(x, y, size)}
+        aria-hidden="true"
+        strokeWidth={2.5}
+        className="text-treasure"
       />
     </g>
   );

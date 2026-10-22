@@ -1,5 +1,6 @@
 "use client";
 
+import { PersonStanding } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 
@@ -303,16 +304,26 @@ export function RunBoard({ map, at, heldKeys, bump, lean }: RunBoardProps) {
           className={pulsing ? "motion-safe:animate-bump-pulse" : undefined}
           style={{ transformBox: "fill-box", transformOrigin: "center" }}
         >
-          <circle
-            data-runner-at={`${at.x},${at.y}`}
-            cx={CELL_PX / 2}
-            cy={CELL_PX / 2}
-            r={CELL_PX * 0.25}
-            // The outline keeps the runner visible on the start square, whose
-            // marker is the same accent colour.
-            strokeWidth={3}
-            className="fill-accent stroke-bg"
-          />
+          <g data-runner-at={`${at.x},${at.y}`}>
+            <circle
+              cx={CELL_PX / 2}
+              cy={CELL_PX / 2}
+              r={CELL_PX * 0.36}
+              // The outline keeps the runner visible on the start square,
+              // whose marker is the same accent colour.
+              strokeWidth={3}
+              className="fill-accent stroke-bg"
+            />
+            <PersonStanding
+              aria-hidden="true"
+              x={CELL_PX * 0.2}
+              y={CELL_PX * 0.2}
+              width={CELL_PX * 0.6}
+              height={CELL_PX * 0.6}
+              strokeWidth={2.5}
+              className="text-on-accent"
+            />
+          </g>
         </g>
       </g>
     </svg>

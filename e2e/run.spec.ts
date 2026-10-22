@@ -22,6 +22,10 @@ test.describe("the run", () => {
       "data-runner-at",
       "0,0",
     );
+    // The runner is a person, drawn on its own backdrop.
+    await expect(
+      host.locator("[data-runner-at] svg.lucide-person-standing"),
+    ).toHaveCount(1);
 
     const route = [...GATED_MAZE_ROUTE];
     // Down onto the key, then into the wall.

@@ -252,7 +252,7 @@ test.describe("save status", () => {
 });
 
 test.describe("icons", () => {
-  test("the start is an S marker and the treasure a chest", async ({
+  test("the start is an S marker and the treasure a trophy", async ({
     page,
   }) => {
     await signUpAndOpenNewMaze(page);
@@ -269,5 +269,6 @@ test.describe("icons", () => {
     await expect(treasure).toHaveCount(1);
     expect(await treasure.evaluate((el) => el.tagName)).toBe("g");
     expect(await treasure.locator("rect, path").count()).toBeGreaterThan(1);
+    await expect(treasure.locator("svg.lucide-trophy")).toHaveCount(1);
   });
 });
