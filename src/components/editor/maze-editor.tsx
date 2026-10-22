@@ -26,7 +26,7 @@ import {
 import { api } from "~/trpc/react";
 import { Board } from "./board";
 import { DetailTools } from "./detail-tools";
-import { trackDiscard } from "./pending-discards";
+import { discardsSettled, trackDiscard } from "./pending-discards";
 import { ShapeTools } from "./shape-tools";
 import { UseInMatch } from "./use-in-match";
 import { ValidationPanel, type SaveState } from "./validation-panel";
@@ -125,9 +125,25 @@ export function MazeEditor({
   // draft only while the author has not touched it; once they have, their
   // edits stay, and the save's version check turns the clash into a
   // `draftChangedElsewhere` conflict instead of a silent overwrite.
+  //
+  // Not until this tab's earlier editors have finished leaving (capped, see
+  // `discardsSettled`): after a quick leave-then-Back, the old editor's
+  // flush may still be in flight, and a read before it lands would adopt
+  // the pre-flush version and make the next save a false conflict.
+  const [othersLeft, setOthersLeft] = useState(false);
+  useEffect(() => {
+    let live = true;
+    void discardsSettled().then(() => {
+      if (live) setOthersLeft(true);
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
   const fresh = api.maze.get.useQuery(
     { id },
     {
+      enabled: othersLeft,
       staleTime: 0,
       gcTime: 0,
       refetchOnMount: "always",

@@ -257,6 +257,49 @@ test.describe("a stale copy of the editor", () => {
     await expect(page.locator("[data-budget]")).toHaveText("2 / 36 squares");
   });
 
+  test("going Back while the flush on the way out is still in flight is not a conflict", async ({
+    page,
+  }) => {
+    await signUpAndOpenNewMaze(page);
+    const first = saved(page);
+    await page.locator('[data-cell="0,0"]').click();
+    await first;
+    await expect(page.locator("[data-save-state]")).toHaveAttribute(
+      "data-save-state",
+      "saved",
+    );
+
+    // Every save from here waits, before it reaches the server, until
+    // released: the flush on the way out is in flight across the Back.
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    await page.route("**/api/trpc/maze.saveDraft*", async (route) => {
+      await held;
+      await route.continue();
+    });
+
+    await page.locator('[data-cell="1,0"]').click();
+    await page.getByRole("link", { name: "Labyrinths" }).click();
+    await expect(page).toHaveURL(/\/en\/labyrinths$/);
+    await page.goBack();
+    await expect(page.locator("svg[data-board]")).toBeVisible();
+    // Long enough for an ungated refresh to have read the pre-flush draft.
+    await page.waitForTimeout(500);
+    release();
+
+    // The refresh waited for the flush, so it adopts both squares.
+    await expect(page.locator("[data-budget]")).toHaveText("2 / 36 squares");
+    await page.locator('[data-cell="2,0"]').click();
+    await expect(page.locator("[data-save-state]")).toHaveAttribute(
+      "data-save-state",
+      "saved",
+    );
+    await expect(page.locator("[data-save-error]")).toHaveCount(0);
+
+    await page.reload();
+    await expect(page.locator("[data-budget]")).toHaveText("3 / 36 squares");
+  });
+
   test("a second tab that saves over newer work is refused, and the first tab's work survives", async ({
     page,
     browser,
