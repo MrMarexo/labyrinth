@@ -30,8 +30,11 @@
   /* The boundary of an interactive control: WCAG 1.4.11 wants 3:1.
      3.14:1 against --bg. */
   --border-strong: oklch(65% 0 0);
-  --accent: oklch(55% 0.18 260);
+  /* The foreground, not a hue: 16.8:1 against --bg and --on-accent. */
+  --accent: oklch(22% 0 0);
   --on-accent: oklch(99% 0 0);
+  /* Gates and keys rotate this to their own hues (gate-colours.ts). */
+  --gate-base: oklch(55% 0.18 260);
   --danger: oklch(55% 0.19 25);
 
   --cell-painted: oklch(93% 0 0);
@@ -50,8 +53,10 @@
   --border: oklch(32% 0 0);
   /* 3.13:1 against --bg. */
   --border-strong: oklch(50% 0 0);
-  --accent: oklch(70% 0.16 260);
+  /* 15.6:1 against --bg and --on-accent. */
+  --accent: oklch(95% 0 0);
   --on-accent: oklch(18% 0 0);
+  --gate-base: oklch(70% 0.16 260);
   --danger: oklch(68% 0.17 25);
 
   --cell-painted: oklch(30% 0 0);
@@ -68,6 +73,7 @@
   --color-border-strong: var(--border-strong);
   --color-accent: var(--accent);
   --color-on-accent: var(--on-accent);
+  --color-gate-base: var(--gate-base);
   --color-danger: var(--danger);
   --color-cell-painted: var(--cell-painted);
   --color-cell-void: var(--cell-void);
@@ -82,9 +88,14 @@ body {
 
 /*
  * Tailwind v4 dropped the pointer cursor from buttons; put it back for
- * everything clickable, and give the HTML controls a short colour transition
- * so hover and selection changes don't snap. Board squares (SVG role=button)
- * get the cursor but no transition — a swipe repaints dozens of them.
+ * everything clickable, and give the HTML controls a short transition so
+ * hover and selection changes don't snap. Board squares (SVG role=button)
+ * get the cursor but no transition or tint — a swipe repaints dozens of them.
+ *
+ * Every enabled button tints on hover in its own text colour, drawn as an
+ * inset shadow so it lies over whatever background the button has. Nothing
+ * here uses a ring (also a box-shadow), so the two never compete; focus is
+ * the browser's outline.
  */
 @layer base {
   button:not(:disabled),
@@ -95,11 +106,24 @@ body {
     cursor: pointer;
   }
 
+  button:disabled,
+  select:disabled {
+    cursor: not-allowed;
+  }
+
+  @media (hover: hover) {
+    button:not(:disabled):hover {
+      box-shadow: inset 0 0 0 100vmax
+        color-mix(in oklch, currentColor 10%, transparent);
+    }
+  }
+
   @media (prefers-reduced-motion: no-preference) {
     button,
     a,
     select {
-      transition-property: color, background-color, border-color, opacity;
+      transition-property:
+        color, background-color, border-color, opacity, box-shadow;
       transition-duration: 150ms;
       transition-timing-function: ease-out;
     }

@@ -14,14 +14,13 @@ export const GATE_HUES: readonly number[] = Array.from(
 );
 
 /**
- * Gate colours reuse the accent token's lightness and chroma — so they stay
- * correct in both themes — rotated to a per-gate hue. `GATE_HUES` alone is
- * what keeps adjacent gates distinct; `--color-danger` was tried as a second
- * base to alternate with, but at nearly the same lightness and chroma as
- * `--color-accent` the swap was imperceptible once the hue override ran, so
- * this uses one base instead of pretending to alternate.
+ * Gate colours reuse the `--gate-base` token's lightness and chroma — so they
+ * stay correct in both themes — rotated to a per-gate hue. That token exists
+ * for this alone: the accent is achromatic (white or black), and rotating the
+ * hue of a colour with no chroma would turn every gate grey. `GATE_HUES`
+ * alone is what keeps adjacent gates distinct.
  */
 export function gateColour(gate: number): string {
   const hue = GATE_HUES[(gate - 1) % GATE_HUES.length];
-  return `oklch(from var(--color-accent) l c ${hue})`;
+  return `oklch(from var(--color-gate-base) l c ${hue})`;
 }

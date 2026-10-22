@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { rgbOf } from "./support/colour";
 import { signUpAndOpenNewMaze } from "./support/maze";
 import { openSettings } from "./support/settings";
 
@@ -44,6 +45,16 @@ async function assertGateStrokesAreDistinctAndResolved(
     expect(value).not.toBe(wall);
   }
   expect(gateA).not.toBe(gateB);
+
+  // Chromatic, not grey: gates have their own base colour, so an
+  // achromatic accent must not drain them.
+  for (const edge of ["V:0,0", "V:2,0"]) {
+    const [r, g, b] = await rgbOf(
+      page.locator(`[data-segment="${edge}"][data-gate]`),
+      "stroke",
+    );
+    expect(Math.max(r, g, b) - Math.min(r, g, b)).toBeGreaterThan(30);
+  }
 }
 
 test.describe("board keyboard navigation", () => {

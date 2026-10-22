@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+import { rgbOf } from "./support/colour";
+import { signUp, signUpAndOpenNewMaze } from "./support/maze";
 import { openSettings } from "./support/settings";
 
 test.describe("appearance", () => {
@@ -93,5 +95,64 @@ test.describe("appearance", () => {
     await expect(
       page.getByRole("button", { name: "Nastavenia" }),
     ).toBeVisible();
+  });
+
+  test("accent buttons are near-white in the dark theme and near-black in the light one", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      window.localStorage.setItem("theme", "dark");
+    });
+    await signUp(page);
+    await page.goto("/en/labyrinths");
+    const button = page.getByRole("button", { name: "New labyrinth" });
+    await expect(button).toHaveClass(/bg-accent/);
+
+    const dark = await rgbOf(button, "backgroundColor");
+    for (const channel of dark) expect(channel).toBeGreaterThan(200);
+    // Its label is dark on the white button.
+    for (const channel of await rgbOf(button, "color")) {
+      expect(channel).toBeLessThan(80);
+    }
+
+    await openSettings(page);
+    await page.getByRole("combobox", { name: "Theme" }).selectOption("light");
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+    const light = await rgbOf(button, "backgroundColor");
+    for (const channel of light) expect(channel).toBeLessThan(80);
+    for (const channel of await rgbOf(button, "color")) {
+      expect(channel).toBeGreaterThan(200);
+    }
+  });
+});
+
+test.describe("buttons", () => {
+  test("an enabled button tints on hover; a disabled one shows not-allowed and no tint", async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name === "mobile", "no hover on touch");
+    await signUpAndOpenNewMaze(page);
+
+    const undo = page.getByRole("button", { name: "Undo" });
+    await expect(undo).toBeDisabled();
+    await undo.hover({ force: true });
+    expect(await undo.evaluate((el) => getComputedStyle(el).boxShadow)).toBe(
+      "none",
+    );
+    expect(await undo.evaluate((el) => getComputedStyle(el).cursor)).toBe(
+      "not-allowed",
+    );
+
+    const tool = page.getByRole("radio", { name: "Wall" });
+    expect(await tool.evaluate((el) => getComputedStyle(el).boxShadow)).toBe(
+      "none",
+    );
+    await tool.hover();
+    await expect
+      .poll(() => tool.evaluate((el) => getComputedStyle(el).boxShadow))
+      .not.toBe("none");
+    expect(await tool.evaluate((el) => getComputedStyle(el).cursor)).toBe(
+      "pointer",
+    );
   });
 });

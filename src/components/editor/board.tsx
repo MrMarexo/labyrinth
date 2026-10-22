@@ -686,16 +686,22 @@ export function Board({
           className="stroke-accent"
         />
       )}
+      {/* Hollow, so it reads apart from a wall in the same colour. */}
       {ring?.kind === "edge" && (
-        <line
-          data-focus-ring
-          aria-hidden="true"
-          pointerEvents="none"
-          {...edgeLine(ring.edge)}
-          strokeWidth={6}
-          strokeLinecap="round"
-          className="stroke-accent"
-        />
+        <g data-focus-ring aria-hidden="true" pointerEvents="none">
+          <line
+            {...edgeLine(ring.edge)}
+            strokeWidth={9}
+            strokeLinecap="round"
+            className="stroke-accent"
+          />
+          <line
+            {...edgeLine(ring.edge)}
+            strokeWidth={4}
+            strokeLinecap="round"
+            className="stroke-bg"
+          />
+        </g>
       )}
     </svg>
   );
