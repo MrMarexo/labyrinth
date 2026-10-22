@@ -29,7 +29,11 @@ async function submitGated(
   matchId: string,
 ) {
   const created = await caller.maze.createDraft({ name: "Gated", ...settings });
-  await caller.maze.saveDraft({ id: created.id, data: gatedMazeDraft() });
+  await caller.maze.saveDraft({
+    id: created.id,
+    data: gatedMazeDraft(),
+    expectedVersion: 0,
+  });
   await caller.match.submitMaze({ matchId, mazeId: created.id });
 }
 

@@ -32,6 +32,12 @@ export const maze = pgTable(
     data: jsonb("data").notNull(),
     contentHash: text("content_hash"),
     optimalMoves: integer("optimal_moves"),
+    /**
+     * Bumped by every `saveDraft`, which only writes over the version the
+     * editor loaded: a stale editor (another tab, a cached page) is refused
+     * instead of silently overwriting newer squares.
+     */
+    version: integer("version").notNull().default(0),
     status: text("status", { enum: ["draft", "submitted"] })
       .notNull()
       .default("draft"),

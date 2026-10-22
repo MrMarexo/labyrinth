@@ -78,6 +78,7 @@ export const mazeRouter = createTRPCRouter({
           cellCount: maze.cellCount,
           gateCount: maze.gateCount,
           status: maze.status,
+          version: maze.version,
           data: maze.data,
         })
         .from(maze)
@@ -183,8 +184,20 @@ export const mazeRouter = createTRPCRouter({
       return { discarded: deleted.length > 0 };
     }),
 
+  /**
+   * Writes the draft only over `expectedVersion`, the version the editor
+   * last loaded or saved, and returns the new one. An editor working from a
+   * stale copy — a second tab, a page the router cached — is refused with
+   * `errors.draftChangedElsewhere` instead of silently dropping newer work.
+   */
   saveDraft: protectedProcedure
-    .input(z.object({ id: z.string(), data: draftMazeSchema }))
+    .input(
+      z.object({
+        id: z.string(),
+        data: draftMazeSchema,
+        expectedVersion: z.number().int().min(0),
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       const [found] = await ctx.db
         .select()
@@ -207,21 +220,49 @@ export const mazeRouter = createTRPCRouter({
           })
         : null;
 
-      const updated = await ctx.db
+      // One conditional statement: still the caller's, still a draft (a
+      // `submitMaze` since the read above is caught here too), and still at
+      // the version this editor last saw.
+      const [updated] = await ctx.db
         .update(maze)
         .set({
           data: input.data,
           contentHash: validation?.ok ? validation.contentHash : null,
           optimalMoves: validation?.ok ? validation.optimalMoves : null,
+          version: sql`${maze.version} + 1`,
         })
-        .where(ownedBy(input.id, ctx.session.user.id))
-        .returning({ id: maze.id });
-      assertOwned(updated[0]);
+        .where(
+          and(
+            ownedBy(input.id, ctx.session.user.id),
+            eq(maze.status, "draft"),
+            eq(maze.version, input.expectedVersion),
+          ),
+        )
+        .returning({ version: maze.version });
 
-      if (validation?.ok) return { valid: true as const, issues: [] };
+      if (!updated) {
+        const [found] = await ctx.db
+          .select({ status: maze.status })
+          .from(maze)
+          .where(ownedBy(input.id, ctx.session.user.id));
+        if (assertOwned(found).status === "submitted") {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "errors.mazeIsSubmitted",
+          });
+        }
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "errors.draftChangedElsewhere",
+        });
+      }
+
+      const { version } = updated;
+      if (validation?.ok) return { valid: true as const, issues: [], version };
       return {
         valid: false as const,
         issues: validation?.issues ?? [{ key: INCOMPLETE_DRAFT_KEY }],
+        version,
       };
     }),
 

@@ -43,6 +43,13 @@
       "when": 1792150163622,
       "tag": "0005_tiny_the_hand",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792706660224,
+      "tag": "0006_classy_butterfly",
+      "breakpoints": true
     }
   ]
 }

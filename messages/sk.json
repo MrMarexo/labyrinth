@@ -67,7 +67,8 @@
     "matchNotDrawing": "Tento zápas už bludiská neprijíma.",
     "fieldRequired": "Toto pole je povinné.",
     "emailInvalid": "Zadajte platnú e-mailovú adresu.",
-    "matchNotCancellable": "Zrušiť sa dá len zápas, ktorý ešte čaká na súpera."
+    "matchNotCancellable": "Zrušiť sa dá len zápas, ktorý ešte čaká na súpera.",
+    "draftChangedElsewhere": "Toto bludisko sa medzitým zmenilo inde. Načítajte ho znova, aby ste videli najnovšiu verziu."
   },
   "play": {
     "title": "Vaše hry",
@@ -190,7 +191,8 @@
     "redo": "Dopredu",
     "saveFailed": "Vaše zmeny sa nepodarilo uložiť.",
     "retry": "Skúsiť znova",
-    "useInMatch": "Použiť v tomto zápase"
+    "useInMatch": "Použiť v tomto zápase",
+    "reload": "Načítať znova"
   },
   "lobby": {
     "title": "Zápas",

@@ -94,7 +94,11 @@ describe("publishing", () => {
     expect(on(matchChannel(created.id))).toHaveLength(1);
 
     const draft = await host.maze.createDraft({ name: "M", ...settings });
-    await host.maze.saveDraft({ id: draft.id, data: gatedMazeDraft() });
+    await host.maze.saveDraft({
+      id: draft.id,
+      data: gatedMazeDraft(),
+      expectedVersion: 0,
+    });
     await host.match.submitMaze({ matchId: created.id, mazeId: draft.id });
     expect(on(matchChannel(created.id))).toHaveLength(2);
   });

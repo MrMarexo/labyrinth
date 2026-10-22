@@ -36,7 +36,11 @@ async function savedMaze(
     cellCount: SOLVABLE_MAZE_CELL_COUNT,
     gateCount: SOLVABLE_MAZE_GATE_COUNT,
   });
-  await caller.maze.saveDraft({ id: created.id, data: solvableDraft() });
+  await caller.maze.saveDraft({
+    id: created.id,
+    data: solvableDraft(),
+    expectedVersion: 0,
+  });
   return created.id;
 }
 
@@ -315,7 +319,12 @@ describe("match.submitMaze", () => {
 
     expect(
       await rejection(
-        host.maze.saveDraft({ id: mazeId, data: solvableDraft() }),
+        host.maze.saveDraft({
+          id: mazeId,
+          data: solvableDraft(),
+          // The version it is at: only the status refuses this.
+          expectedVersion: 1,
+        }),
       ),
     ).toEqual({ code: "FORBIDDEN", message: "errors.mazeIsSubmitted" });
   });

@@ -67,6 +67,7 @@ describe("maze.saveDraft", () => {
     const result = await caller.maze.saveDraft({
       id: created.id,
       data: { ...emptyDraft(), cells: [{ x: 0, y: 0 }] },
+      expectedVersion: 0,
     });
 
     expect(result.valid).toBe(false);
@@ -88,9 +89,10 @@ describe("maze.saveDraft", () => {
     const result = await caller.maze.saveDraft({
       id: created.id,
       data: solvableDraft(),
+      expectedVersion: 0,
     });
 
-    expect(result).toEqual({ valid: true, issues: [] });
+    expect(result).toEqual({ valid: true, issues: [], version: 1 });
 
     const [row] = await db.select().from(maze).where(eq(maze.id, created.id));
     expect(row?.contentHash).not.toBeNull();
@@ -103,12 +105,17 @@ describe("maze.saveDraft", () => {
     const stranger = createCaller(await signedIn());
 
     const notMine = await rejection(
-      stranger.maze.saveDraft({ id: created.id, data: emptyDraft() }),
+      stranger.maze.saveDraft({
+        id: created.id,
+        data: emptyDraft(),
+        expectedVersion: 0,
+      }),
     );
     const missing = await rejection(
       stranger.maze.saveDraft({
         id: crypto.randomUUID(),
         data: emptyDraft(),
+        expectedVersion: 0,
       }),
     );
 
@@ -119,6 +126,80 @@ describe("maze.saveDraft", () => {
     // The invariant stated directly: a maze that belongs to someone else must
     // be indistinguishable from one that does not exist at all.
     expect(missing).toEqual(notMine);
+  });
+  it("starts at version 0 and counts up one per save", async () => {
+    const caller = createCaller(await signedIn());
+    const created = await caller.maze.createDraft(settings);
+    expect((await caller.maze.get({ id: created.id })).version).toBe(0);
+
+    const first = await caller.maze.saveDraft({
+      id: created.id,
+      data: { ...emptyDraft(), cells: [{ x: 0, y: 0 }] },
+      expectedVersion: 0,
+    });
+    const second = await caller.maze.saveDraft({
+      id: created.id,
+      data: { ...emptyDraft(), cells: [{ x: 1, y: 0 }] },
+      expectedVersion: first.version,
+    });
+
+    expect([first.version, second.version]).toEqual([1, 2]);
+    expect((await caller.maze.get({ id: created.id })).version).toBe(2);
+  });
+
+  it("refuses a save from a stale version and leaves the stored draft alone", async () => {
+    const caller = createCaller(await signedIn());
+    const created = await caller.maze.createDraft(settings);
+    const kept = { ...emptyDraft(), cells: [{ x: 0, y: 0 }] };
+    await caller.maze.saveDraft({
+      id: created.id,
+      data: kept,
+      expectedVersion: 0,
+    });
+
+    // A second editor that loaded the maze before that save.
+    await expect(
+      rejection(
+        caller.maze.saveDraft({
+          id: created.id,
+          data: { ...emptyDraft(), cells: [{ x: 1, y: 0 }] },
+          expectedVersion: 0,
+        }),
+      ),
+    ).resolves.toEqual({
+      code: "CONFLICT",
+      message: "errors.draftChangedElsewhere",
+    });
+
+    const [row] = await db.select().from(maze).where(eq(maze.id, created.id));
+    expect(row?.data).toEqual(kept);
+    expect(row?.version).toBe(1);
+  });
+
+  it("still refuses a submitted maze as submitted, whatever the version", async () => {
+    const caller = createCaller(await signedIn());
+    const created = await caller.maze.createDraft(settings);
+    await db
+      .update(maze)
+      .set({ status: "submitted" })
+      .where(eq(maze.id, created.id));
+
+    for (const expectedVersion of [0, 7]) {
+      await expect(
+        rejection(
+          caller.maze.saveDraft({
+            id: created.id,
+            data: emptyDraft(),
+            expectedVersion,
+          }),
+        ),
+      ).resolves.toEqual({
+        code: "FORBIDDEN",
+        message: "errors.mazeIsSubmitted",
+      });
+    }
+    const [row] = await db.select().from(maze).where(eq(maze.id, created.id));
+    expect(row?.version).toBe(0);
   });
 });
 
@@ -160,7 +241,15 @@ describe("maze.get", () => {
     const created = await caller.maze.createDraft(settings);
     const fetched = await caller.maze.get({ id: created.id });
     expect(Object.keys(fetched).sort()).toEqual(
-      ["cellCount", "data", "gateCount", "id", "name", "status"].sort(),
+      [
+        "cellCount",
+        "data",
+        "gateCount",
+        "id",
+        "name",
+        "status",
+        "version",
+      ].sort(),
     );
     expect(fetched).not.toHaveProperty("authorId");
     expect(fetched).not.toHaveProperty("contentHash");
@@ -315,6 +404,7 @@ describe("maze.draftForMatch", () => {
     await host.maze.saveDraft({
       id: painted.id,
       data: { ...emptyDraft(), cells: [{ x: 0, y: 0 }] },
+      expectedVersion: 0,
     });
     const otherSize = await host.maze.createDraft({
       ...settings,
@@ -401,6 +491,7 @@ describe("maze.discardIfEmpty", () => {
     await caller.maze.saveDraft({
       id: created.id,
       data: { ...emptyDraft(), cells: [{ x: 0, y: 0 }] },
+      expectedVersion: 0,
     });
 
     await caller.maze.discardIfEmpty({ id: created.id });

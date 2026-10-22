@@ -67,7 +67,8 @@
     "matchNotDrawing": "This match is not accepting labyrinths.",
     "fieldRequired": "This field is required.",
     "emailInvalid": "Enter a valid email address.",
-    "matchNotCancellable": "Only a match still waiting for an opponent can be cancelled."
+    "matchNotCancellable": "Only a match still waiting for an opponent can be cancelled.",
+    "draftChangedElsewhere": "This labyrinth was changed somewhere else. Reload to see the latest version."
   },
   "play": {
     "title": "Your games",
@@ -190,7 +191,8 @@
     "redo": "Redo",
     "saveFailed": "Your changes could not be saved.",
     "retry": "Retry",
-    "useInMatch": "Use in this match"
+    "useInMatch": "Use in this match",
+    "reload": "Reload"
   },
   "lobby": {
     "title": "Match",

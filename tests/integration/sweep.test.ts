@@ -38,7 +38,11 @@ async function savedMaze(
   name: string,
 ) {
   const created = await caller.maze.createDraft({ name, ...settings });
-  await caller.maze.saveDraft({ id: created.id, data: solvableDraft() });
+  await caller.maze.saveDraft({
+    id: created.id,
+    data: solvableDraft(),
+    expectedVersion: 0,
+  });
   return created.id;
 }
 

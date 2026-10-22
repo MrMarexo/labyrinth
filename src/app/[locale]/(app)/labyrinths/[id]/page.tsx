@@ -58,6 +58,7 @@ export default async function EditorPage({
         id={row.id}
         name={row.name}
         initial={parsed.data}
+        version={row.version}
         cellCount={row.cellCount}
         gateCount={row.gateCount}
         forMatch={forMatch}

@@ -37,6 +37,8 @@ export type MazeEditorProps = {
   id: string;
   name: string;
   initial: DraftMaze;
+  /** The server's version of `initial`, which the first save must match. */
+  version: number;
   cellCount: number;
   gateCount: number;
   /** The match this editor was opened from, checked by the page. */
@@ -47,6 +49,7 @@ export function MazeEditor({
   id,
   name,
   initial,
+  version,
   cellCount,
   gateCount,
   forMatch,
@@ -89,6 +92,9 @@ export function MazeEditor({
   // very next edit's autosave resend the lost work instead of the gap going
   // unnoticed forever.
   const lastSentRef = useRef<DraftMaze>(initial);
+  // The server's version of `lastSentRef`'s draft, sent with every save as
+  // its precondition. Moves only with `lastSentRef`, on a successful save.
+  const versionRef = useRef(version);
   // Whether a saveDraft call is currently in flight.
   const savingRef = useRef(false);
   // Set when something wants to send while a call is already in flight —
@@ -114,8 +120,9 @@ export function MazeEditor({
     // `mutateAsync`, not `mutate` with callbacks: TanStack Query drops a
     // `mutate` call's callbacks once the component has unmounted, and this
     // pipeline has to keep going after the author navigates away.
-    const onSuccess = () => {
+    const onSuccess = (result: { version: number }) => {
       lastSentRef.current = draft;
+      versionRef.current = result.version;
       if (mountedRef.current) {
         setSaveError(null);
         setSavedDraft(draft);
@@ -168,7 +175,7 @@ export function MazeEditor({
       afterLeaving();
     };
     saveDraft
-      .mutateAsync({ id, data: draft })
+      .mutateAsync({ id, data: draft, expectedVersion: versionRef.current })
       .then(onSuccess, onError)
       .finally(onSettled);
   }

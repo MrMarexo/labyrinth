@@ -187,7 +187,11 @@ describe("run.result", () => {
       cellCount: 36,
       gateCount: 1,
     });
-    await host.maze.saveDraft({ id: draft.id, data: gatedMazeDraft() });
+    await host.maze.saveDraft({
+      id: draft.id,
+      data: gatedMazeDraft(),
+      expectedVersion: 0,
+    });
     await host.match.submitMaze({ matchId: created.id, mazeId: draft.id });
     await db
       .update(match)
