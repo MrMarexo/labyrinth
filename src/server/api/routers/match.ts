@@ -9,7 +9,12 @@ import {
   matchCodeSchema,
   runChannel,
 } from "~/match";
-import { CELL_COUNT_PRESETS, MAX_GATES, validateMaze } from "~/maze";
+import {
+  CELL_COUNT_PRESETS,
+  MAX_GATES,
+  draftMazeSchema,
+  validateMaze,
+} from "~/maze";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { match, matchPlayer, maze, user } from "~/server/db/schema";
 import {
@@ -151,10 +156,13 @@ export const matchRouter = createTRPCRouter({
       const now = new Date();
 
       const joined = await ctx.db.transaction(async (tx) => {
+        // Locked, so a join racing `cancel` either waits for the delete and
+        // then finds nothing, or seats its player before the cancel looks.
         const [row] = await tx
           .select()
           .from(match)
-          .where(eq(match.code, input.code));
+          .where(eq(match.code, input.code))
+          .for("update");
         if (!row) {
           throw new TRPCError({
             code: "NOT_FOUND",
@@ -338,16 +346,54 @@ export const matchRouter = createTRPCRouter({
       ];
       if (faced.length > 0) conditions.push(notInArray(maze.id, faced));
 
-      return ctx.db
+      // `data` is for the picker's previews. Author-facing: the first
+      // condition limits this to the caller's own mazes, never the
+      // opponent's (invariant 1).
+      const rows = await ctx.db
         .select({
           id: maze.id,
           name: maze.name,
-          status: maze.status,
           updatedAt: maze.updatedAt,
+          data: maze.data,
         })
         .from(maze)
         .where(and(...conditions))
         .orderBy(desc(maze.updatedAt));
+      return rows.map((row) => ({
+        ...row,
+        data: draftMazeSchema.parse(row.data),
+      }));
+    }),
+
+  /**
+   * Deletes a match nobody has joined yet (spec §9). The players cascade,
+   * and no maze can have been submitted to it. Anything past
+   * `awaiting_opponent` is refused: the opponent has a stake by then.
+   */
+  cancel: protectedProcedure
+    .input(z.object({ matchId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.db.transaction(async (tx) => {
+        // Locked like `join`, which locks the same row first, so the status
+        // read here is the one the delete acts on.
+        const found = await participantRows(
+          tx,
+          input.matchId,
+          ctx.session.user.id,
+          { lock: true },
+        );
+        if (!found) notYours();
+        if (found.row.status !== "awaiting_opponent") {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "errors.matchNotCancellable",
+          });
+        }
+        await tx.delete(match).where(eq(match.id, found.row.id));
+      });
+
+      await publishMatchChanged(input.matchId);
+      return { id: input.matchId };
     }),
 
   submitMaze: protectedProcedure

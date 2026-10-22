@@ -21,3 +21,10 @@ that needs the maze is a design conversation, not an implementation detail.
 `run.get` is the runner's read and must stay free of `maze.data`: everything it
 returns comes from `runState.view`, which is built only from deltas the runner
 was already sent.
+
+## Author-facing reads
+
+`maze.get` and `match.eligibleMazes` also return `maze.data`, but only for
+mazes whose `authorId` is the caller — their own drawings, for the editor and
+the lobby picker's previews. Both filter on the author in the query itself.
+Keep that filter first, and never widen either to someone else's maze.

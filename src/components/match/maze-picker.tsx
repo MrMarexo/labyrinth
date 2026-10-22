@@ -90,9 +90,6 @@ export function MazePicker({ matchId, selected, onSelect }: MazePickerProps) {
               className={optionClass(active)}
             >
               <span>{m.name}</span>
-              <span className="text-muted text-xs">
-                {m.status === "submitted" ? t("mazeSubmitted") : t("mazeDraft")}
-              </span>
             </button>
           );
         })}

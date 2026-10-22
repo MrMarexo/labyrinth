@@ -65,7 +65,8 @@
     "alreadySubmitted": "You have already submitted a labyrinth.",
     "matchNotDrawing": "This match is not accepting labyrinths.",
     "fieldRequired": "This field is required.",
-    "emailInvalid": "Enter a valid email address."
+    "emailInvalid": "Enter a valid email address.",
+    "matchNotCancellable": "Only a match still waiting for an opponent can be cancelled."
   },
   "play": {
     "title": "Your games",
@@ -192,8 +193,6 @@
     "pickHeading": "Your labyrinths at this size",
     "noneEligible": "You have no labyrinths at this size yet.",
     "drawNew": "Draw a new one",
-    "mazeDraft": "Draft",
-    "mazeSubmitted": "Already submitted",
     "submit": "Submit this labyrinth",
     "submitting": "Submitting…",
     "confirmSubmit": "Submit {name}? It can never be edited again.",

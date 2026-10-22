@@ -157,3 +157,17 @@ describe("match.get channels", () => {
     });
   });
 });
+
+describe("publishing a cancel", () => {
+  it("pings the match once the cancel has committed", async () => {
+    const host = createCaller(await signedIn());
+    const created = await host.match.create({ cellCount: 36, gateCount: 0 });
+    events = [];
+
+    await host.match.cancel({ matchId: created.id });
+
+    expect(on(matchChannel(created.id))).toEqual([
+      { channel: matchChannel(created.id), event: EVENTS.changed, data: {} },
+    ]);
+  });
+});

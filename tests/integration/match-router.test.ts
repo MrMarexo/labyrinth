@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 
 import { CODE_LENGTH, HOURS_24_MS, HOURS_48_MS } from "~/match";
@@ -715,5 +715,105 @@ describe("match.eligibleMazes", () => {
       message: "errors.notYourMatch",
     });
     expect(missing).toEqual(notMine);
+  });
+});
+
+describe("match.eligibleMazes data", () => {
+  it("returns each offered maze's own drawing, and never the opponent's", async () => {
+    const hostCtx = await signedIn();
+    const host = createCaller(hostCtx);
+    const guest = createCaller(await signedIn());
+    const created = await host.match.create(settings);
+    await guest.match.join({ code: created.code });
+
+    const mine = await savedMaze(host, "Mine with data");
+    const theirs = await savedMaze(guest, "Theirs with data");
+
+    const offered = await host.match.eligibleMazes({ matchId: created.id });
+    expect(offered.map((m) => m.id)).not.toContain(theirs);
+    expect(offered.find((m) => m.id === mine)?.data).toEqual(solvableDraft());
+
+    // Every drawing returned belongs to the caller (invariant 1).
+    const rows = await db
+      .select({ id: maze.id, authorId: maze.authorId })
+      .from(maze)
+      .where(
+        inArray(
+          maze.id,
+          offered.map((m) => m.id),
+        ),
+      );
+    expect(rows).toHaveLength(offered.length);
+    for (const row of rows) {
+      expect(row.authorId).toBe(hostCtx.session!.user.id);
+    }
+  });
+});
+
+describe("match.cancel", () => {
+  it("deletes a waiting match and its players, then publishes", async () => {
+    const host = createCaller(await signedIn());
+    const created = await host.match.create(settings);
+
+    expect(await host.match.cancel({ matchId: created.id })).toEqual({
+      id: created.id,
+    });
+
+    expect(
+      await db.select().from(match).where(eq(match.id, created.id)),
+    ).toEqual([]);
+    expect(
+      await db
+        .select()
+        .from(matchPlayer)
+        .where(eq(matchPlayer.matchId, created.id)),
+    ).toEqual([]);
+    expect((await host.match.list()).map((m) => m.id)).not.toContain(
+      created.id,
+    );
+  });
+
+  it("refuses once the match is drawing", async () => {
+    const host = createCaller(await signedIn());
+    const created = await host.match.create(settings);
+    await createCaller(await signedIn()).match.join({ code: created.code });
+
+    expect(await rejection(host.match.cancel({ matchId: created.id }))).toEqual(
+      { code: "CONFLICT", message: "errors.matchNotCancellable" },
+    );
+    const [row] = await db.select().from(match).where(eq(match.id, created.id));
+    expect(row?.status).toBe("drawing");
+  });
+
+  it("refuses a stranger, indistinguishably from a match that does not exist", async () => {
+    const host = createCaller(await signedIn());
+    const created = await host.match.create(settings);
+    const stranger = createCaller(await signedIn());
+
+    const notMine = await rejection(
+      stranger.match.cancel({ matchId: created.id }),
+    );
+    const missing = await rejection(
+      stranger.match.cancel({ matchId: crypto.randomUUID() }),
+    );
+    expect(notMine).toEqual({
+      code: "FORBIDDEN",
+      message: "errors.notYourMatch",
+    });
+    expect(missing).toEqual(notMine);
+    const [row] = await db.select().from(match).where(eq(match.id, created.id));
+    expect(row?.status).toBe("awaiting_opponent");
+  });
+
+  it("leaves the code unknown to anyone joining afterwards", async () => {
+    const host = createCaller(await signedIn());
+    const created = await host.match.create(settings);
+    await host.match.cancel({ matchId: created.id });
+
+    expect(
+      await rejection(
+        createCaller(await signedIn()).match.join({ code: created.code }),
+      ),
+    ).toEqual({ code: "NOT_FOUND", message: "errors.matchCodeUnknown" });
   });
 });

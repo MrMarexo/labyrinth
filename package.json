@@ -35,6 +35,7 @@
     "better-auth": "^1.7.5",
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.41.0",
+    "lucide-react": "1.52.0",
     "next": "^15.2.3",
     "next-intl": "^4.14.5",
     "pusher": "^5.3.4",
