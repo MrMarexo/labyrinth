@@ -660,3 +660,18 @@ describe("lowestUnplaced", () => {
     expect(lowestUnplaced("key", next.draft, 3)).toBe(2);
   });
 });
+
+describe("load", () => {
+  it("replaces the draft with the one given, by reference, with no history", () => {
+    const edited = apply(start(), { type: "paintCell", at: { x: 0, y: 0 } });
+    expect(edited.past).toHaveLength(1);
+    const fresh = { ...emptyDraft(), cells: [{ x: 5, y: 5 }] };
+
+    const loaded = editorReducer(edited, { type: "load", draft: fresh });
+
+    expect(loaded.draft).toBe(fresh);
+    expect(loaded.past).toEqual([]);
+    expect(loaded.future).toEqual([]);
+    expect(loaded.strokeBase).toBeNull();
+  });
+});

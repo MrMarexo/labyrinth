@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 import { signUp, signUpAndOpenNewMaze } from "./support/maze";
 
@@ -214,5 +214,100 @@ test.describe("leaving the editor", () => {
 
     await page.reload();
     await expect(page.getByRole("link", { name: "Test maze" })).toHaveCount(0);
+  });
+});
+
+test.describe("a stale copy of the editor", () => {
+  /** Resolves once a save has answered 200. */
+  function saved(page: Page) {
+    return page.waitForResponse(
+      (r) => r.url().includes("/api/trpc/maze.saveDraft") && r.status() === 200,
+    );
+  }
+
+  test("going Back to the editor shows the saved draft, and the next save keeps it", async ({
+    page,
+  }) => {
+    await signUpAndOpenNewMaze(page);
+    const first = saved(page);
+    await page.locator('[data-cell="0,0"]').click();
+    await first;
+    await expect(page.locator("[data-save-state]")).toHaveAttribute(
+      "data-save-state",
+      "saved",
+    );
+
+    await page.getByRole("link", { name: "Labyrinths" }).click();
+    await expect(page).toHaveURL(/\/en\/labyrinths$/);
+    await page.goBack();
+    await expect(page).toHaveURL(/\/en\/labyrinths\/[^/]+$/);
+
+    // The router may hand back the page as first rendered; the editor
+    // refreshes itself on open.
+    await expect(page.locator("[data-budget]")).toHaveText("1 / 36 squares");
+    const second = saved(page);
+    await page.locator('[data-cell="1,0"]').click();
+    await second;
+    await expect(page.locator("[data-save-state]")).toHaveAttribute(
+      "data-save-state",
+      "saved",
+    );
+
+    await page.reload();
+    await expect(page.locator("[data-budget]")).toHaveText("2 / 36 squares");
+  });
+
+  test("a second tab that saves over newer work is refused, and the first tab's work survives", async ({
+    page,
+    browser,
+  }) => {
+    await signUpAndOpenNewMaze(page);
+    const url = page.url();
+
+    const other = await browser.newContext({
+      storageState: await page.context().storageState(),
+    });
+    try {
+      const second = await other.newPage();
+      // Opened, and refreshed on open, before the first tab saves anything.
+      const fetched = second.waitForResponse((r) =>
+        r.url().includes("/api/trpc/maze.get"),
+      );
+      await second.goto(url);
+      await expect(second.locator("svg[data-board]")).toBeVisible();
+      await fetched;
+
+      const first = saved(page);
+      await page.locator('[data-cell="0,0"]').click();
+      await first;
+
+      // The batch link streams, so a refusal still arrives as a 200; the
+      // banner is the signal.
+      await second.locator('[data-cell="5,5"]').click();
+      const banner = second.locator("[data-save-error]");
+      await expect(banner).toContainText(
+        "This labyrinth was changed somewhere else. Reload to see the latest version.",
+      );
+      // Locked: no retry of the refused draft, no more edits.
+      await expect(second.getByRole("button", { name: "Retry" })).toHaveCount(
+        0,
+      );
+      await expect(second.getByRole("button", { name: "Undo" })).toBeDisabled();
+
+      await second.getByRole("button", { name: "Reload" }).click();
+      await expect(second.locator("[data-budget]")).toHaveText(
+        "1 / 36 squares",
+      );
+      await expect(second.locator("[data-save-error]")).toHaveCount(0);
+
+      await page.reload();
+      await expect(page.locator("[data-budget]")).toHaveText("1 / 36 squares");
+      await expect(page.locator('[data-cell="0,0"]')).toHaveAttribute(
+        "aria-label",
+        /painted/,
+      );
+    } finally {
+      await other.close();
+    }
   });
 });

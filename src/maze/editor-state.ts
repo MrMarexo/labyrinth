@@ -51,7 +51,12 @@ export type EditorAction =
   | { type: "undo" }
   | { type: "redo" }
   | { type: "beginStroke" }
-  | { type: "endStroke" };
+  | { type: "endStroke" }
+  /**
+   * Starts over from `draft` as if it had just been opened: no history, and
+   * the same reference-preserving cleanup as `initialEditorState`.
+   */
+  | { type: "load"; draft: DraftMaze };
 
 export function initialEditorState(draft: DraftMaze): EditorState {
   return {
@@ -105,6 +110,8 @@ export function editorReducer(
   state: EditorState,
   action: EditorAction,
 ): EditorState {
+  if (action.type === "load") return initialEditorState(action.draft);
+
   if (action.type === "beginStroke") {
     if (state.strokeBase !== null) return state;
     return { ...state, strokeBase: state.draft };

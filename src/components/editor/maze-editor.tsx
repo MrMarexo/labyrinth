@@ -113,6 +113,42 @@ export function MazeEditor({
   // rather than a value some earlier closure captured.
   const draftRef = useRef(state.draft);
   draftRef.current = state.draft;
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
+  // `initial` can be stale: Next's router cache replays the page as first
+  // rendered on Back and Forward, and a prefetch can cache it mid-save. So
+  // the editor asks the server again on open. A newer version replaces the
+  // draft only while the author has not touched it; once they have, their
+  // edits stay, and the save's version check turns the clash into a
+  // `draftChangedElsewhere` conflict instead of a silent overwrite.
+  const fresh = api.maze.get.useQuery(
+    { id },
+    {
+      staleTime: 0,
+      gcTime: 0,
+      refetchOnMount: "always",
+      refetchOnWindowFocus: false,
+    },
+  );
+  useEffect(() => {
+    const latest = fresh.data;
+    if (!latest) return;
+    if (latest.status === "submitted") {
+      setLocked(true);
+      setSaveError({ key: "errors.mazeIsSubmitted" });
+      return;
+    }
+    if (latest.version <= versionRef.current || savingRef.current) return;
+    const { past, future, strokeBase } = stateRef.current;
+    if (past.length > 0 || future.length > 0 || strokeBase !== null) return;
+    // The same object the reducer loads, so the autosave's first-render
+    // guard holds again and the fresh draft is not written straight back.
+    lastSentRef.current = latest.data;
+    versionRef.current = latest.version;
+    setSavedDraft(latest.data);
+    dispatch({ type: "load", draft: latest.data });
+  }, [fresh.data]);
 
   function send(draft: DraftMaze) {
     savingRef.current = true;
@@ -153,7 +189,14 @@ export function MazeEditor({
       // but the rule ("mazes are never edited once finished") has to
       // hold the day that becomes reachable, not the day someone
       // remembers to add a check for it.
-      if (resolved.key === "errors.mazeIsSubmitted") setLocked(true);
+      // Neither is fixed by sending again: a used maze is final, and a
+      // stale copy would overwrite whatever the other copy saved.
+      if (
+        resolved.key === "errors.mazeIsSubmitted" ||
+        resolved.key === "errors.draftChangedElsewhere"
+      ) {
+        setLocked(true);
+      }
       setSaveError(resolved);
       // Deliberately no corrective send here: `lastSentRef` stays at its
       // old value on a failure, so a blind recheck would find the live
@@ -449,6 +492,15 @@ export function MazeEditor({
                 className="border-border-strong rounded border px-2 py-1 text-xs"
               >
                 {t("editor.retry")}
+              </button>
+            )}
+            {saveError.key === "errors.draftChangedElsewhere" && (
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                className="border-border-strong rounded border px-2 py-1 text-xs"
+              >
+                {t("editor.reload")}
               </button>
             )}
           </div>
