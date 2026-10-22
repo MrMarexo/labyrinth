@@ -46,6 +46,8 @@ quietly rather than loudly.
 1. **No procedure reachable by a runner may select `maze.data`.** The maze is
    secret; a runner learning it ends the game. Author-facing and runner-facing
    reads are separate procedures with separate return types.
+   `match.eligibleMazes` returns `data` only for the caller's own mazes, for
+   the lobby picker's previews: an author-facing read, so it is allowed.
 2. **`src/maze/` and `src/match/` import nothing** from Next, React, tRPC or
    Drizzle. They are pure functions over plain data, shared by the server, the
    live spectator view, the replay view and eventually a mobile client. ESLint

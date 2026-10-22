@@ -116,6 +116,45 @@ test.describe("the lobby's maze picker", () => {
   });
 });
 
+test.describe("the editor's match check", () => {
+  test("offers no use button for a match you are not in, or at another size", async ({
+    players,
+  }) => {
+    const host = await players({
+      name: "Wrong size",
+      cellCount: 64,
+      gateCount: 0,
+    });
+    const guest = await players({ name: "Other", cellCount: 36, gateCount: 0 });
+    const outsider = await players({
+      name: "Outsider's",
+      cellCount: 36,
+      gateCount: 0,
+    });
+    const code = await createMatch(host, { cells: 36, gates: 0 });
+    const matchId = host.url().split("/").at(-1)!;
+    await join(guest, code);
+
+    /** Opens the player's only labyrinth with `?match=` pointing here. */
+    async function openWithMatch(page: Page, name: string) {
+      await page.goto("/en/labyrinths");
+      await page.getByRole("link", { name }).click();
+      await expect(page.locator("svg[data-board]")).toBeVisible();
+      await page.goto(`${page.url()}?match=${matchId}`);
+      await expect(page.locator("svg[data-board]")).toBeVisible();
+      await expect(page.locator("[data-save-state]")).toBeAttached();
+    }
+
+    // In the match, but the labyrinth is 64 squares and the match 36.
+    await openWithMatch(host, "Wrong size");
+    await expect(host.locator("[data-use-in-match]")).toHaveCount(0);
+
+    // The right size, but not their match.
+    await openWithMatch(outsider, "Outsider's");
+    await expect(outsider.locator("[data-use-in-match]")).toHaveCount(0);
+  });
+});
+
 test.describe("cancelling a waiting match", () => {
   test("removes it from the list, and its code stops working", async ({
     players,

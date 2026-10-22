@@ -1,3 +1,4 @@
+import { TRPCError } from "@trpc/server";
 import { and, eq, inArray } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 
@@ -815,5 +816,51 @@ describe("match.cancel", () => {
         createCaller(await signedIn()).match.join({ code: created.code }),
       ),
     ).toEqual({ code: "NOT_FOUND", message: "errors.matchCodeUnknown" });
+  });
+});
+
+/** A settled tRPC call's error as `{ code, message }`, or its status. */
+function failure(result: PromiseSettledResult<unknown>) {
+  if (result.status === "rejected" && result.reason instanceof TRPCError) {
+    return { code: result.reason.code, message: result.reason.message };
+  }
+  return result.status;
+}
+
+describe("match.cancel racing match.join", () => {
+  it("ends in exactly one of the two valid states", async () => {
+    const host = createCaller(await signedIn());
+    const guest = createCaller(await signedIn());
+    const created = await host.match.create(settings);
+
+    const [cancelled, joined] = await Promise.allSettled([
+      host.match.cancel({ matchId: created.id }),
+      guest.match.join({ code: created.code }),
+    ]);
+
+    const rows = await db.select().from(match).where(eq(match.id, created.id));
+    const players = await db
+      .select()
+      .from(matchPlayer)
+      .where(eq(matchPlayer.matchId, created.id));
+
+    if (cancelled.status === "fulfilled") {
+      // The cancel won: the match is gone and the join found nothing.
+      expect(rows).toEqual([]);
+      expect(players).toEqual([]);
+      expect(failure(joined)).toEqual({
+        code: "NOT_FOUND",
+        message: "errors.matchCodeUnknown",
+      });
+    } else {
+      // The join won: both are seated and the cancel was refused.
+      expect(joined.status).toBe("fulfilled");
+      expect(failure(cancelled)).toEqual({
+        code: "CONFLICT",
+        message: "errors.matchNotCancellable",
+      });
+      expect(rows[0]?.status).toBe("drawing");
+      expect(players).toHaveLength(2);
+    }
   });
 });
