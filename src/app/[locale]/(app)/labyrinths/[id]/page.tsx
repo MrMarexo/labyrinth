@@ -1,8 +1,9 @@
 import { notFound } from "next/navigation";
 
 import { MazeEditor } from "~/components/editor/maze-editor";
+import { ReadOnlyMaze } from "~/components/editor/read-only-maze";
 import { mayUseInMatch } from "~/match";
-import { draftMazeSchema } from "~/maze";
+import { draftMazeSchema, draftToMaze } from "~/maze";
 import { api } from "~/trpc/server";
 
 export default async function EditorPage({
@@ -20,6 +21,23 @@ export default async function EditorPage({
 
   const parsed = draftMazeSchema.safeParse(row.data);
   if (!parsed.success) notFound();
+
+  // Used in a match: never edited again, so no editor at all, and any
+  // `?match=` is beside the point.
+  if (row.status === "submitted") {
+    const maze = draftToMaze(parsed.data);
+    if (!maze) notFound();
+    return (
+      <main className="mx-auto max-w-5xl p-8">
+        <ReadOnlyMaze
+          name={row.name}
+          cellCount={row.cellCount}
+          gateCount={row.gateCount}
+          maze={maze}
+        />
+      </main>
+    );
+  }
 
   // Opened from a match's lobby: offer to use the maze there, but only if
   // that could succeed. A match the caller is not in reads the same as one

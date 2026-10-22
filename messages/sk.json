@@ -87,7 +87,9 @@
     "confirmDelete": "Potvrdiť zmazanie {name}",
     "confirmDeleteShort": "Potvrdiť",
     "deleteCancel": "Zrušiť",
-    "deleting": "Maže sa…"
+    "deleting": "Maže sa…",
+    "readOnly": "Toto bludisko už bolo použité v zápase, preto ho nemožno upraviť. Môžete ho znova použiť v iných zápasoch rovnakej veľkosti.",
+    "backToList": "Späť na vaše bludiská"
   },
   "matches": {
     "title": "Vaše zápasy",

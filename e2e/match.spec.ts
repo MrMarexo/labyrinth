@@ -60,11 +60,12 @@ test.describe("match lifecycle", () => {
     await expect(host.locator("[data-run-view]")).toBeVisible();
   });
 
-  test("a submitted labyrinth can no longer be edited", async ({ players }) => {
+  test("a submitted labyrinth opens read-only", async ({ players }) => {
     const host = await players({ name: "One way", ...SIZE });
     const guest = await players({ name: "Theirs", ...SIZE });
 
     const code = await createMatch(host, { cells: 36, gates: 0 });
+    const matchId = host.url().split("/").at(-1)!;
     await guest.goto("/en/matches");
     await guest.getByLabel("Join code").fill(code);
     await guest.getByRole("button", { name: "Join" }).click();
@@ -79,37 +80,42 @@ test.describe("match lifecycle", () => {
       "true",
     );
 
-    // The library still lists it...
+    // Any save attempt at all would mean the editor was mounted. The
+    // server's own refusal (`errors.mazeIsSubmitted`) is covered by the
+    // match router's integration tests.
+    const saves: string[] = [];
+    host.on("request", (r) => {
+      if (r.url().includes("maze.saveDraft")) saves.push(r.url());
+    });
+
+    // The library still lists it, and opens it as a picture, not an editor.
     await host.goto("/en/labyrinths");
-    await expect(host.getByRole("link", { name: "One way" })).toBeVisible();
-
-    // ...but the editor must refuse to change it. Merely checking the name
-    // is still listed would not prove that — it would pass identically if
-    // the editor silently let the edit through. Opening it and attempting a
-    // real edit is what actually exercises `errors.mazeIsSubmitted`
-    // (`src/server/api/routers/maze.ts`'s `saveDraft`).
     await host.getByRole("link", { name: "One way" }).click();
-    await expect(host.locator("svg[data-board]")).toBeVisible();
-
-    // The seeded maze (`openMazeDraft`) has every square already painted,
-    // so clicking one with the default "Paint" tool is a no-op that never
-    // reaches the network — switch to "Erase square" first so the click is
-    // a real edit that triggers the autosave this test is about.
-    await host.getByRole("radio", { name: "Erase square" }).click();
-    const saveAttempt = host.waitForResponse(
-      (r) => r.url().includes("/api/trpc/maze.saveDraft") && r.status() !== 0,
+    const view = host.locator("[data-maze-readonly]");
+    await expect(view).toBeVisible();
+    await expect(
+      view.getByRole("heading", { name: "One way", level: 1 }),
+    ).toBeVisible();
+    await expect(view).toContainText("36 squares, 0 gates");
+    await expect(view).toContainText(
+      "This labyrinth has been used in a match, so it can't be edited. You can reuse it in other matches of the same size.",
     );
-    await host.locator('[data-cell="0,0"]').click();
-    await saveAttempt;
-
-    const banner = host.locator("[data-save-error]");
-    await expect(banner).toBeVisible();
-    await expect(banner).toContainText(
-      "This labyrinth has been submitted and can no longer be changed.",
+    expect(await view.locator("[data-outline]").count()).toBeGreaterThan(0);
+    await expect(host.locator("svg[data-board]")).toHaveCount(0);
+    await expect(host.getByRole("radio", { name: "Erase square" })).toHaveCount(
+      0,
     );
-    // Locked: no retry offered, and undo/redo are disabled.
-    await expect(host.getByRole("button", { name: "Retry" })).not.toBeVisible();
-    await expect(host.getByRole("button", { name: "Undo" })).toBeDisabled();
+    await expect(host.getByRole("button", { name: "Undo" })).toHaveCount(0);
+
+    // A `?match=` link to it changes nothing: still read-only, no use button.
+    await host.goto(`${host.url()}?match=${matchId}`);
+    await expect(view).toBeVisible();
+    await expect(host.locator("[data-use-in-match]")).toHaveCount(0);
+
+    // And back to the list.
+    await view.getByRole("link", { name: "Back to your labyrinths" }).click();
+    await expect(host).toHaveURL(/\/en\/labyrinths$/);
+    expect(saves).toEqual([]);
   });
 
   test("an unknown join code is refused with a translated message", async ({

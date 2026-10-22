@@ -87,7 +87,9 @@
     "confirmDelete": "Confirm delete {name}",
     "confirmDeleteShort": "Confirm",
     "deleteCancel": "Cancel",
-    "deleting": "Deleting…"
+    "deleting": "Deleting…",
+    "readOnly": "This labyrinth has been used in a match, so it can't be edited. You can reuse it in other matches of the same size.",
+    "backToList": "Back to your labyrinths"
   },
   "matches": {
     "title": "Your matches",
