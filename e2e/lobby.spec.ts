@@ -179,6 +179,51 @@ test.describe("the lobby's maze picker", () => {
   });
 });
 
+test.describe("leaving the editor for the lobby", () => {
+  test("drawing a new one waits for the last editor to finish leaving", async ({
+    players,
+  }) => {
+    const host = await players({ name: "Seed", cellCount: 64, gateCount: 0 });
+    const guest = await players({ name: "Other", cellCount: 36, gateCount: 0 });
+    const code = await createMatch(host, { cells: 36, gates: 0 });
+    const matchId = host.url().split("/").at(-1)!;
+    await join(guest, code);
+
+    await host.reload();
+    await host.getByRole("button", { name: "Draw a new one" }).click();
+    await expect(host).toHaveURL(/\/en\/labyrinths\/[^/?]+\?match=/);
+    const left = new URL(host.url()).pathname;
+    await host.locator('[data-cell="0,0"]').click();
+    await expect(host.locator("[data-save-state]")).toHaveAttribute(
+      "data-save-state",
+      "saved",
+    );
+
+    // From here every save reaches the database at once, but its answer
+    // takes three seconds to come back: the flush on the way out is still
+    // in flight while the author is already back in the lobby.
+    await host.route("**/api/trpc/maze.saveDraft*", async (route) => {
+      const response = await route.fetch();
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+      await route.fulfill({ response });
+    });
+    await host.getByRole("radio", { name: "Erase square" }).click();
+    await host.locator('[data-cell="0,0"]').click();
+    await host.getByRole("link", { name: "Matches" }).click();
+    await host.locator(`a[href$="/matches/${matchId}"]`).click();
+    await host.getByRole("button", { name: "Draw a new one" }).click();
+    await expect(host).toHaveURL(/\/en\/labyrinths\/[^/?]+\?match=/);
+
+    // Not the draft that was being discarded on the way out: this one is
+    // still there once everything has settled.
+    expect(new URL(host.url()).pathname).not.toBe(left);
+    await host.waitForTimeout(4000);
+    await host.reload();
+    await expect(host.locator("svg[data-board]")).toBeVisible();
+    await expect(host.locator("[data-budget]")).toHaveText("0 / 36 squares");
+  });
+});
+
 test.describe("the editor's match check", () => {
   test("offers no use button for a match you are not in, or at another size", async ({
     players,

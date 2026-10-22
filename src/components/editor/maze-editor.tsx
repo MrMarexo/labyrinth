@@ -109,6 +109,9 @@ export function MazeEditor({
   const mountedRef = useRef(true);
   // Set once the way-out discard has been fired, so it fires at most once.
   const discardedRef = useRef(false);
+  // Resolves the promise registered at unmount, which covers the flush and
+  // the discard together; null when no leave is under way.
+  const leftRef = useRef<(() => void) | null>(null);
   // Mirrors `state.draft` so the pipeline below always reads the live draft
   // rather than a value some earlier closure captured.
   const draftRef = useRef(state.draft);
@@ -234,31 +237,47 @@ export function MazeEditor({
     if (mountedRef.current || savingRef.current) return;
     const synced = draftRef.current === lastSentRef.current;
     if (!synced || draftRef.current.cells.length > 0) {
-      refreshAfterLeaving();
+      finishLeaving();
       return;
     }
     if (discardedRef.current) return;
     discardedRef.current = true;
     // A tick later, and only if still unmounted: StrictMode's development
     // remount runs this cleanup on a live editor and then mounts it again.
+    void Promise.resolve().then(async () => {
+      if (mountedRef.current) {
+        discardedRef.current = false;
+        finishLeaving();
+        return;
+      }
+      try {
+        await discardIfEmpty.mutateAsync({ id });
+      } catch {
+        // Left in place; draftForMatch may hand it out again, harmlessly.
+      } finally {
+        finishLeaving();
+      }
+    });
+  }
+
+  /**
+   * Called once at unmount, before the flush: "Draw a new one" waits on
+   * this, so it can never be handed the draft this leave is about to
+   * discard, even while the flush is still in flight.
+   */
+  function beginLeaving() {
     trackDiscard(
-      Promise.resolve().then(async () => {
-        if (mountedRef.current) {
-          discardedRef.current = false;
-          return;
-        }
-        try {
-          await discardIfEmpty.mutateAsync({ id });
-        } finally {
-          refreshAfterLeaving();
-        }
+      new Promise<void>((resolve) => {
+        leftRef.current = resolve;
       }),
     );
   }
 
-  /** The list the author is most likely going back to. */
-  function refreshAfterLeaving() {
+  /** Ends the leave: settles its promise and refreshes the list. */
+  function finishLeaving() {
     void utils.maze.list.invalidate();
+    leftRef.current?.();
+    leftRef.current = null;
   }
 
   // The single entry point for "there might be something to save". Sends
@@ -283,6 +302,8 @@ export function MazeEditor({
   maybeSendRef.current = maybeSend;
   const afterLeavingRef = useRef(afterLeaving);
   afterLeavingRef.current = afterLeaving;
+  const beginLeavingRef = useRef(beginLeaving);
+  beginLeavingRef.current = beginLeaving;
 
   // Autosave. Debounced at AUTOSAVE_MS: every edit resets the timer, so a
   // burst of clicks produces one request after the author pauses, not one
@@ -309,6 +330,7 @@ export function MazeEditor({
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
+      beginLeavingRef.current();
       maybeSendRef.current();
       afterLeavingRef.current();
     };

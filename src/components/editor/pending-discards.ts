@@ -1,7 +1,8 @@
 /**
- * Discards the editor fired on its way out that have not settled yet. "Draw
- * a new one" waits on these first: it may reuse an empty draft, and must not
- * be handed the very one a just-closed editor is deleting.
+ * Editors still leaving: each closed editor registers one promise at unmount
+ * that settles once its flush and any discard are done. "Draw a new one"
+ * waits on these first: it may reuse an empty draft, and must not be handed
+ * the very one a just-closed editor is about to delete.
  */
 const pending = new Set<Promise<unknown>>();
 
