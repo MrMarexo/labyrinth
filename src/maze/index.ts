@@ -14,6 +14,7 @@ export * from "./format";
 export * from "./geometry";
 export * from "./normalize";
 export * from "./playback";
+export * from "./predict";
 export * from "./reduce";
 export * from "./replay";
 export * from "./run";

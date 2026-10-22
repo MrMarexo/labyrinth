@@ -99,7 +99,11 @@ describe("resolveCompletion", () => {
     fc.assert(
       fc.property(arbFinished("a"), arbFinished("b"), (a, b) => {
         const expected =
-          a.penalties < b.penalties ? "a" : a.penalties > b.penalties ? "b" : null;
+          a.penalties < b.penalties
+            ? "a"
+            : a.penalties > b.penalties
+              ? "b"
+              : null;
         expect(resolveCompletion([a, b])).toEqual({
           kind: "complete",
           winnerId: expected,

@@ -43,6 +43,23 @@ describe("frameAt", () => {
     }
   });
 
+  it("knows the passages crossed so far, and not the bump", () => {
+    // S, S onto the key, then S into the wall.
+    const frame = frameAt(loggedRoute(), 3);
+    expect(frame.map.passages).toEqual([
+      { o: "H", x: 0, y: 0 },
+      { o: "H", x: 0, y: 1 },
+    ]);
+    expect(frameAt(loggedRoute(), 0).map.passages).toEqual([]);
+  });
+
+  it("knows the gate as a passage once it has been crossed", () => {
+    const moves = loggedRoute();
+    const gate = { o: "H", x: 5, y: 2 };
+    expect(frameAt(moves, 8).map.passages).not.toContainEqual(gate);
+    expect(frameAt(moves, 9).map.passages).toContainEqual(gate);
+  });
+
   it("clamps a step outside the timeline", () => {
     const moves = loggedRoute();
     expect(frameAt(moves, -3)).toEqual(frameAt(moves, 0));

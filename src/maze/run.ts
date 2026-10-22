@@ -1,5 +1,6 @@
 import type { Direction, Maze, Point } from "./format";
-import { cellKey, edgeKey } from "./geometry";
+import { DIRECTIONS } from "./format";
+import { cellKey, edgeBetween, edgeKey, step, type Edge } from "./geometry";
 import {
   applyMove,
   initialRunState,
@@ -12,13 +13,20 @@ import {
 
 /**
  * Everything a runner knows about the maze they are solving: every cell they
- * have stood on and every segment they have bumped or crossed, in the
- * start-relative frame `RunnerDelta` uses. It is built from deltas and
- * nothing else, so it cannot hold anything a delta did not already disclose.
+ * have stood on, every segment they have bumped or crossed, and every edge
+ * they have walked through, in the start-relative frame `RunnerDelta` uses.
+ * It is built from deltas and nothing else, so it cannot hold anything a
+ * delta did not already disclose.
+ *
+ * `passages` is what lets the client move instantly through ground it has
+ * already covered (spec §7.3). A crossed gate is both a segment and a
+ * passage. Maps stored before passages existed lack the field, so readers go
+ * through `withPassages`.
  */
 export type DiscoveredMap = {
   cells: RevealedCell[];
   segments: RevealedSegment[];
+  passages: Edge[];
 };
 
 /** Where the runner is and what they have seen, in their own frame. */
@@ -35,7 +43,22 @@ export type StoredRun = { state: RunState; view: RunView };
 
 /** The runner knows one thing at the start: that they are on the start cell. */
 export function emptyMap(): DiscoveredMap {
-  return { cells: [{ x: 0, y: 0 }], segments: [] };
+  return { cells: [{ x: 0, y: 0 }], segments: [], passages: [] };
+}
+
+/** A stored map, with `passages` defaulted for one written before it existed. */
+export function withPassages(
+  map: Omit<DiscoveredMap, "passages"> & { passages?: Edge[] },
+): DiscoveredMap {
+  return { ...map, passages: map.passages ?? [] };
+}
+
+/** The edge a delta crossed, or null for a move that went nowhere. */
+export function crossedEdge(delta: RunnerDelta): Edge | null {
+  const to = cellKey(delta.at);
+  if (to === cellKey(delta.from)) return null;
+  const dir = DIRECTIONS.find((d) => cellKey(step(delta.from, d)) === to);
+  return dir ? edgeBetween(delta.from, dir) : null;
 }
 
 export function freshRun(maze: Maze): StoredRun {
@@ -46,9 +69,10 @@ export function freshRun(maze: Maze): StoredRun {
 }
 
 export function recordDelta(
-  map: DiscoveredMap,
+  stored: DiscoveredMap,
   delta: RunnerDelta,
 ): DiscoveredMap {
+  const map = withPassages(stored);
   let cells = map.cells;
   const cell = delta.revealedCell;
   if (cell) {
@@ -69,7 +93,13 @@ export function recordDelta(
     segments = [...segments, { ...segment }];
   }
 
-  return { cells, segments };
+  let passages = map.passages;
+  const crossed = crossedEdge(delta);
+  if (crossed && !passages.some((p) => edgeKey(p) === edgeKey(crossed))) {
+    passages = [...passages, crossed];
+  }
+
+  return { cells, segments, passages };
 }
 
 /**

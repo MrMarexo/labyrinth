@@ -2,7 +2,7 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 
 import { DIRECTIONS, type Direction, type Maze } from "~/maze/format";
-import { cellKey } from "~/maze/geometry";
+import { cellKey, edgeBetween, edgeKey, step } from "~/maze/geometry";
 import { applyMove, initialRunState } from "~/maze/reduce";
 import {
   advanceRun,
@@ -48,7 +48,11 @@ function walk(maze: Maze, dirs: readonly Direction[]) {
 
 describe("emptyMap", () => {
   it("knows only the start cell, at the origin", () => {
-    expect(emptyMap()).toEqual({ cells: [{ x: 0, y: 0 }], segments: [] });
+    expect(emptyMap()).toEqual({
+      cells: [{ x: 0, y: 0 }],
+      segments: [],
+      passages: [],
+    });
   });
 });
 
@@ -83,6 +87,42 @@ describe("recordDelta", () => {
     const { run } = walk(corridor(), ["W", "W"]);
     expect(run.view.map.segments).toEqual([
       { o: "V", x: -2, y: 0, kind: "wall" },
+    ]);
+  });
+
+  it("records the edge a move crossed as a passage", () => {
+    const { run } = walk(corridor(), ["W"]);
+    expect(run.view.map.passages).toEqual([{ o: "V", x: -1, y: 0 }]);
+  });
+
+  it("records a passage once, however often it is crossed", () => {
+    const { run } = walk(corridor(), ["W", "E", "W", "E"]);
+    expect(run.view.map.passages).toEqual([{ o: "V", x: -1, y: 0 }]);
+  });
+
+  it("records no passage for a bump", () => {
+    const { run } = walk(corridor(), ["E", "W", "W"]);
+    // E bumps the gate, W crosses to the key, W bumps the boundary.
+    expect(run.view.map.passages).toEqual([{ o: "V", x: -1, y: 0 }]);
+  });
+
+  it("records a crossed gate as both a segment and a passage", () => {
+    const { run } = walk(corridor(), ["W", "E", "E"]);
+    expect(run.view.map.segments).toEqual([
+      { o: "V", x: 0, y: 0, kind: "gate", gate: 1 },
+    ]);
+    expect(run.view.map.passages).toEqual([
+      { o: "V", x: -1, y: 0 },
+      { o: "V", x: 0, y: 0 },
+    ]);
+  });
+
+  it("accepts a map stored before passages were recorded", () => {
+    const maze = corridor();
+    const { delta } = applyMove(maze, initialRunState(maze), "W");
+    const legacy = { cells: [{ x: 0, y: 0 }], segments: [] };
+    expect(recordDelta(legacy as never, delta).passages).toEqual([
+      { o: "V", x: -1, y: 0 },
     ]);
   });
 
@@ -145,6 +185,31 @@ describe("the map holds nothing the runner has not touched", () => {
           const stoodOn = new Set(pathFrom(deltas).map(cellKey));
           const mapped = new Set(run.view.map.cells.map(cellKey));
           expect(mapped).toEqual(stoodOn);
+        },
+      ),
+    );
+  });
+
+  it("contains exactly the edges crossed, for any walk", () => {
+    const maze = corridor();
+    fc.assert(
+      fc.property(
+        fc.array(fc.constantFrom<Direction>(...DIRECTIONS), { maxLength: 40 }),
+        (dirs) => {
+          const { run, deltas } = walk(maze, dirs);
+          const crossed = new Set(
+            deltas
+              .filter((d) => cellKey(d.at) !== cellKey(d.from))
+              .map((d) => {
+                const dir = DIRECTIONS.find(
+                  (x) => cellKey(step(d.from, x)) === cellKey(d.at),
+                )!;
+                return edgeKey(edgeBetween(d.from, dir));
+              }),
+          );
+          const mapped = run.view.map.passages.map(edgeKey);
+          expect(new Set(mapped)).toEqual(crossed);
+          expect(mapped).toHaveLength(crossed.size);
         },
       ),
     );
