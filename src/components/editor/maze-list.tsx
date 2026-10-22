@@ -37,7 +37,14 @@ export function MazeList() {
         return (
           <li key={item.id} className="flex flex-col gap-1 py-3">
             <div className="flex items-center justify-between gap-3">
-              <Link href={`/labyrinths/${item.id}`} className="underline">
+              {/* Not prefetched: the prefetch would cache the editor page
+                  with the draft as it is now, and a save still landing from
+                  the editor just left would be missing when it opens. */}
+              <Link
+                href={`/labyrinths/${item.id}`}
+                prefetch={false}
+                className="underline"
+              >
                 {item.name}
               </Link>
               <span className="text-muted text-sm">

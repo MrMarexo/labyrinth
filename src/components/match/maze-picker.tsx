@@ -1,7 +1,9 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useRef, type KeyboardEvent } from "react";
+import { useRef, useState, type KeyboardEvent } from "react";
+
+import { discardsSettled } from "~/components/editor/pending-discards";
 
 import { MazePreview } from "~/components/maze-drawing";
 import { useRouter } from "~/i18n/navigation";
@@ -114,15 +116,21 @@ function preview(data: Parameters<typeof draftToMaze>[0]) {
 }
 
 /**
- * Starts a labyrinth at exactly this match's settings and opens it in the
- * editor, which offers to use it here once it is drawn.
+ * Opens an empty labyrinth at exactly this match's settings in the editor,
+ * which offers to use it here once it is drawn. The server reuses one of the
+ * player's own empty drafts at these settings rather than making another.
  */
 function DrawNew({ match }: { match: MazePickerProps["match"] }) {
   const t = useTranslations("lobby");
   const te = useTranslations();
   const router = useRouter();
-  const create = api.maze.createDraft.useMutation({
+  const utils = api.useUtils();
+  // True while an editor that just closed may still be discarding the very
+  // draft the server would hand back.
+  const [waiting, setWaiting] = useState(false);
+  const create = api.maze.draftForMatch.useMutation({
     onSuccess: ({ id }) => {
+      void utils.maze.list.invalidate();
       router.push({
         pathname: `/labyrinths/${id}`,
         query: { match: match.id },
@@ -132,6 +140,7 @@ function DrawNew({ match }: { match: MazePickerProps["match"] }) {
   const error = create.isError
     ? resolveErrorKey(te, create.error, "errors.unknown")
     : null;
+  const busy = waiting || create.isPending || create.isSuccess;
 
   return (
     <div className="space-y-1">
@@ -139,17 +148,19 @@ function DrawNew({ match }: { match: MazePickerProps["match"] }) {
         type="button"
         data-draw-new
         // Still pending while the editor loads, so it cannot fire twice.
-        disabled={create.isPending || create.isSuccess}
-        onClick={() =>
+        disabled={busy}
+        onClick={async () => {
+          setWaiting(true);
+          await discardsSettled();
+          setWaiting(false);
           create.mutate({
+            matchId: match.id,
             name: t("newMazeName", { code: match.code }),
-            cellCount: match.cellCount,
-            gateCount: match.gateCount,
-          })
-        }
+          });
+        }}
         className="border-border-strong rounded border px-3 py-2 text-sm disabled:opacity-50"
       >
-        {create.isPending || create.isSuccess ? t("creatingNew") : t("drawNew")}
+        {busy ? t("creatingNew") : t("drawNew")}
       </button>
       {error && (
         <p role="alert" data-draw-new-error className="text-danger text-sm">

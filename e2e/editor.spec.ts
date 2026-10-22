@@ -141,3 +141,78 @@ test.describe("recovering from a failed save", () => {
     await expect(banner).toHaveCount(0);
   });
 });
+
+test.describe("leaving the editor", () => {
+  test("an empty new labyrinth is discarded on the way out", async ({
+    page,
+  }) => {
+    await signUpAndOpenNewMaze(page);
+    const discarded = page.waitForResponse(
+      (r) =>
+        r.url().includes("/api/trpc/maze.discardIfEmpty") && r.status() === 200,
+    );
+    await page.getByRole("link", { name: "Labyrinths" }).click();
+    await expect(page).toHaveURL(/\/en\/labyrinths$/);
+    await discarded;
+
+    // From the server, not a cached list from before the maze existed.
+    await page.reload();
+    await expect(page.getByRole("link", { name: "Test maze" })).toHaveCount(0);
+    await expect(
+      page.getByText("You have not drawn any labyrinths yet."),
+    ).toBeVisible();
+  });
+
+  test("one drawn square, left before the autosave fires, is kept", async ({
+    page,
+  }) => {
+    await signUpAndOpenNewMaze(page);
+    let discards = 0;
+    page.on("request", (r) => {
+      if (r.url().includes("maze.discardIfEmpty")) discards += 1;
+    });
+    await page.locator('[data-cell="3,3"]').click();
+    // The editor flushes on its way out, rather than losing the square to
+    // the autosave debounce.
+    const flushed = page.waitForResponse(
+      (r) => r.url().includes("/api/trpc/maze.saveDraft") && r.status() === 200,
+    );
+    await page.getByRole("link", { name: "Labyrinths" }).click();
+    await expect(page).toHaveURL(/\/en\/labyrinths$/);
+    await flushed;
+    // The batch link streams, so the 200 above can arrive before the write
+    // commits; the list refetch follows the save's settled body.
+    await page.waitForResponse((r) => r.url().includes("/api/trpc/maze.list"));
+    expect(discards).toBe(0);
+
+    // Opened again by its link, without a reload: the editor shows what the
+    // server holds, not the page as it was when the author left it.
+
+    await page.getByRole("link", { name: "Test maze" }).click();
+    await expect(page.locator("[data-budget]")).toHaveText("1 / 36 squares");
+  });
+
+  test("a labyrinth erased back to nothing is discarded on the way out", async ({
+    page,
+  }) => {
+    await signUpAndOpenNewMaze(page);
+    const saved = page.waitForResponse(
+      (r) => r.url().includes("/api/trpc/maze.saveDraft") && r.status() === 200,
+    );
+    await page.locator('[data-cell="3,3"]').click();
+    await saved;
+
+    await page.getByRole("radio", { name: "Erase square" }).click();
+    await page.locator('[data-cell="3,3"]').click();
+    const discarded = page.waitForResponse(
+      (r) =>
+        r.url().includes("/api/trpc/maze.discardIfEmpty") && r.status() === 200,
+    );
+    await page.getByRole("link", { name: "Labyrinths" }).click();
+    await expect(page).toHaveURL(/\/en\/labyrinths$/);
+    await discarded;
+
+    await page.reload();
+    await expect(page.getByRole("link", { name: "Test maze" })).toHaveCount(0);
+  });
+});

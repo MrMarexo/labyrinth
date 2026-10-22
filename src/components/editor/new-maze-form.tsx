@@ -12,9 +12,13 @@ export function NewMazeForm() {
   const t = useTranslations("labyrinths");
   const te = useTranslations();
   const router = useRouter();
+  const utils = api.useUtils();
   const [open, setOpen] = useState(false);
   const create = api.maze.createDraft.useMutation({
-    onSuccess: ({ id }) => router.push(`/labyrinths/${id}`),
+    onSuccess: ({ id }) => {
+      void utils.maze.list.invalidate();
+      router.push(`/labyrinths/${id}`);
+    },
   });
   const createError = create.isError
     ? resolveErrorKey(te, create.error, "errors.unknown")

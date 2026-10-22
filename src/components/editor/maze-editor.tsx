@@ -26,6 +26,7 @@ import {
 import { api } from "~/trpc/react";
 import { Board } from "./board";
 import { DetailTools } from "./detail-tools";
+import { trackDiscard } from "./pending-discards";
 import { ShapeTools } from "./shape-tools";
 import { UseInMatch } from "./use-in-match";
 import { ValidationPanel, type SaveState } from "./validation-panel";
@@ -67,7 +68,9 @@ export function MazeEditor({
   // The gate or key number the gate and key tools place. Set to the default
   // each time one of those tools is activated, then only by the author.
   const [chosen, setChosen] = useState<number | null>(null);
+  const utils = api.useUtils();
   const saveDraft = api.maze.saveDraft.useMutation();
+  const discardIfEmpty = api.maze.discardIfEmpty.useMutation();
 
   // `locked` and `saveError` are read from render; everything else here is
   // bookkeeping for the autosave pipeline below and lives in refs so that
@@ -98,6 +101,8 @@ export function MazeEditor({
   // call settles, must not resurrect the content it undid).
   const pendingRef = useRef(false);
   const mountedRef = useRef(true);
+  // Set once the way-out discard has been fired, so it fires at most once.
+  const discardedRef = useRef(false);
   // Mirrors `state.draft` so the pipeline below always reads the live draft
   // rather than a value some earlier closure captured.
   const draftRef = useRef(state.draft);
@@ -106,63 +111,104 @@ export function MazeEditor({
   function send(draft: DraftMaze) {
     savingRef.current = true;
     if (mountedRef.current) setInFlight(true);
-    saveDraft.mutate(
-      { id, data: draft },
-      {
-        onSuccess: () => {
-          lastSentRef.current = draft;
-          if (mountedRef.current) {
-            setSaveError(null);
-            setSavedDraft(draft);
-          }
-          // The live draft can have moved on while this request was in
-          // flight — most sharply when undo pops the history stack back
-          // onto the very object `lastSentRef` already pointed at, which
-          // makes `state.draft === lastSentRef.current` true again and
-          // defeats the debounce effect's change detection below (it never
-          // sees a "change" to react to, so it never schedules anything).
-          // `maybeSend` re-reads `draftRef` fresh, so this is a correct
-          // recheck rather than a repeat of whatever was queued earlier;
-          // `savingRef` is still true here (this call's own `onSettled`
-          // hasn't run yet), so this only ever sets `pendingRef` — the
-          // actual send happens from `onSettled` below once this call's
-          // bookkeeping is done. Covers redo identically, since it restores
-          // a draft by reference the same way undo does, and converges
-          // through a run of several undo/redo dispatches during one
-          // in-flight save, because each corrective round-trip rechecks the
-          // live draft again on its own settle.
-          maybeSend();
-        },
-        onError: (error) => {
-          if (!mountedRef.current) return;
-          const resolved = resolveErrorKey(t, error, "editor.saveFailed");
-          // A maze can only reach this state once Phase 3 adds submission —
-          // nothing in this phase ever sets a maze's status to "submitted" —
-          // but the rule ("mazes are never edited once finished") has to
-          // hold the day that becomes reachable, not the day someone
-          // remembers to add a check for it.
-          if (resolved.key === "errors.mazeIsSubmitted") setLocked(true);
-          setSaveError(resolved);
-          // Deliberately no corrective send here: `lastSentRef` stays at its
-          // old value on a failure, so a blind recheck would find the live
-          // draft still "different" forever and retry the same rejected
-          // content in a tight loop. `pendingRef` below still only reflects
-          // a genuinely new edit queued elsewhere while this attempt was in
-          // flight — never the content that just failed.
-        },
-        onSettled: () => {
-          savingRef.current = false;
-          if (mountedRef.current) setInFlight(false);
-          // Deliberately unguarded by `mountedRef`: a queued send must still
-          // reach the server after the author has navigated away, or it is
-          // simply lost. Only the UI feedback above is skipped post-unmount.
-          if (pendingRef.current) {
-            pendingRef.current = false;
-            maybeSend();
-          }
-        },
-      },
+    // `mutateAsync`, not `mutate` with callbacks: TanStack Query drops a
+    // `mutate` call's callbacks once the component has unmounted, and this
+    // pipeline has to keep going after the author navigates away.
+    const onSuccess = () => {
+      lastSentRef.current = draft;
+      if (mountedRef.current) {
+        setSaveError(null);
+        setSavedDraft(draft);
+      }
+      // The live draft can have moved on while this request was in
+      // flight — most sharply when undo pops the history stack back
+      // onto the very object `lastSentRef` already pointed at, which
+      // makes `state.draft === lastSentRef.current` true again and
+      // defeats the debounce effect's change detection below (it never
+      // sees a "change" to react to, so it never schedules anything).
+      // `maybeSend` re-reads `draftRef` fresh, so this is a correct
+      // recheck rather than a repeat of whatever was queued earlier;
+      // `savingRef` is still true here (this call's own `onSettled`
+      // hasn't run yet), so this only ever sets `pendingRef` — the
+      // actual send happens from `onSettled` below once this call's
+      // bookkeeping is done. Covers redo identically, since it restores
+      // a draft by reference the same way undo does, and converges
+      // through a run of several undo/redo dispatches during one
+      // in-flight save, because each corrective round-trip rechecks the
+      // live draft again on its own settle.
+      maybeSend();
+    };
+    const onError = (error: Parameters<typeof resolveErrorKey>[1]) => {
+      if (!mountedRef.current) return;
+      const resolved = resolveErrorKey(t, error, "editor.saveFailed");
+      // A maze can only reach this state once Phase 3 adds submission —
+      // nothing in this phase ever sets a maze's status to "submitted" —
+      // but the rule ("mazes are never edited once finished") has to
+      // hold the day that becomes reachable, not the day someone
+      // remembers to add a check for it.
+      if (resolved.key === "errors.mazeIsSubmitted") setLocked(true);
+      setSaveError(resolved);
+      // Deliberately no corrective send here: `lastSentRef` stays at its
+      // old value on a failure, so a blind recheck would find the live
+      // draft still "different" forever and retry the same rejected
+      // content in a tight loop. `pendingRef` below still only reflects
+      // a genuinely new edit queued elsewhere while this attempt was in
+      // flight — never the content that just failed.
+    };
+    const onSettled = () => {
+      savingRef.current = false;
+      if (mountedRef.current) setInFlight(false);
+      // Deliberately unguarded by `mountedRef`: a queued send must still
+      // reach the server after the author has navigated away, or it is
+      // simply lost. Only the UI feedback above is skipped post-unmount.
+      if (pendingRef.current) {
+        pendingRef.current = false;
+        maybeSend();
+      }
+      afterLeaving();
+    };
+    saveDraft
+      .mutateAsync({ id, data: draft })
+      .then(onSuccess, onError)
+      .finally(onSettled);
+  }
+
+  /**
+   * Once the editor has gone and nothing is left to save: a draft the server
+   * holds as empty is deleted, so blank labyrinths do not pile up; anything
+   * else just refreshes what the author goes back to. Runs only when the
+   * server is known to hold exactly the live draft — never while a save is
+   * in flight or failed — so it can never race a save of squares.
+   */
+  function afterLeaving() {
+    if (mountedRef.current || savingRef.current) return;
+    const synced = draftRef.current === lastSentRef.current;
+    if (!synced || draftRef.current.cells.length > 0) {
+      refreshAfterLeaving();
+      return;
+    }
+    if (discardedRef.current) return;
+    discardedRef.current = true;
+    // A tick later, and only if still unmounted: StrictMode's development
+    // remount runs this cleanup on a live editor and then mounts it again.
+    trackDiscard(
+      Promise.resolve().then(async () => {
+        if (mountedRef.current) {
+          discardedRef.current = false;
+          return;
+        }
+        try {
+          await discardIfEmpty.mutateAsync({ id });
+        } finally {
+          refreshAfterLeaving();
+        }
+      }),
     );
+  }
+
+  /** The list the author is most likely going back to. */
+  function refreshAfterLeaving() {
+    void utils.maze.list.invalidate();
   }
 
   // The single entry point for "there might be something to save". Sends
@@ -185,6 +231,8 @@ export function MazeEditor({
   // every edit — always calls the version closed over the latest id/state.
   const maybeSendRef = useRef(maybeSend);
   maybeSendRef.current = maybeSend;
+  const afterLeavingRef = useRef(afterLeaving);
+  afterLeavingRef.current = afterLeaving;
 
   // Autosave. Debounced at AUTOSAVE_MS: every edit resets the timer, so a
   // burst of clicks produces one request after the author pauses, not one
@@ -212,6 +260,7 @@ export function MazeEditor({
     return () => {
       mountedRef.current = false;
       maybeSendRef.current();
+      afterLeavingRef.current();
     };
   }, []);
 
