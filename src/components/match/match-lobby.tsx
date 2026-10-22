@@ -34,8 +34,9 @@ export function MatchLobby({ matchId, initialData }: MatchLobbyProps) {
     { initialData },
   );
   // Same query key `MazePicker` reads below, so once the picker is showing
-  // this is a cache read, not a second request — it exists here only to
-  // look up the chosen maze's name for the confirmation sentence. Gated on
+  // this is a cache read, not a second request — it exists here to look up
+  // the chosen maze's name for the confirmation sentence, and to leave out
+  // the use button when there is nothing to use. Gated on
   // the same condition as the picker itself, so it is not fetched at all
   // for a match in any other status.
   const { data: mazes } = api.match.eligibleMazes.useQuery(
@@ -123,7 +124,8 @@ export function MatchLobby({ matchId, initialData }: MatchLobbyProps) {
             }}
           />
 
-          {confirming ? (
+          {/* Nothing eligible: drawing a new one is the only way on. */}
+          {!mazes || mazes.length === 0 ? null : confirming ? (
             <ConfirmUse
               name={selectedMaze?.name ?? ""}
               pending={submit.isPending}
