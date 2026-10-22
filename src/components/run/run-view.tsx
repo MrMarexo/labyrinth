@@ -63,7 +63,7 @@ export function RunView({
   const format = useFormatter();
   const utils = api.useUtils();
 
-  const { data } = api.run.get.useQuery({ matchId });
+  const { data: fetched } = api.run.get.useQuery({ matchId });
   const [members, setMembers] = useState(0);
   useChannel(runChannel, { onMembers: setMembers });
   const watchers = Math.max(0, members - 1);
@@ -134,9 +134,9 @@ export function RunView({
     }
   };
 
-  const { enqueue, lean, pending } = useMoveQueue(
+  const { enqueue, lean, pending, rebase } = useMoveQueue(
     matchId,
-    data?.nextSeq ?? 1,
+    fetched?.nextSeq ?? 1,
     () => utils.run.get.getData({ matchId }),
     {
       onDelta,
@@ -160,6 +160,20 @@ export function RunView({
       },
     },
   );
+
+  // A refetch that began before moves this tab already drew would step the
+  // runner back; bring it forward instead (predictions are certain), and
+  // write the result back so the queue predicts from it too.
+  const forward = (d: NonNullable<typeof fetched>) => {
+    const r = rebase(d);
+    return r === d
+      ? d
+      : { ...r, heldKeys: heldKeys(r.map), nextSeq: r.moves + 1 };
+  };
+  const data = fetched ? forward(fetched) : fetched;
+  useEffect(() => {
+    if (data && data !== fetched) utils.run.get.setData({ matchId }, data);
+  }, [data, fetched, matchId, utils]);
 
   const finished = (data?.finished ?? true) || expired;
   useEffect(() => {

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   predictMove,
+  rebaseRun,
   sameDelta,
   type Direction,
   type PredictableView,
@@ -24,6 +25,9 @@ const MAX_WAITING = 1;
  * should not pile up more than a few.
  */
 const MAX_AHEAD = 8;
+
+/** Deltas kept for rebasing a stale `run.get` snapshot; more than MAX_AHEAD. */
+const MAX_DRAWN = 32;
 
 /**
  * - `predicted`: a step through a known passage, drawn before it is sent.
@@ -73,6 +77,13 @@ export function useMoveQueue(
   const seq = useRef(nextSeq);
   const latest = useRef({ handlers, view });
   const [lean, setLean] = useState<Direction | null>(null);
+  // Every delta this tab drew (predicted or answered), newest last: what a
+  // stale refetch is brought forward with. Cleared whenever the server's
+  // history may differ from it (a resync or the match ending).
+  const drawn = useRef<RunnerDelta[]>([]);
+  const remember = (delta: RunnerDelta) => {
+    drawn.current = [...drawn.current, delta].slice(-MAX_DRAWN);
+  };
 
   useEffect(() => {
     latest.current = { handlers, view };
@@ -87,6 +98,7 @@ export function useMoveQueue(
 
   const resync = useCallback(async () => {
     resyncing.current = true;
+    drawn.current = [];
     outbox.current = [];
     waiting.current = [];
     unresolved.current = false;
@@ -106,12 +118,15 @@ export function useMoveQueue(
   const pumpRef = useRef<() => Promise<void>>(async () => undefined);
 
   const commit = useCallback((dir: Direction) => {
-    const current = latest.current.view();
-    if (!current || current.finished) return;
+    const snapshot = latest.current.view();
+    if (!snapshot) return;
+    const current = rebaseRun(snapshot, drawn.current);
+    if (current.finished) return;
     const predicted = predictMove(current, dir);
     outbox.current.push({ seq: seq.current, dir, predicted });
     seq.current += 1;
     if (predicted) {
+      remember(predicted);
       latest.current.handlers.onDelta(predicted, "predicted", false);
     } else {
       unresolved.current = true;
@@ -149,12 +164,18 @@ export function useMoveQueue(
       } else {
         unresolved.current = false;
         setLean(null);
+        remember(result.delta);
         onDelta(result.delta, "answered", result.matchOver);
         if (result.delta.finished || result.matchOver) waiting.current = [];
         const next = waiting.current.shift();
         if (next) commit(next);
       }
       if (result.matchOver) {
+        // Predictions queued behind this move were drawn but never sent.
+        if (outbox.current.length > 0) {
+          drawn.current = [];
+          void utils.run.get.invalidate({ matchId });
+        }
         outbox.current = [];
         onMatchOver("errors.matchOver");
       }
@@ -171,6 +192,9 @@ export function useMoveQueue(
     if (failed === "resync") {
       await resync();
     } else if (failed) {
+      // Refused: whatever this tab drew past the server's last move must go.
+      drawn.current = [];
+      void utils.run.get.invalidate({ matchId });
       outbox.current = [];
       waiting.current = [];
       unresolved.current = false;
@@ -197,5 +221,15 @@ export function useMoveQueue(
     [commit],
   );
 
-  return { enqueue, lean, pending: lean !== null };
+  /**
+   * A `run.get` snapshot brought forward by what this tab has already drawn
+   * (see `rebaseRun`). The same object when there is nothing to add.
+   */
+  const rebase = useCallback(
+    <T extends PredictableView & { finished: boolean }>(snapshot: T): T =>
+      rebaseRun(snapshot, drawn.current),
+    [],
+  );
+
+  return { enqueue, lean, pending: lean !== null, rebase };
 }

@@ -8,6 +8,7 @@ import {
   freshRun,
   mazeSchema,
   predictMove,
+  rebaseRun,
   sameDelta,
   type Direction,
   type Maze,
@@ -144,5 +145,41 @@ describe("sameDelta", () => {
     expect(sameDelta(a, { ...a, penalties: 1 })).toBe(false);
     expect(sameDelta(a, { ...a, at: { x: 0, y: 0 } })).toBe(false);
     expect(sameDelta(a, { ...a, revealedCell: { x: -1, y: 0 } })).toBe(false);
+  });
+});
+
+describe("rebaseRun", () => {
+  function snapshot(run: StoredRun) {
+    return { ...known(run), finished: run.state.finished };
+  }
+
+  it("replays deltas the snapshot has not seen yet, in order", () => {
+    const maze = corridor();
+    const before = walk(maze, ["W"]);
+    const deltas = [];
+    let run = before;
+    for (const dir of ["E", "W", "E"] as const) {
+      const next = advanceRun(run, maze, dir);
+      deltas.push(next.delta);
+      run = next.run;
+    }
+    expect(rebaseRun(snapshot(before), deltas)).toEqual(snapshot(run));
+  });
+
+  it("skips deltas the snapshot already includes", () => {
+    const maze = corridor();
+    const first = advanceRun(freshRun(maze), maze, "W");
+    const second = advanceRun(first.run, maze, "E");
+    expect(rebaseRun(snapshot(first.run), [first.delta, second.delta])).toEqual(
+      snapshot(second.run),
+    );
+  });
+
+  it("leaves the snapshot alone when the deltas do not follow on from it", () => {
+    const maze = corridor();
+    const first = advanceRun(freshRun(maze), maze, "W");
+    const second = advanceRun(first.run, maze, "E");
+    const fresh = snapshot(freshRun(maze));
+    expect(rebaseRun(fresh, [second.delta])).toEqual(fresh);
   });
 });

@@ -6,7 +6,7 @@ import type {
   RunnerDelta,
   RunnerOutcome,
 } from "./reduce";
-import { withPassages, type DiscoveredMap } from "./run";
+import { recordDelta, withPassages, type DiscoveredMap } from "./run";
 
 /** What the client holds about its own run: its `run.get`, less the rest. */
 export type PredictableView = {
@@ -97,4 +97,32 @@ export function sameDelta(a: RunnerDelta, b: RunnerDelta): boolean {
     cell(a.revealedCell, b.revealedCell) &&
     segment(a.revealedSegment, b.revealedSegment)
   );
+}
+
+/**
+ * A server snapshot brought forward by the deltas this client has already
+ * drawn and the snapshot predates — a `run.get` refetch that started before
+ * the latest moves committed would otherwise step the runner back. Deltas
+ * the snapshot already includes are skipped; the rest are applied only while
+ * each follows on from the last (its `moves` one higher), so a snapshot from
+ * a different history is returned untouched. Extra fields pass through.
+ */
+export function rebaseRun<T extends PredictableView & { finished: boolean }>(
+  snapshot: T,
+  deltas: readonly RunnerDelta[],
+): T {
+  let out = snapshot;
+  for (const delta of deltas) {
+    if (delta.moves <= out.moves) continue;
+    if (delta.moves !== out.moves + 1) break;
+    out = {
+      ...out,
+      at: { ...delta.at },
+      map: recordDelta(out.map, delta),
+      penalties: delta.penalties,
+      moves: delta.moves,
+      finished: delta.finished,
+    };
+  }
+  return out;
 }
