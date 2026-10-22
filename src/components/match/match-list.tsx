@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 
+import { CancelMatch } from "~/components/match/cancel-match";
 import { Link } from "~/i18n/navigation";
 import type { MatchStatus } from "~/match";
 import { api } from "~/trpc/react";
@@ -46,9 +47,12 @@ export function MatchList() {
               {t("sizeAndGates", { cells: m.cellCount, gates: m.gateCount })}
             </p>
             {m.status === "awaiting_opponent" && (
-              <p data-match-code={m.code} className="text-sm">
-                {t("shareCode", { code: m.code })}
-              </p>
+              <>
+                <p data-match-code={m.code} className="text-sm">
+                  {t("shareCode", { code: m.code })}
+                </p>
+                <CancelMatch matchId={m.id} />
+              </>
             )}
           </div>
           <Link href={`/matches/${m.id}`} className="underline">

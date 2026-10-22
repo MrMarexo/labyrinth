@@ -110,7 +110,12 @@
     "statusRunning": "Running",
     "statusComplete": "Finished",
     "statusAbandoned": "Abandoned",
-    "sizeAndGates": "{cells, plural, one {# square} other {# squares}}, {gates, plural, one {# gate} other {# gates}}"
+    "sizeAndGates": "{cells, plural, one {# square} other {# squares}}, {gates, plural, one {# gate} other {# gates}}",
+    "cancel": "Cancel match",
+    "cancelConfirm": "Cancel this match? The join code will stop working.",
+    "cancelYes": "Yes, cancel it",
+    "cancelNo": "Keep it",
+    "cancelling": "Cancelling…"
   },
   "maze": {
     "format": {
@@ -182,7 +187,8 @@
     "undo": "Undo",
     "redo": "Redo",
     "saveFailed": "Your changes could not be saved.",
-    "retry": "Retry"
+    "retry": "Retry",
+    "useInMatch": "Use in this match"
   },
   "lobby": {
     "title": "Match",
@@ -192,17 +198,19 @@
     "opponentDrawing": "Your opponent is still choosing theirs.",
     "opponentSubmitted": "Your opponent's labyrinth is in.",
     "pickHeading": "Your labyrinths at this size",
-    "noneEligible": "You have no labyrinths at this size yet.",
+    "noneEligible": "You don't have any labyrinths you can use for this match.",
     "drawNew": "Draw a new one",
     "submit": "Submit this labyrinth",
     "submitting": "Submitting…",
-    "confirmSubmit": "Submit {name}? It can never be edited again.",
-    "confirmYes": "Submit",
+    "confirmSubmit": "Use {name} in this match? After that it can't be edited, but you can reuse it in other matches.",
+    "confirmYes": "Use it",
     "confirmNo": "Cancel",
     "deadline": "Expires {when}",
     "abandoned": "This match was abandoned. Nobody won.",
     "forfeited": "You ran out of time on this one.",
-    "opponentForfeited": "Your opponent ran out of time."
+    "opponentForfeited": "Your opponent ran out of time.",
+    "newMazeName": "Labyrinth for match {code}",
+    "creatingNew": "Creating…"
   },
   "run": {
     "watching": "{count, plural, one {# watching} other {# watching}}",

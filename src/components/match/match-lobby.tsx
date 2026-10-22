@@ -3,7 +3,10 @@
 import { useFormatter, useTranslations } from "next-intl";
 import { useState } from "react";
 
+import { CancelMatch } from "~/components/match/cancel-match";
+import { ConfirmUse } from "~/components/match/confirm-use";
 import { MazePicker } from "~/components/match/maze-picker";
+import { useRouter } from "~/i18n/navigation";
 import { resolveErrorKey } from "~/lib/resolve-error-key";
 import { isTerminal } from "~/match";
 import { api, type RouterOutputs } from "~/trpc/react";
@@ -24,6 +27,7 @@ export function MatchLobby({ matchId, initialData }: MatchLobbyProps) {
   const te = useTranslations();
   const format = useFormatter();
   const utils = api.useUtils();
+  const router = useRouter();
 
   const { data, isPending } = api.match.get.useQuery(
     { id: matchId },
@@ -81,9 +85,15 @@ export function MatchLobby({ matchId, initialData }: MatchLobbyProps) {
       <p data-match-status={data.status}>{statusText}</p>
 
       {data.status === "awaiting_opponent" && (
-        <p data-match-code={data.code} className="text-sm">
-          {tm("shareCode", { code: data.code })}
-        </p>
+        <>
+          <p data-match-code={data.code} className="text-sm">
+            {tm("shareCode", { code: data.code })}
+          </p>
+          <CancelMatch
+            matchId={matchId}
+            onCancelled={() => router.push("/matches")}
+          />
+        </>
       )}
 
       <span data-you-submitted={String(data.you.hasSubmitted)} />
@@ -105,7 +115,7 @@ export function MatchLobby({ matchId, initialData }: MatchLobbyProps) {
       {data.status === "drawing" && !data.you.hasSubmitted && (
         <div className="space-y-3">
           <MazePicker
-            matchId={matchId}
+            match={data}
             selected={selected}
             onSelect={(id) => {
               setSelected(id);
@@ -114,30 +124,15 @@ export function MatchLobby({ matchId, initialData }: MatchLobbyProps) {
           />
 
           {confirming ? (
-            <div className="space-y-2">
-              <p>{t("confirmSubmit", { name: selectedMaze?.name ?? "" })}</p>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  disabled={submit.isPending}
-                  onClick={() => {
-                    if (!selected) return;
-                    submit.mutate({ matchId, mazeId: selected });
-                  }}
-                  className="bg-accent text-on-accent rounded px-3 py-2 text-sm disabled:opacity-50"
-                >
-                  {submit.isPending ? t("submitting") : t("confirmYes")}
-                </button>
-                <button
-                  type="button"
-                  disabled={submit.isPending}
-                  onClick={() => setConfirming(false)}
-                  className="border-border-strong rounded border px-3 py-2 text-sm disabled:opacity-50"
-                >
-                  {t("confirmNo")}
-                </button>
-              </div>
-            </div>
+            <ConfirmUse
+              name={selectedMaze?.name ?? ""}
+              pending={submit.isPending}
+              onConfirm={() => {
+                if (!selected) return;
+                submit.mutate({ matchId, mazeId: selected });
+              }}
+              onCancel={() => setConfirming(false)}
+            />
           ) : (
             <button
               type="button"

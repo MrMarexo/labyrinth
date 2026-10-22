@@ -110,7 +110,12 @@
     "statusRunning": "Prebieha",
     "statusComplete": "Dokončený",
     "statusAbandoned": "Opustený",
-    "sizeAndGates": "{cells, plural, one {# políčko} few {# políčka} other {# políčok}}, {gates, plural, one {# brána} few {# brány} other {# brán}}"
+    "sizeAndGates": "{cells, plural, one {# políčko} few {# políčka} other {# políčok}}, {gates, plural, one {# brána} few {# brány} other {# brán}}",
+    "cancel": "Zrušiť zápas",
+    "cancelConfirm": "Zrušiť tento zápas? Kód na pripojenie prestane fungovať.",
+    "cancelYes": "Áno, zrušiť",
+    "cancelNo": "Ponechať",
+    "cancelling": "Ruší sa…"
   },
   "maze": {
     "format": {
@@ -182,7 +187,8 @@
     "undo": "Späť",
     "redo": "Dopredu",
     "saveFailed": "Vaše zmeny sa nepodarilo uložiť.",
-    "retry": "Skúsiť znova"
+    "retry": "Skúsiť znova",
+    "useInMatch": "Použiť v tomto zápase"
   },
   "lobby": {
     "title": "Zápas",
@@ -192,17 +198,19 @@
     "opponentDrawing": "Váš súper si svoje ešte vyberá.",
     "opponentSubmitted": "Bludisko vášho súpera je odoslané.",
     "pickHeading": "Vaše bludiská v tejto veľkosti",
-    "noneEligible": "V tejto veľkosti zatiaľ nemáte žiadne bludiská.",
+    "noneEligible": "Nemáte žiadne bludiská, ktoré by ste mohli použiť v tomto zápase.",
     "drawNew": "Nakresliť nové",
     "submit": "Odoslať toto bludisko",
     "submitting": "Odosiela sa…",
-    "confirmSubmit": "Odoslať {name}? Už sa nikdy nebude dať upraviť.",
-    "confirmYes": "Odoslať",
+    "confirmSubmit": "Použiť {name} v tomto zápase? Potom ho už nebude možné upraviť, ale môžete ho znova použiť v iných zápasoch.",
+    "confirmYes": "Použiť",
     "confirmNo": "Zrušiť",
     "deadline": "Platí do {when}",
     "abandoned": "Tento zápas bol opustený. Nikto nevyhral.",
     "forfeited": "V tomto zápase vám vypršal čas.",
-    "opponentForfeited": "Vášmu súperovi vypršal čas."
+    "opponentForfeited": "Vášmu súperovi vypršal čas.",
+    "newMazeName": "Bludisko pre zápas {code}",
+    "creatingNew": "Vytvára sa…"
   },
   "run": {
     "watching": "{count, plural, one {Sleduje # človek} few {Sledujú # ľudia} other {Sleduje # ľudí}}",

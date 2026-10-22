@@ -4,3 +4,4 @@ export * from "./completion";
 export * from "./deadline";
 export * from "./status";
 export * from "./watch";
+export * from "./use-in-match";

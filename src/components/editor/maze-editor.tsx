@@ -27,22 +27,28 @@ import { api } from "~/trpc/react";
 import { Board } from "./board";
 import { DetailTools } from "./detail-tools";
 import { ShapeTools } from "./shape-tools";
+import { UseInMatch } from "./use-in-match";
 import { ValidationPanel, type SaveState } from "./validation-panel";
 
 const AUTOSAVE_MS = 800;
 
 export type MazeEditorProps = {
   id: string;
+  name: string;
   initial: DraftMaze;
   cellCount: number;
   gateCount: number;
+  /** The match this editor was opened from, checked by the page. */
+  forMatch: { id: string; code: string } | null;
 };
 
 export function MazeEditor({
   id,
+  name,
   initial,
   cellCount,
   gateCount,
+  forMatch,
 }: MazeEditorProps) {
   const t = useTranslations();
   // Invariant the first-render guard below depends on: `lastSentRef` and the
@@ -416,6 +422,17 @@ export function MazeEditor({
           valid={validation?.ok === true}
           saveState={saveState}
         />
+
+        {forMatch && (
+          <UseInMatch
+            mazeId={id}
+            name={name}
+            match={forMatch}
+            // The server must hold exactly what is on screen before it is
+            // submitted, so a pending autosave keeps this disabled.
+            ready={validation?.ok === true && saveState === "saved"}
+          />
+        )}
       </aside>
     </div>
   );

@@ -36,7 +36,7 @@ test.describe("match lifecycle", () => {
     await host.reload();
     await host.locator("[data-maze-option]").first().click();
     await host.getByRole("button", { name: "Submit this labyrinth" }).click();
-    await host.getByRole("button", { name: "Submit", exact: true }).click();
+    await host.getByRole("button", { name: "Use it", exact: true }).click();
     await expect(host.locator("[data-you-submitted]")).toHaveAttribute(
       "data-you-submitted",
       "true",
@@ -48,7 +48,7 @@ test.describe("match lifecycle", () => {
 
     await guest.locator("[data-maze-option]").first().click();
     await guest.getByRole("button", { name: "Submit this labyrinth" }).click();
-    await guest.getByRole("button", { name: "Submit", exact: true }).click();
+    await guest.getByRole("button", { name: "Use it", exact: true }).click();
 
     // Since Phase 4 a running match shows the run view in place of the
     // lobby (spec §10.3.1), so `running` is read off the screen that only
@@ -73,7 +73,7 @@ test.describe("match lifecycle", () => {
     await host.reload();
     await host.locator("[data-maze-option]").first().click();
     await host.getByRole("button", { name: "Submit this labyrinth" }).click();
-    await host.getByRole("button", { name: "Submit", exact: true }).click();
+    await host.getByRole("button", { name: "Use it", exact: true }).click();
     await expect(host.locator("[data-you-submitted]")).toHaveAttribute(
       "data-you-submitted",
       "true",

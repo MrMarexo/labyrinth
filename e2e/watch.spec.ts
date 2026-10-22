@@ -70,7 +70,7 @@ test.describe("watching and replay", () => {
     );
     await host.locator("[data-maze-option]").first().click();
     await host.getByRole("button", { name: "Submit this labyrinth" }).click();
-    await host.getByRole("button", { name: "Submit", exact: true }).click();
+    await host.getByRole("button", { name: "Use it", exact: true }).click();
     await expect(host.locator("[data-you-submitted]")).toHaveAttribute(
       "data-you-submitted",
       "true",
@@ -78,7 +78,7 @@ test.describe("watching and replay", () => {
 
     await guest.locator("[data-maze-option]").first().click();
     await guest.getByRole("button", { name: "Submit this labyrinth" }).click();
-    await guest.getByRole("button", { name: "Submit", exact: true }).click();
+    await guest.getByRole("button", { name: "Use it", exact: true }).click();
 
     await expect(host.locator("[data-run-view]")).toBeVisible(PUSH);
   });
