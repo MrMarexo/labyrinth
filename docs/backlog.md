@@ -9,9 +9,8 @@ so this file is the standing list. When a phase picks one up, delete it here.
 
 - **Rematch, and reusing a maze from a finished match's result screen**
   (Phase 3; the result screen now exists, Phase 4).
-- **Cancelling a match you created** (Phase 3). The 24h sweep closes an unjoined
-  match on its own. Needs its own thinking about what cancelling mid-`drawing`
-  means to an opponent who already drew.
+- **Cancelling a match mid-`drawing`** (Phase 3; the waiting case is done).
+  Still undecided: what cancelling means to an opponent who already drew.
 - **Notifying a player who is not on the page** (Phase 4) — email or push when
   the opponent gives up, finishes, or a deadline is near.
 - **Points, rating or win records** (Phase 4). A win is currently `winnerId` on
@@ -51,9 +50,10 @@ so this file is the standing list. When a phase picks one up, delete it here.
   board is `aria-hidden`, so a second "Moved." in a row is silence for a
   screen-reader user. Fix with a nonce or alternating wrapper, or the move count
   in the text. Phase 6.
-- **Phase 3's `match.join` and `match.submitMaze` take no row locks**. The sweep
-  closing a `drawing` match could race a submission; lock the way
-  `participantRows(…, { lock: true })` does.
+- **`match.submitMaze` takes no row lock** (Phase 3). The sweep closing a
+  `drawing` match could race a submission; lock the way
+  `participantRows(…, { lock: true })` does. `match.join` now locks the match
+  row, for `match.cancel`.
 - **Rolling back to pre-Phase-4 code after runs exist**. The old sweep ignores
   `lastMoveAt` and `finishedAt` and would abandon active runs at row 4; the
   expand-only migration rule covers forward deploys only.

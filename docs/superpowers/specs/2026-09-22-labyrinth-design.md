@@ -416,7 +416,7 @@ already discloses the same fact (§9.1).
 **Two channels.** `run-{matchId}-{runnerId}` (presence) carries each move's
 delta with its `seq`; the runner joins it only for the member count, the author
 to watch. `match-{matchId}` (private, both players) carries a payload-free
-"changed" ping on join, submit, give-up and completion, so the lobby updates
+"changed" ping on join, submit, give-up, completion and cancel, so the lobby updates
 live and an open run learns at once that the opponent gave up. Pings carry no
 data — the client refetches through the ordinary procedures, so the channel can
 disclose nothing they would not. A slow poll (60s) remains as the fallback for
@@ -470,6 +470,17 @@ awaiting_opponent → drawing → running → complete
   out of time, or one player gave up (§9.2). Only now is the result computed and
   revealed, so the second finisher cannot play to a known target.
 - `abandoned` — closed with **no winner**. See §9.1.
+
+**Cancelling a waiting match.** While a match is still `awaiting_opponent`, its
+creator — the only player in it — can cancel it, from the matches list or the
+lobby, after a confirmation. Cancelling deletes the match row (its one player
+row cascades, and no maze was ever submitted to it), so the join code stops
+working: a later join gets "no match has that code". `match.cancel` locks the
+match row and re-checks the status, and `join` locks the same row, so a join
+racing the cancel either lands first and the cancel is refused, or waits and
+finds nothing. Any other status is refused (`errors.matchNotCancellable`);
+what cancelling mid-`drawing` should mean to an opponent who already drew is
+undecided (see the backlog).
 
 ### 9.1 Deadlines
 
@@ -613,6 +624,17 @@ Required, not optional:
   live draft, then "Saved" — or, once the maze is also valid, that it is
   saved and ready to be used in a game.
 
+**Drawing for a match.** The lobby's picker always offers "Draw a new one",
+which creates a draft at the match's own size and gate count, named "Labyrinth
+for match {code}", and opens it in the editor as `/labyrinths/{id}?match={matchId}`.
+The editor page checks that match on the server: the caller is in it, it is in
+`drawing`, they have not submitted, and its settings equal the maze's. If so,
+the save-status area offers **Use in this match**, enabled only once the maze
+is valid and saved; it asks for the same confirmation as the lobby, submits,
+and returns to the match. If any check fails the parameter is ignored, with no
+error. Each option in the picker is a row with a small, decorative preview
+of that maze — the same drawing as the result screen's — beside its name.
+
 The side panel runs the validator continuously and reports only facts, never
 judgement: squares used against the budget, gates and keys placed, and whether
 the maze is currently valid. Submit is disabled while invalid and names the
@@ -709,6 +731,11 @@ live" control. The entry points are the waiting screen after your own finish
 Tailwind v4 CSS custom properties with `data-theme` on `html`. Tri-state
 system / light / dark, persisted, with the standard inline script to prevent a
 flash of the wrong theme. Maze colours are tokens, so the board themes itself.
+
+The language and theme controls live together behind one settings button in
+the header (a gear icon), for signed-in and signed-out visitors alike. It
+opens a labelled panel; Escape closes it and returns focus to the button, and
+a click outside closes it.
 
 ### 10.6 Internationalisation
 
