@@ -35,7 +35,7 @@ test.describe("match lifecycle", () => {
     // not notice if it unlocked early.
     await host.reload();
     await host.locator("[data-maze-option]").first().click();
-    await host.getByRole("button", { name: "Submit this labyrinth" }).click();
+    await host.getByRole("button", { name: "Use this labyrinth" }).click();
     await host.getByRole("button", { name: "Use it", exact: true }).click();
     await expect(host.locator("[data-you-submitted]")).toHaveAttribute(
       "data-you-submitted",
@@ -47,7 +47,7 @@ test.describe("match lifecycle", () => {
     );
 
     await guest.locator("[data-maze-option]").first().click();
-    await guest.getByRole("button", { name: "Submit this labyrinth" }).click();
+    await guest.getByRole("button", { name: "Use this labyrinth" }).click();
     await guest.getByRole("button", { name: "Use it", exact: true }).click();
 
     // Since Phase 4 a running match shows the run view in place of the
@@ -72,7 +72,7 @@ test.describe("match lifecycle", () => {
 
     await host.reload();
     await host.locator("[data-maze-option]").first().click();
-    await host.getByRole("button", { name: "Submit this labyrinth" }).click();
+    await host.getByRole("button", { name: "Use this labyrinth" }).click();
     await host.getByRole("button", { name: "Use it", exact: true }).click();
     await expect(host.locator("[data-you-submitted]")).toHaveAttribute(
       "data-you-submitted",

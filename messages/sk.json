@@ -114,7 +114,7 @@
     "cancel": "Zrušiť zápas",
     "cancelConfirm": "Zrušiť tento zápas? Kód na pripojenie prestane fungovať.",
     "cancelYes": "Áno, zrušiť",
-    "cancelNo": "Ponechať",
+    "cancelNo": "Ponechať zápas",
     "cancelling": "Ruší sa…"
   },
   "maze": {
@@ -200,8 +200,8 @@
     "pickHeading": "Vaše bludiská v tejto veľkosti",
     "noneEligible": "Nemáte žiadne bludiská, ktoré by ste mohli použiť v tomto zápase.",
     "drawNew": "Nakresliť nové",
-    "submit": "Odoslať toto bludisko",
-    "submitting": "Odosiela sa…",
+    "submit": "Použiť toto bludisko",
+    "submitting": "Používa sa…",
     "confirmSubmit": "Použiť {name} v tomto zápase? Potom ho už nebude možné upraviť, ale môžete ho znova použiť v iných zápasoch.",
     "confirmYes": "Použiť",
     "confirmNo": "Zrušiť",
