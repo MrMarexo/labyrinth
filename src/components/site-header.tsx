@@ -1,9 +1,8 @@
 import { headers } from "next/headers";
 import { getTranslations } from "next-intl/server";
 
-import { LocaleSwitcher } from "~/components/locale-switcher";
+import { SettingsMenu } from "~/components/settings-menu";
 import { SignOutButton } from "~/components/sign-out-button";
-import { ThemeToggle } from "~/components/theme-toggle";
 import { Link } from "~/i18n/navigation";
 import { getSession } from "~/server/auth";
 
@@ -27,8 +26,7 @@ export async function SiteHeader() {
             </Link>
           </nav>
         )}
-        <LocaleSwitcher />
-        <ThemeToggle />
+        <SettingsMenu />
         {session ? (
           <SignOutButton />
         ) : (

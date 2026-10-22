@@ -7,7 +7,8 @@ import { usePathname, useRouter } from "~/i18n/navigation";
 import { locales, type Locale } from "~/i18n/routing";
 import { api } from "~/trpc/react";
 
-export function LocaleSwitcher() {
+/** `showLabel` prints the label beside the control, as the settings menu does. */
+export function LocaleSwitcher({ showLabel = false }: { showLabel?: boolean }) {
   const t = useTranslations("locale");
   const locale = useLocale();
   const router = useRouter();
@@ -16,8 +17,8 @@ export function LocaleSwitcher() {
   const setLocale = api.profile.setLocale.useMutation();
 
   return (
-    <label className="flex items-center gap-2 text-sm">
-      <span className="sr-only">{t("label")}</span>
+    <label className="flex items-center justify-between gap-3 text-sm">
+      <span className={showLabel ? undefined : "sr-only"}>{t("label")}</span>
       <select
         aria-label={t("label")}
         className="border-border-strong bg-bg rounded border px-2 py-1"

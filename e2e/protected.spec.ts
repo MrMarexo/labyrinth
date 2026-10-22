@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { PASSWORD, uniqueEmail } from "./support/auth";
+import { openSettings } from "./support/settings";
 
 test.describe("protected area", () => {
   test("redirects an anonymous visitor to sign in", async ({ page }) => {
@@ -27,6 +28,7 @@ test.describe("protected area", () => {
       page.getByRole("heading", { level: 1, name: "Your games" }),
     ).toBeVisible();
 
+    await openSettings(page);
     await page.getByRole("combobox", { name: "Language" }).selectOption("sk");
     await expect(page).toHaveURL(/\/sk\/play$/);
     await expect(
@@ -112,6 +114,7 @@ test.describe("language preference", () => {
     await page.getByRole("button", { name: "Sign up" }).click();
     await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
 
+    await openSettings(page);
     await page.getByRole("combobox", { name: "Language" }).selectOption("sk");
     await expect(page).toHaveURL(/\/sk$/);
 

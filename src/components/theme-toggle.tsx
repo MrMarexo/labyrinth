@@ -19,7 +19,8 @@ function apply(choice: Choice) {
   }
 }
 
-export function ThemeToggle() {
+/** `showLabel` prints the label beside the control, as the settings menu does. */
+export function ThemeToggle({ showLabel = false }: { showLabel?: boolean }) {
   const t = useTranslations("theme");
   const [choice, setChoice] = useState<Choice>("system");
 
@@ -33,8 +34,8 @@ export function ThemeToggle() {
   }, []);
 
   return (
-    <label className="flex items-center gap-2 text-sm">
-      <span className="sr-only">{t("label")}</span>
+    <label className="flex items-center justify-between gap-3 text-sm">
+      <span className={showLabel ? undefined : "sr-only"}>{t("label")}</span>
       <select
         aria-label={t("label")}
         className="border-border-strong bg-bg rounded border px-2 py-1"
