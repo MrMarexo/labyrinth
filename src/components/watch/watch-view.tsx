@@ -255,7 +255,6 @@ function WatchPlayer({
             at={frame.at}
             heldKeys={frame.heldKeys}
             bump={bump}
-            pending={false}
           />
           <div className="flex flex-wrap gap-4 text-sm">
             <p data-penalties={frame.penalties}>

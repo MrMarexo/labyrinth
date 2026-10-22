@@ -3,7 +3,7 @@ import { expect } from "@playwright/test";
 import { GATED_MAZE_ROUTE } from "~/lib/open-maze";
 
 import { createMatch, test } from "./support/match";
-import { startRunningMatch, walk } from "./support/run";
+import { closeFinishPopup, startRunningMatch, walk } from "./support/run";
 
 // Well under the 60s fallback poll: passing these proves the push.
 const PUSH = { timeout: 10_000 };
@@ -16,6 +16,7 @@ test.describe("watching and replay", () => {
   }, testInfo) => {
     const { host, guest } = await startRunningMatch(players, createMatch);
     await walk(host, [...GATED_MAZE_ROUTE], testInfo);
+    await closeFinishPopup(host);
     await host.locator("a[data-watch-live]").click();
     await expect(host).toHaveURL(/\/watch\?run=opponent$/);
     const view = host.locator("[data-watch-view]");
@@ -98,6 +99,7 @@ test.describe("watching and replay", () => {
   }, testInfo) => {
     const { host, guest } = await startRunningMatch(players, createMatch);
     await walk(host, [...GATED_MAZE_ROUTE], testInfo);
+    await closeFinishPopup(host);
     await walk(guest, [...GATED_MAZE_ROUTE], testInfo);
     await expect(host.locator("[data-match-result]")).toBeVisible(PUSH);
 

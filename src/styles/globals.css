@@ -5,18 +5,15 @@
     var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif,
     "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
 
-  --animate-shake: shake 240ms ease-in-out;
+  --animate-bump-pulse: bump-pulse 200ms ease-out;
 
-  @keyframes shake {
+  @keyframes bump-pulse {
     0%,
     100% {
-      transform: translateX(0);
+      transform: scale(1);
     }
-    25% {
-      transform: translateX(-4px);
-    }
-    75% {
-      transform: translateX(4px);
+    40% {
+      transform: scale(1.35);
     }
   }
 }

@@ -1,10 +1,13 @@
 "use client";
 
+import { useState } from "react";
+
 import { POLL_MS } from "~/components/realtime/poll";
 import { useChannel } from "~/components/realtime/use-channel";
 import { MatchLobby } from "~/components/match/match-lobby";
+import { FinishPopup } from "~/components/run/finish-popup";
 import { MatchResult } from "~/components/run/match-result";
-import { RunView } from "~/components/run/run-view";
+import { RunView, type Finish } from "~/components/run/run-view";
 import { EVENTS, isTerminal } from "~/match";
 import { api, type RouterOutputs } from "~/trpc/react";
 
@@ -46,16 +49,38 @@ export function MatchScreen({
 
   const ran = data.you.hasSubmitted && (data.opponent?.hasSubmitted ?? false);
 
+  // Held here, not in the run view: the finishing move can complete the
+  // match, which swaps the run view for the result underneath the popup.
+  const [finish, setFinish] = useState<Finish | null>(null);
+
+  let screen;
   if (data.status === "running") {
-    return (
+    screen = (
       <RunView
         matchId={matchId}
         opponentName={data.opponent?.displayName ?? ""}
         deadlineAt={data.deadlineAt}
         runChannel={data.channels.yourRun}
+        onFinish={setFinish}
       />
     );
+  } else if (isTerminal(data.status) && ran) {
+    screen = <MatchResult matchId={matchId} />;
+  } else {
+    screen = <MatchLobby matchId={matchId} initialData={data} />;
   }
-  if (isTerminal(data.status) && ran) return <MatchResult matchId={matchId} />;
-  return <MatchLobby matchId={matchId} initialData={data} />;
+
+  return (
+    <>
+      {screen}
+      {finish && (
+        <FinishPopup
+          matchId={matchId}
+          finish={finish}
+          ready={finish.matchOver || isTerminal(data.status)}
+          onClose={() => setFinish(null)}
+        />
+      )}
+    </>
+  );
 }

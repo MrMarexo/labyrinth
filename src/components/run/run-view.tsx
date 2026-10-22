@@ -7,7 +7,7 @@ import { gateColour } from "~/components/editor/gate-colours";
 import { isTypingTarget } from "~/components/keyboard";
 import { useChannel } from "~/components/realtime/use-channel";
 import { RunBoard, type Bump } from "~/components/run/run-board";
-import { useMoveQueue } from "~/components/run/use-move-queue";
+import { useMoveQueue, type DeltaKind } from "~/components/run/use-move-queue";
 import { Link } from "~/i18n/navigation";
 import { resolveErrorKey } from "~/lib/resolve-error-key";
 import {
@@ -41,16 +41,22 @@ const DPAD: { dir: Direction; label: string; area: string; arrow: string }[] = [
   { dir: "S", label: "moveS", area: "col-start-2 row-start-3", arrow: "↓" },
 ];
 
+/** What the finish popup reports, from the move that reached the treasure. */
+export type Finish = { penalties: number; moves: number; matchOver: boolean };
+
 export function RunView({
   matchId,
   opponentName,
   deadlineAt,
   runChannel,
+  onFinish,
 }: {
   matchId: string;
   opponentName: string;
   deadlineAt: Date;
   runChannel: string;
+  /** Called once, on the finishing move — never on a reload. */
+  onFinish: (finish: Finish) => void;
 }) {
   const t = useTranslations("run");
   const te = useTranslations();
@@ -99,9 +105,10 @@ export function RunView({
     return copy[delta.outcome]();
   }
 
-  const onDelta = (delta: RunnerDelta) => {
+  const onDelta = (delta: RunnerDelta, kind: DeltaKind, matchOver: boolean) => {
     utils.run.get.setData({ matchId }, (old) => {
-      if (!old) return old;
+      // Already drawn: a confirmed prediction, or an answer a refetch beat.
+      if (!old || old.moves >= delta.moves) return old;
       const map = recordDelta(old.map, delta);
       return {
         ...old,
@@ -114,34 +121,45 @@ export function RunView({
         finished: delta.finished,
       };
     });
+    if (kind === "confirmed") return;
     setAnnouncement(announce(delta));
     if (delta.outcome.startsWith("blocked") && delta.revealedSegment) {
       setBump({ segment: delta.revealedSegment, id: delta.moves });
     }
+    if (delta.finished) {
+      // The popup's time needs `run.get`'s elapsedMs, which only the server
+      // knows.
+      void utils.run.get.invalidate({ matchId });
+      onFinish({ penalties: delta.penalties, moves: delta.moves, matchOver });
+    }
   };
 
-  const { enqueue, pending } = useMoveQueue(matchId, data?.nextSeq ?? 1, {
-    onDelta,
-    onMatchOver: (key) => {
-      void utils.match.get.invalidate({ id: matchId });
-      if (key === "errors.matchExpired") {
-        setExpired(true);
-        setAnnouncement(te("errors.matchExpired"));
-      }
+  const { enqueue, lean, pending } = useMoveQueue(
+    matchId,
+    data?.nextSeq ?? 1,
+    () => utils.run.get.getData({ matchId }),
+    {
+      onDelta,
+      onMatchOver: (key) => {
+        void utils.match.get.invalidate({ id: matchId });
+        if (key === "errors.matchExpired") {
+          setExpired(true);
+          setAnnouncement(te("errors.matchExpired"));
+        }
+      },
+      onResync: () => {
+        setAnnouncement(
+          te(
+            resolveErrorKey(
+              te,
+              { message: "errors.moveOutOfOrder" },
+              "errors.unknown",
+            ).key as never,
+          ),
+        );
+      },
     },
-    onResync: () => {
-      void utils.run.get.invalidate({ matchId });
-      setAnnouncement(
-        te(
-          resolveErrorKey(
-            te,
-            { message: "errors.moveOutOfOrder" },
-            "errors.unknown",
-          ).key as never,
-        ),
-      );
-    },
-  });
+  );
 
   const finished = (data?.finished ?? true) || expired;
   useEffect(() => {
@@ -160,148 +178,168 @@ export function RunView({
 
   if (!data) return null;
 
-  return (
-    <div data-run-view className="space-y-4">
-      <div className="space-y-2">
-        <p className="text-muted text-sm">{t("penaltiesLabel")}</p>
-        <p data-penalties={data.penalties} className="text-4xl font-bold">
-          {data.penalties}
+  const counters = (
+    <div className="space-y-2">
+      <p data-run-rule className="text-sm">
+        {t.rich("rule", { b: (chunks) => <strong>{chunks}</strong> })}
+      </p>
+      <p className="text-muted text-sm">{t("penaltiesLabel")}</p>
+      <p data-penalties={data.penalties} className="text-4xl font-bold">
+        {data.penalties}
+      </p>
+      <div className="flex flex-wrap items-center gap-4 text-sm">
+        <p data-moves={data.moves}>
+          {t("movesLabel")}: {data.moves}
         </p>
-        <div className="flex flex-wrap items-center gap-4 text-sm">
-          <p data-moves={data.moves}>
-            {t("movesLabel")}: {data.moves}
-          </p>
-          <div className="flex items-center gap-2">
-            <span>{t("keysLabel")}:</span>
-            {data.heldKeys.length === 0 ? (
-              <span className="text-muted">{t("noKeys")}</span>
-            ) : (
-              data.heldKeys.map((gate) => (
-                <span
-                  key={gate}
-                  data-held-key={gate}
-                  role="img"
-                  aria-label={t("keyName", { gate })}
-                  title={t("keyName", { gate })}
-                  className="border-border-strong inline-block size-4 rounded-full border"
-                  style={{ backgroundColor: gateColour(gate) }}
-                />
-              ))
-            )}
-          </div>
-        </div>
-        <span aria-live="polite">
-          {watchers >= 1 && (
-            <span data-watchers={watchers} className="text-muted text-sm">
-              {t("watching", { count: watchers })}
-            </span>
+        <div className="flex items-center gap-2">
+          <span>{t("keysLabel")}:</span>
+          {data.heldKeys.length === 0 ? (
+            <span className="text-muted">{t("noKeys")}</span>
+          ) : (
+            data.heldKeys.map((gate) => (
+              <span
+                key={gate}
+                data-held-key={gate}
+                role="img"
+                aria-label={t("keyName", { gate })}
+                title={t("keyName", { gate })}
+                className="border-border-strong inline-block size-4 rounded-full border"
+                style={{ backgroundColor: gateColour(gate) }}
+              />
+            ))
           )}
-        </span>
-        {pending && <span data-run-pending hidden />}
+        </div>
+      </div>
+      <span aria-live="polite">
+        {watchers >= 1 && (
+          <span data-watchers={watchers} className="text-muted text-sm">
+            {t("watching", { count: watchers })}
+          </span>
+        )}
+      </span>
+      {pending && <span data-run-pending hidden />}
+    </div>
+  );
+
+  return (
+    // Below lg the three parts stack in DOM order; from lg the board takes
+    // the left column and the other two share a 20rem column on the right.
+    <div
+      data-run-view
+      className="space-y-4 lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:grid-rows-[auto_1fr] lg:items-start lg:space-y-0 lg:gap-x-8 lg:gap-y-4"
+    >
+      <div className="lg:col-start-2 lg:row-start-1">{counters}</div>
+
+      <div
+        data-run-board-column
+        className="space-y-2 lg:col-start-1 lg:row-span-2 lg:row-start-1"
+      >
+        <p aria-live="polite" data-run-announcement className="sr-only">
+          {announcement}
+        </p>
+        <RunBoard
+          map={data.map}
+          at={data.at}
+          heldKeys={data.heldKeys}
+          bump={bump}
+          lean={lean}
+        />
+        <p className="text-muted text-sm">{t("hint")}</p>
       </div>
 
-      <p aria-live="polite" data-run-announcement className="sr-only">
-        {announcement}
-      </p>
-
-      <RunBoard
-        map={data.map}
-        at={data.at}
-        heldKeys={data.heldKeys}
-        bump={bump}
-        pending={pending}
-      />
-      <p className="text-muted text-sm">{t("hint")}</p>
-      <p data-run-deadline className="text-muted text-sm">
-        {t("deadline", {
-          when: format.dateTime(deadlineAt, {
-            dateStyle: "medium",
-            timeStyle: "short",
-          }),
-        })}
-      </p>
-
-      {expired && (
-        <p role="alert" data-run-expired className="text-danger text-sm">
-          {te("errors.matchExpired")}
+      <div className="space-y-4 lg:col-start-2 lg:row-start-2">
+        <p data-run-deadline className="text-muted text-sm">
+          {t("deadline", {
+            when: format.dateTime(deadlineAt, {
+              dateStyle: "medium",
+              timeStyle: "short",
+            }),
+          })}
         </p>
-      )}
 
-      {data.finished ? (
-        <div data-run-finished className="space-y-2">
-          <p>
-            {t("finishedWaiting", {
-              penalties: data.penalties,
-              moves: data.moves,
-            })}
+        {expired && (
+          <p role="alert" data-run-expired className="text-danger text-sm">
+            {te("errors.matchExpired")}
           </p>
-          <Link
-            href={`/matches/${matchId}/watch?run=opponent`}
-            data-watch-live
-            className="text-accent inline-block text-sm underline"
-          >
-            {t("watchLive")}
-          </Link>
-        </div>
-      ) : expired ? null : (
-        <>
-          <div
-            role="group"
-            aria-label={t("dpadLabel")}
-            className="grid w-fit grid-cols-3 grid-rows-3 gap-1"
-          >
-            {DPAD.map(({ dir, label, area, arrow }) => (
-              <button
-                key={dir}
-                type="button"
-                aria-label={t(label as "moveN")}
-                onClick={() => enqueue(dir)}
-                className={`${area} border-border-strong min-h-11 min-w-11 rounded border text-lg`}
-              >
-                <span aria-hidden="true">{arrow}</span>
-              </button>
-            ))}
-          </div>
+        )}
 
-          {confirming ? (
-            <div className="space-y-2">
-              <p>{t("confirmGiveUp", { name: opponentName })}</p>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  disabled={giveUp.isPending}
-                  onClick={() => giveUp.mutate({ matchId })}
-                  className="bg-accent text-on-accent rounded px-3 py-2 text-sm disabled:opacity-50"
-                >
-                  {giveUp.isPending ? t("givingUp") : t("giveUpYes")}
-                </button>
-                <button
-                  type="button"
-                  disabled={giveUp.isPending}
-                  onClick={() => setConfirming(false)}
-                  className="border-border-strong rounded border px-3 py-2 text-sm disabled:opacity-50"
-                >
-                  {t("giveUpNo")}
-                </button>
-              </div>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setConfirming(true)}
-              className="border-border-strong rounded border px-3 py-2 text-sm"
-            >
-              {t("giveUp")}
-            </button>
-          )}
-
-          {giveUpError && (
-            <p role="alert" className="text-danger text-sm">
-              {te(giveUpError.key as never, giveUpError.params as never)}
+        {data.finished ? (
+          <div data-run-finished className="space-y-2">
+            <p>
+              {t("finishedWaiting", {
+                penalties: data.penalties,
+                moves: data.moves,
+              })}
             </p>
-          )}
-        </>
-      )}
+            <Link
+              href={`/matches/${matchId}/watch?run=opponent`}
+              data-watch-live
+              className="text-accent inline-block text-sm underline"
+            >
+              {t("watchLive")}
+            </Link>
+          </div>
+        ) : expired ? null : (
+          <>
+            <div
+              role="group"
+              data-dpad
+              aria-label={t("dpadLabel")}
+              className="grid w-fit grid-cols-3 grid-rows-3 gap-1"
+            >
+              {DPAD.map(({ dir, label, area, arrow }) => (
+                <button
+                  key={dir}
+                  type="button"
+                  aria-label={t(label as "moveN")}
+                  onClick={() => enqueue(dir)}
+                  className={`${area} border-border-strong min-h-11 min-w-11 rounded border text-lg`}
+                >
+                  <span aria-hidden="true">{arrow}</span>
+                </button>
+              ))}
+            </div>
+
+            {confirming ? (
+              <div className="space-y-2">
+                <p>{t("confirmGiveUp", { name: opponentName })}</p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled={giveUp.isPending}
+                    onClick={() => giveUp.mutate({ matchId })}
+                    className="bg-accent text-on-accent rounded px-3 py-2 text-sm disabled:opacity-50"
+                  >
+                    {giveUp.isPending ? t("givingUp") : t("giveUpYes")}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={giveUp.isPending}
+                    onClick={() => setConfirming(false)}
+                    className="border-border-strong rounded border px-3 py-2 text-sm disabled:opacity-50"
+                  >
+                    {t("giveUpNo")}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirming(true)}
+                className="border-border-strong rounded border px-3 py-2 text-sm"
+              >
+                {t("giveUp")}
+              </button>
+            )}
+
+            {giveUpError && (
+              <p role="alert" className="text-danger text-sm">
+                {te(giveUpError.key as never, giveUpError.params as never)}
+              </p>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }

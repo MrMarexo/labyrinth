@@ -91,3 +91,23 @@ export async function startRunningMatch(
   await expect(guest.locator("[data-run-view]")).toBeVisible();
   return { host, guest };
 }
+
+/** Presses one move: the keyboard on desktop, the d-pad on mobile. */
+export async function press(
+  page: Page,
+  dir: Direction,
+  testInfo: TestInfo,
+): Promise<void> {
+  if (testInfo.project.name === "mobile") {
+    await page.getByRole("button", { name: BUTTON[dir] }).click();
+  } else {
+    await page.keyboard.press(KEY[dir]);
+  }
+}
+
+/** Dismisses the popup the treasure opens, which is modal. */
+export async function closeFinishPopup(page: Page): Promise<void> {
+  const popup = page.locator("[data-finish-popup]");
+  await popup.getByRole("button", { name: "Close" }).click();
+  await expect(popup).toBeHidden();
+}
