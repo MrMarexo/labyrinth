@@ -19,7 +19,8 @@ A match runs like this:
    **opponent's** maze.
 5. A run is continuous — you move until you reach the treasure. You never wait
    for the other player.
-6. Each blocked move costs one penalty. Fewest penalties wins.
+6. Each blocked move is a bump (stored as a penalty). Fewest bumps wins; equal
+   bumps is a draw (§2.6).
 7. The result is withheld until both players finish, then revealed to both.
 
 The author of a maze may watch their opponent solving it live, and may replay
@@ -32,7 +33,8 @@ any completed run afterwards.
 - **Cell** — one square of the labyrinth.
 - **Segment** — a wall or a gate, sitting on the edge *between* two cells.
 - **Void** — a square that is not part of the labyrinth.
-- **Penalty** — the score. Incremented by one on every blocked move. This is
+- **Penalty** — the score, shown to players as **bumps**. Incremented by one on
+  every blocked move. This is
   what the original description calls a "turn"; there is no alternating turn
   order.
 
@@ -80,19 +82,18 @@ that run. Each gate id appears on exactly one segment and has exactly one key.
 
 ### 2.6 Scoring
 
-Fewest penalties wins. Tiebreakers, in order: fewer total moves, then shorter
-elapsed run time. Both players' mazes share the same cell budget and gate count,
-which is what makes the raw comparison defensible — beyond that, asymmetry is
+Fewest **bumps** wins. A bump is a move into a wall or a locked gate (stored as
+`penalties`); walking is free. There is no tiebreak: **equal bumps is a draw**,
+which completes the match with no winner (`endReason: finished`, `winnerId`
+null). Both players' mazes share the same cell budget and gate count, which is
+what makes the raw comparison defensible — beyond that, asymmetry is
 intentional. You chose how cruel to make your maze.
 
-Elapsed run time is measured from the runner's first move to the move that
-reached the treasure — not from the unlocking, because runs are asynchronous and
-a player who starts a day later has not been slower.
-
-Two runs identical on all three counts complete with **no winner**
-(`endReason: finished`, `winnerId` null). Matching to the millisecond is all but
-impossible, but the outcome has to be defined rather than left to whichever row
-the comparison happened to visit first.
+Moves and elapsed run time are recorded and shown, on the finish popup and the
+result screen, but never decide anything. Elapsed run time is measured from the
+runner's first move to the move that reached the treasure — not from the
+unlocking, because runs are asynchronous and a player who starts a day later
+has not been slower.
 
 ## 3. Maze format
 
@@ -348,13 +349,38 @@ verdict is never trusted.
 on a flaky connection cannot produce a phantom penalty. Since penalties *are*
 the score, this matters more here than it normally would.
 
-### 7.3 No optimistic movement
+### 7.3 No optimistic movement for unknown edges
 
 The client genuinely does not know whether a wall is there — that is the game.
 Guessing and rolling back would flicker the map and sometimes draw a wall that
-does not exist. Instead: a brief pending state, and held-key input queued as
-sequential `seq`-numbered moves so holding an arrow key feels continuous at
-~150 ms round trips.
+does not exist. The board's map therefore changes only from server deltas for
+any edge the runner has not yet walked through.
+
+The delay is hidden in two ways instead:
+
+- **Known passages move instantly.** The discovered map records every edge the
+  runner has walked through (`passages`, start-relative, a crossed gate
+  included). A move through one has a certain answer, which `predictMove`
+  computes from the runner's own map; the client draws it at once, still sends
+  the move with its `seq`, and reconciles. A matching answer changes nothing;
+  any disagreement or refusal falls back to refetching `run.get`. A predicted
+  move never bumps. Several such moves may run ahead of the server; a move
+  over an unknown edge waits for its own answer, and nothing past it is
+  predicted until then.
+- **Lean, then resolve.** On a key press over an unknown edge the runner leans
+  about a third of a cell toward it (~90 ms) and holds; the answer either
+  slides it into the new cell or springs it back with a bump pulse. The lean
+  is cosmetic — the runner's logical position never moves before the server
+  answers — and is skipped under reduced motion.
+
+Held-key input is still queued as sequential `seq`-numbered moves, with one
+move waiting behind an unknown edge.
+
+The obvious alternative — ship the maze to the browser, encrypted, and let the
+client resolve moves locally — is rejected outright. A browser that can
+decrypt the maze to resolve a move holds the key, and so does the player
+running it: encryption hides the maze from no one who can open the developer
+tools. The server stays the only authority on unknown edges (§7.1).
 
 ## 8. Realtime, spectating and replay
 
@@ -605,9 +631,25 @@ is the intended answer, out of scope here.
 
 The same board component with a different data source: discovered cells and
 bumped segments instead of the full maze. Arrow keys and WASD on desktop, an
-on-screen d-pad on touch. Penalties take the prominent position since they are
-the score; moves and held keys (colour-matched to their gates) are secondary. A
-blocked move shakes the board and draws the segment that stopped you.
+on-screen d-pad on touch. A one-line rule sits at the top — **Fewest bumps
+wins.** Walking is free; a wall or a locked gate is a bump; equal bumps is a
+draw. Bumps take the prominent position since they are the score; moves and
+held keys (colour-matched to their gates) are secondary. A blocked move pulses
+the runner briefly (about 200 ms, never left enlarged) and draws the segment
+that stopped you.
+
+On desktop (`lg` and up) the board is on the left and a right-hand column
+(about 20rem) holds the rule, the bump counter, moves, keys, the watching
+badge, the deadline, the d-pad and Give up. Narrower screens stack the same
+parts in that order around the board.
+
+The board shows at least 7 × 7 cells, centred on the runner, and grows to fit
+every discovered cell, segment and passage with a cell of padding, easing the
+change over about 200 ms. An edge between two discovered cells that is neither
+a known segment nor a passage is drawn as a faint dashed line: untested, could
+go either way. A key on a discovered cell has been collected (stepping on a
+cell picks it up) and a drawn treasure has been reached, so both are drawn at
+about 15% opacity. The watch view's runner board shares all of this.
 
 "The same board component" is to be read as the same *look*, not the same
 component: the editor board renders every square of the frame and labels each
@@ -617,14 +659,19 @@ gate colours and is fed only what the runner has discovered. Its viewport grows
 as the runner explores, because the frame's size is itself a secret.
 
 A runner who finds the treasure sees their own score and a waiting state; the
-opponent's score stays hidden until the match ends (§9).
+opponent's score stays hidden until the match ends (§9). The finishing move
+also opens a modal popup, once and never on a reload: "You found the
+treasure!", their bumps, moves and time, and either that the result is revealed
+when the opponent finishes or runs out of time (with a link to watch them
+live), or — when that move completed the match — that the result is ready,
+with a button to see it. Escape or Close dismisses it.
 
 ### 10.3.1 Result screen
 
 Shown on `/matches/[id]` once the match is `complete` or `abandoned` — the one
 URL renders the lobby, the run or the result by status. It gives the winner, or
-"no winner"; the reason; both players' penalties, moves and time side by side,
-with the deciding tiebreaker marked; and **both mazes in full**, each with the
+"no winner" (a draw on equal bumps); the reason; both players' bumps, moves
+and time side by side, with the bumps marked when they decided it; and **both mazes in full**, each with the
 path its runner took drawn over it as a static polyline. The opponent's maze
 with your path is the payoff of the game. Your maze with theirs is the poor
 man's replay until §10.4 exists, and gives way to it then.
@@ -842,7 +889,9 @@ does not need to change to add a lobby later.
 | Forfeits | Missing a deadline never hands the opponent a win unless that opponent reached the treasure. Every deadline except the last closes the match with no winner. |
 | Giving up (Phase 4) | Allowed mid-run, confirmed, irreversible. Ends the match at once and the opponent wins, finished or not. A concession is not silence, so the no-unearned-wins rule does not apply to it (§9.2). |
 | What the result reveals (Phase 4) | Scores, winner, reason, and both full mazes with each runner's path drawn over them. |
-| Perfect tie | No winner. |
+| Perfect tie | No winner. Superseded by the scoring change below: any tie on bumps is a draw. |
+| Scoring (revised) | Bumps only. Fewest bumps wins; equal bumps is a draw. Moves and time are shown, never scored — the earlier moves-then-time tiebreak is gone. |
+| Client-side maze for faster moves | No, not even encrypted. A browser that can decrypt the maze to resolve moves gives the key to the player. Delay is hidden by instant moves through known passages and a lean-then-resolve animation instead (§7.3). |
 | Watching (Phase 5) | Only once your own run is over — before that the opponent's live score would be a known target (§8). Pace-based replay, 1×–8×. |
 | Spectating layout | Two boards side by side — the runner's fogged view and the author's full maze — because authors do not remember their own walls. |
 | Connectivity rule | Shape must be orthogonally connected and the treasure must be reachable. Sealed pockets allowed. |
