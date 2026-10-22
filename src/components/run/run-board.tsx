@@ -84,8 +84,8 @@ export function untestedEdges(map: DiscoveredMap): Edge[] {
 type Box = { x: number; y: number; w: number; h: number };
 
 /**
- * At least MIN_SPAN cells each way, centred on the runner, and grown to fit
- * everything discovered with a cell of padding.
+ * At least MIN_SPAN cells each way, centred on the runner, grown to fit
+ * everything discovered with a cell of padding, then squared off.
  */
 function boardBox(map: DiscoveredMap, at: Point): Box {
   const half = Math.floor(MIN_SPAN / 2);
@@ -103,6 +103,17 @@ function boardBox(map: DiscoveredMap, at: Point): Box {
   for (const e of [...map.segments, ...(map.passages ?? [])]) {
     include(e.x, e.y);
     include(e.o === "H" ? e.x : e.x + 1, e.o === "H" ? e.y + 1 : e.y);
+  }
+  // Square, so the board's on-screen size never changes as it grows: on a
+  // phone the d-pad below it must not move under the thumb.
+  const spanX = maxX - minX + 1;
+  const spanY = maxY - minY + 1;
+  if (spanX < spanY) {
+    minX -= Math.floor((spanY - spanX) / 2);
+    maxX += Math.ceil((spanY - spanX) / 2);
+  } else if (spanY < spanX) {
+    minY -= Math.floor((spanX - spanY) / 2);
+    maxY += Math.ceil((spanX - spanY) / 2);
   }
   return {
     x: minX * CELL_PX,
@@ -209,7 +220,8 @@ export function RunBoard({ map, at, heldKeys, bump, lean }: RunBoardProps) {
       role="img"
       aria-label={t("boardLabel")}
       viewBox={`${box.x} ${box.y} ${box.w} ${box.h}`}
-      className="border-border-strong h-auto w-full max-w-[700px] rounded border"
+      preserveAspectRatio="xMidYMid meet"
+      className="border-border-strong aspect-square h-auto w-full max-w-[700px] rounded border"
     >
       <rect
         aria-hidden="true"

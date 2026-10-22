@@ -207,6 +207,42 @@ test.describe("how the run feels", () => {
     }
   });
 
+  test("the board keeps its size while it grows, so the d-pad stays put", async ({
+    players,
+  }, testInfo) => {
+    const { host } = await startRunningMatch(players, createMatch);
+    const board = host.locator("[data-run-board]");
+    const dpad = host.locator("[data-dpad]");
+    // Page coordinates, not viewport ones: tapping the d-pad on mobile may
+    // scroll the page, which is not the board moving.
+    const place = () =>
+      Promise.all(
+        [board, dpad].map((l) =>
+          l.evaluate((e) => {
+            const r = e.getBoundingClientRect();
+            return {
+              x: r.left + window.scrollX,
+              y: r.top + window.scrollY,
+              width: r.width,
+              height: r.height,
+            };
+          }),
+        ),
+      );
+    const [boardBefore, dpadBefore] = await place();
+    // Down the west edge, bump the wall, then east along it: the explored
+    // area grows taller first, then wider, never square.
+    await walk(host, ["S", "S", "S", "E", "E", "E", "E"], testInfo);
+    // Past the 200ms zoom easing.
+    await host.waitForTimeout(400);
+    expect(await board.getAttribute("viewBox")).not.toBe("-120 -120 280 280");
+    const [boardAfter, dpadAfter] = await place();
+    expect(boardAfter!.height).toBeCloseTo(boardBefore!.height, 0);
+    expect(boardAfter!.width).toBeCloseTo(boardBefore!.width, 0);
+    expect(dpadAfter!.y).toBeCloseTo(dpadBefore!.y, 0);
+    expect(dpadAfter!.x).toBeCloseTo(dpadBefore!.x, 0);
+  });
+
   test("the board shows at least seven squares each way from the start", async ({
     players,
   }) => {
