@@ -155,14 +155,26 @@ describe("maze.get", () => {
     expect(fetched.data).toEqual(emptyDraft());
   });
 
-  it("projects only what the editor needs — no authorId, status or derived metrics", async () => {
+  it("projects only what the editor and the read-only view need — status, but no authorId or derived metrics", async () => {
     const caller = createCaller(await signedIn());
     const created = await caller.maze.createDraft(settings);
     const fetched = await caller.maze.get({ id: created.id });
+    expect(Object.keys(fetched).sort()).toEqual(
+      ["cellCount", "data", "gateCount", "id", "name", "status"].sort(),
+    );
     expect(fetched).not.toHaveProperty("authorId");
-    expect(fetched).not.toHaveProperty("status");
     expect(fetched).not.toHaveProperty("contentHash");
     expect(fetched).not.toHaveProperty("optimalMoves");
+    expect(fetched.status).toBe("draft");
+
+    // The page decides read-only from this: a used labyrinth says so.
+    await db
+      .update(maze)
+      .set({ status: "submitted" })
+      .where(eq(maze.id, created.id));
+    expect((await caller.maze.get({ id: created.id })).status).toBe(
+      "submitted",
+    );
   });
 
   it("refuses someone else's maze, indistinguishably from a missing one", async () => {
@@ -256,5 +268,184 @@ describe("maze.remove", () => {
 
     const [row] = await db.select().from(maze).where(eq(maze.id, created.id));
     expect(row).toBeDefined();
+  });
+});
+
+/** A match in `drawing`: `host` made it at `settings`' size, a guest joined. */
+async function drawingMatch() {
+  const hostCtx = await signedIn();
+  const host = createCaller(hostCtx);
+  const created = await host.match.create({
+    cellCount: settings.cellCount,
+    gateCount: settings.gateCount,
+  });
+  await createCaller(await signedIn()).match.join({ code: created.code });
+  return { host, hostId: hostCtx.session!.user.id, matchId: created.id };
+}
+
+describe("maze.draftForMatch", () => {
+  it("creates an empty draft at the match's settings when there is none to reuse", async () => {
+    const { host, hostId, matchId } = await drawingMatch();
+
+    const { id } = await host.maze.draftForMatch({ matchId, name: "New" });
+
+    const [row] = await db.select().from(maze).where(eq(maze.id, id));
+    expect(row?.authorId).toBe(hostId);
+    expect(row?.status).toBe("draft");
+    expect(row?.name).toBe("New");
+    expect(row?.cellCount).toBe(settings.cellCount);
+    expect(row?.gateCount).toBe(settings.gateCount);
+    expect(row?.data).toEqual(emptyDraft());
+  });
+
+  it("reuses the caller's own empty draft at the same settings instead of piling up another", async () => {
+    const { host, matchId } = await drawingMatch();
+
+    const first = await host.maze.draftForMatch({ matchId, name: "New" });
+    const second = await host.maze.draftForMatch({ matchId, name: "New" });
+
+    expect(second.id).toBe(first.id);
+    const mine = await host.maze.list();
+    expect(mine.map((m) => m.id)).toEqual([first.id]);
+  });
+
+  it("does not reuse a draft that has squares, one at other settings, or someone else's", async () => {
+    const { host, matchId } = await drawingMatch();
+    const painted = await host.maze.createDraft(settings);
+    await host.maze.saveDraft({
+      id: painted.id,
+      data: { ...emptyDraft(), cells: [{ x: 0, y: 0 }] },
+    });
+    const otherSize = await host.maze.createDraft({
+      ...settings,
+      cellCount: 64,
+    });
+    const otherGates = await host.maze.createDraft({
+      ...settings,
+      gateCount: settings.gateCount + 1,
+    });
+    const stranger = createCaller(await signedIn());
+    const theirs = await stranger.maze.createDraft(settings);
+
+    const { id } = await host.maze.draftForMatch({ matchId, name: "New" });
+
+    expect([painted.id, otherSize.id, otherGates.id, theirs.id]).not.toContain(
+      id,
+    );
+  });
+
+  it("refuses a caller who is not in the match, indistinguishably from a missing one", async () => {
+    const { matchId } = await drawingMatch();
+    const strangerCtx = await signedIn();
+    const stranger = createCaller(strangerCtx);
+
+    const notMine = await rejection(
+      stranger.maze.draftForMatch({ matchId, name: "New" }),
+    );
+    const missing = await rejection(
+      stranger.maze.draftForMatch({
+        matchId: crypto.randomUUID(),
+        name: "New",
+      }),
+    );
+
+    expect(notMine).toEqual({
+      code: "FORBIDDEN",
+      message: "errors.notYourMatch",
+    });
+    expect(missing).toEqual(notMine);
+    const rows = await db
+      .select()
+      .from(maze)
+      .where(eq(maze.authorId, strangerCtx.session!.user.id));
+    expect(rows).toHaveLength(0);
+  });
+
+  it("refuses a match that is not in drawing", async () => {
+    const hostCtx = await signedIn();
+    const host = createCaller(hostCtx);
+    // Nobody has joined: still awaiting an opponent.
+    const created = await host.match.create({
+      cellCount: settings.cellCount,
+      gateCount: settings.gateCount,
+    });
+
+    await expect(
+      rejection(host.maze.draftForMatch({ matchId: created.id, name: "New" })),
+    ).resolves.toEqual({
+      code: "CONFLICT",
+      message: "errors.matchNotDrawing",
+    });
+    const rows = await db
+      .select()
+      .from(maze)
+      .where(eq(maze.authorId, hostCtx.session!.user.id));
+    expect(rows).toHaveLength(0);
+  });
+});
+
+describe("maze.discardIfEmpty", () => {
+  it("deletes the caller's own empty draft", async () => {
+    const caller = createCaller(await signedIn());
+    const created = await caller.maze.createDraft(settings);
+
+    await caller.maze.discardIfEmpty({ id: created.id });
+
+    const [row] = await db.select().from(maze).where(eq(maze.id, created.id));
+    expect(row).toBeUndefined();
+  });
+
+  it("keeps a draft that has squares", async () => {
+    const caller = createCaller(await signedIn());
+    const created = await caller.maze.createDraft(settings);
+    await caller.maze.saveDraft({
+      id: created.id,
+      data: { ...emptyDraft(), cells: [{ x: 0, y: 0 }] },
+    });
+
+    await caller.maze.discardIfEmpty({ id: created.id });
+
+    const [row] = await db.select().from(maze).where(eq(maze.id, created.id));
+    expect(row).toBeDefined();
+  });
+
+  it("keeps a submitted maze, even an empty one", async () => {
+    const caller = createCaller(await signedIn());
+    const created = await caller.maze.createDraft(settings);
+    // An empty maze can never really be submitted; set directly so the
+    // status is the only thing that keeps it.
+    await db
+      .update(maze)
+      .set({ status: "submitted" })
+      .where(eq(maze.id, created.id));
+
+    await caller.maze.discardIfEmpty({ id: created.id });
+
+    const [row] = await db.select().from(maze).where(eq(maze.id, created.id));
+    expect(row).toBeDefined();
+  });
+
+  it("keeps someone else's empty draft, and is a quiet no-op for them and for a missing id", async () => {
+    const owner = createCaller(await signedIn());
+    const created = await owner.maze.createDraft(settings);
+    const stranger = createCaller(await signedIn());
+
+    await stranger.maze.discardIfEmpty({ id: created.id });
+    await stranger.maze.discardIfEmpty({ id: crypto.randomUUID() });
+
+    const [row] = await db.select().from(maze).where(eq(maze.id, created.id));
+    expect(row).toBeDefined();
+  });
+
+  it("rejects an anonymous caller with a message key", async () => {
+    const caller = createCaller(
+      await createTRPCContext({ headers: new Headers() }),
+    );
+    await expect(
+      rejection(caller.maze.discardIfEmpty({ id: crypto.randomUUID() })),
+    ).resolves.toEqual({
+      code: "UNAUTHORIZED",
+      message: "errors.notSignedIn",
+    });
   });
 });
