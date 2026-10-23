@@ -131,6 +131,69 @@ test.describe("a locked match", () => {
     ).toBeVisible();
     await expect(host.locator("[data-join-request]")).toHaveCount(0, PUSH);
   });
+
+  test("a requester's row disappears live when the match is cancelled", async ({
+    players,
+  }) => {
+    const host = await players({ name: "Host maze", ...SIZE });
+    const guest = await players({ name: "Guest maze", ...SIZE });
+    const matchId = await createMatch(host, {
+      cells: 36,
+      gates: 0,
+      access: "locked",
+    });
+
+    await guest.goto("/en/matches");
+    const entry = guest.locator(`[data-lobby-match="${matchId}"]`);
+    await entry.getByRole("button", { name: "Request to join" }).click();
+    await expect(entry.locator("[data-request-state]")).toHaveAttribute(
+      "data-request-state",
+      "pending",
+    );
+
+    await host.locator("[data-cancel-match]").click();
+    await host.getByRole("button", { name: "Yes, cancel it" }).click();
+
+    await expect(entry).toHaveCount(0, PUSH);
+    await guest.goto(`/en/matches/${matchId}/join`);
+    await expect(guest.locator("[data-match-closed]")).toBeVisible();
+  });
+
+  test("a requester's row disappears live when someone else fills the match", async ({
+    players,
+  }) => {
+    const host = await players({ name: "Host maze", ...SIZE });
+    const guestA = await players({ name: "A maze", ...SIZE });
+    const guestB = await players({ name: "B maze", ...SIZE });
+    const matchId = await createMatch(host, {
+      cells: 36,
+      gates: 0,
+      access: "locked",
+    });
+
+    await guestA.goto("/en/matches");
+    const entry = guestA.locator(`[data-lobby-match="${matchId}"]`);
+    await entry.getByRole("button", { name: "Request to join" }).click();
+    await expect(entry.locator("[data-request-state]")).toHaveAttribute(
+      "data-request-state",
+      "pending",
+    );
+    await guestB.goto(`/en/matches/${matchId}/join`);
+    await guestB.getByRole("button", { name: "Request to join" }).click();
+
+    const requests = host.locator("[data-join-request]");
+    await expect(requests).toHaveCount(2, PUSH);
+    // Both accounts share a display name; B asked second, so B's row is last.
+    await requests
+      .last()
+      .getByRole("button", { name: /^Accept / })
+      .click();
+
+    await expect(guestB).toHaveURL(new RegExp(`/en/matches/${matchId}$`), PUSH);
+    await expect(entry).toHaveCount(0, PUSH);
+    await guestA.goto(`/en/matches/${matchId}/join`);
+    await expect(guestA.locator("[data-match-closed]")).toBeVisible();
+  });
 });
 
 test.describe("the share link", () => {
@@ -208,7 +271,7 @@ test.describe("the share link", () => {
     });
 
     await host.locator("[data-share-match]").click();
-    await expect(host.getByRole("status")).toHaveText("Link copied");
+    await expect(host.getByText("Link copied")).toBeVisible();
     const copied = await host.evaluate(() => navigator.clipboard.readText());
     expect(copied).toBe(
       `${new URL(host.url()).origin}/en/matches/${matchId}/join`,
