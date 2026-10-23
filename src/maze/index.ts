@@ -12,6 +12,7 @@ export * from "./draft";
 export * from "./editor-state";
 export * from "./format";
 export * from "./geometry";
+export * from "./library";
 export * from "./normalize";
 export * from "./playback";
 export * from "./predict";
