@@ -512,11 +512,6 @@ export const matchRouter = createTRPCRouter({
       }));
     }),
 
-  /**
-   * Deletes a match nobody has joined yet (spec §9). The players cascade,
-   * and no maze can have been submitted to it. Anything past
-   * `awaiting_opponent` is refused: the opponent has a stake by then.
-   */
   requestJoin: protectedProcedure
     .input(z.object({ matchId: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
@@ -703,10 +698,16 @@ export const matchRouter = createTRPCRouter({
         }
       });
 
+      await publishMatchChanged(input.matchId);
       await publishUserChanged(input.userId);
       return { id: input.matchId };
     }),
 
+  /**
+   * Deletes a match nobody has joined yet (spec §9). The players cascade,
+   * and no maze can have been submitted to it. Anything past
+   * `awaiting_opponent` is refused: the opponent has a stake by then.
+   */
   cancel: protectedProcedure
     .input(z.object({ matchId: z.string() }))
     .mutation(async ({ ctx, input }) => {

@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   EVENTS,
@@ -248,13 +248,14 @@ describe("join requests", () => {
       expect(pinged(matchChannel(matchId))).toBe(true);
     });
 
-    it("declineRequest pings the requester", async () => {
+    it("declineRequest pings the requester and the match", async () => {
       const { creator, matchId } = await lockedMatch();
       const a = await player();
       await a.caller.match.requestJoin({ matchId });
       events = [];
       await creator.caller.match.declineRequest({ matchId, userId: a.id });
       expect(pinged(userChannel(a.id))).toBe(true);
+      expect(pinged(matchChannel(matchId))).toBe(true);
     });
 
     it("acceptRequest pings every requester, the match and the lobby", async () => {
@@ -298,5 +299,28 @@ describe("expired matches", () => {
     expect(pinged(lobbyChannel())).toBe(true);
     expect(pinged(userChannel(a.id))).toBe(true);
     expect(pinged(matchChannel(matchId))).toBe(true);
+  });
+
+  it("a failing requester read cannot fail a sweep whose closes committed", async () => {
+    const { matchId } = await lockedMatch();
+    const a = await player();
+    await a.caller.match.requestJoin({ matchId });
+    const spy = vi.spyOn(db, "selectDistinct").mockImplementation(() => {
+      throw new Error("boom");
+    });
+    const logged = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    let logCount = 0;
+    try {
+      await sweepAll(db, new Date(Date.now() + HOURS_24_MS + 1000));
+      logCount = logged.mock.calls.length;
+    } finally {
+      spy.mockRestore();
+      logged.mockRestore();
+    }
+    const [row] = await db.select().from(match).where(eq(match.id, matchId));
+    expect(row?.status).toBe("abandoned");
+    expect(logCount).toBeGreaterThan(0);
   });
 });

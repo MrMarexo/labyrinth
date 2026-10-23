@@ -148,9 +148,9 @@ export async function sweepExpiredMatches(
       if (await closeIfExpired(db, row.id, now)) closed.push(row.id);
     }
   } finally {
-    // Committed closes are pinged even if a later one throws; publishSafely
-    // never throws, so this cannot mask that error. Concurrently, so the
-    // batch spends at most one publish timeout on them.
+    // Committed closes are pinged even if a later one throws; neither
+    // publish step throws, so this cannot mask that error. Concurrently, so
+    // the batch spends at most one publish timeout on them.
     await Promise.all(closed.map(publishMatchChanged));
     await publishLobbyAndRequesters(db, due, closed);
   }
@@ -163,23 +163,32 @@ export async function sweepExpiredMatches(
 /**
  * A waiting match that closed leaves the lobby, and its requesters (whose
  * rows stay until the match is purged) need to refetch their requests.
+ * Never throws: the requester read is a DB call, and publishing must not
+ * fail the sweep (AGENTS.md invariant 12).
  */
 async function publishLobbyAndRequesters(
   db: typeof Database,
   due: { id: string; status: string }[],
   closed: string[],
 ): Promise<void> {
-  const waiting = due
-    .filter((m) => closed.includes(m.id) && m.status === "awaiting_opponent")
-    .map((m) => m.id);
-  if (waiting.length === 0) return;
+  try {
+    const waiting = due
+      .filter((m) => closed.includes(m.id) && m.status === "awaiting_opponent")
+      .map((m) => m.id);
+    if (waiting.length === 0) return;
 
-  const requesters = await db
-    .selectDistinct({ userId: matchRequest.userId })
-    .from(matchRequest)
-    .where(inArray(matchRequest.matchId, waiting));
-  await Promise.all([
-    publishLobbyChanged(),
-    ...requesters.map((r) => publishUserChanged(r.userId)),
-  ]);
+    const requesters = await db
+      .selectDistinct({ userId: matchRequest.userId })
+      .from(matchRequest)
+      .where(inArray(matchRequest.matchId, waiting));
+    await Promise.all([
+      publishLobbyChanged(),
+      ...requesters.map((r) => publishUserChanged(r.userId)),
+    ]);
+  } catch (error) {
+    console.error(
+      "[realtime] publishing lobby and requester pings failed",
+      error,
+    );
+  }
 }
