@@ -1,5 +1,3 @@
-import { z } from "zod";
-
 /**
  * No I, L, O, 0 or 1: a join code is read off one screen and typed into
  * another, usually by someone reading it aloud. Dropping the ambiguous
@@ -20,16 +18,3 @@ export function makeCode(draw: (max: number) => number): string {
   }
   return code;
 }
-
-/**
- * Uppercases before validating, so someone typing their code in lowercase is
- * not told it is wrong.
- */
-export const matchCodeSchema = z
-  .string()
-  .trim()
-  .toUpperCase()
-  .length(CODE_LENGTH, { message: "errors.matchCodeMalformed" })
-  .regex(new RegExp(`^[${CODE_ALPHABET}]+$`), {
-    message: "errors.matchCodeMalformed",
-  });

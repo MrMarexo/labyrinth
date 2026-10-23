@@ -1,4 +1,10 @@
-import { EVENTS, matchChannel, runChannel } from "~/match";
+import {
+  EVENTS,
+  lobbyChannel,
+  matchChannel,
+  runChannel,
+  userChannel,
+} from "~/match";
 import type { LoggedMove } from "~/maze";
 
 import { publishSafely } from "./index";
@@ -15,4 +21,14 @@ export function publishMove(
 /** "Refetch the match": no payload, so the channel can disclose nothing. */
 export function publishMatchChanged(matchId: string): Promise<void> {
   return publishSafely(matchChannel(matchId), EVENTS.changed, {});
+}
+
+/** "Refetch the lobby": same no-payload shape as `publishMatchChanged`. */
+export function publishLobbyChanged(): Promise<void> {
+  return publishSafely(lobbyChannel(), EVENTS.changed, {});
+}
+
+/** "Refetch your requests and matches": for the one user on this channel. */
+export function publishUserChanged(userId: string): Promise<void> {
+  return publishSafely(userChannel(userId), EVENTS.changed, {});
 }

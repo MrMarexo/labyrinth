@@ -80,7 +80,7 @@ describe("sweepExpiredMatches", () => {
   it("abandons a drawing match where neither player drew, blaming neither", async () => {
     const host = createCaller(await signedIn());
     const created = await host.match.create(settings);
-    await createCaller(await signedIn()).match.join({ code: created.code });
+    await createCaller(await signedIn()).match.join({ matchId: created.id });
 
     await sweepAll(db, later(HOURS_48_MS + 1000));
 
@@ -99,7 +99,7 @@ describe("sweepExpiredMatches", () => {
     const host = createCaller(hostCtx);
     const created = await host.match.create(settings);
     const guestCtx = await signedIn();
-    await createCaller(guestCtx).match.join({ code: created.code });
+    await createCaller(guestCtx).match.join({ matchId: created.id });
     await host.match.submitMaze({
       matchId: created.id,
       mazeId: await savedMaze(host, "Drew it"),
@@ -129,7 +129,7 @@ describe("sweepExpiredMatches", () => {
     const host = createCaller(await signedIn());
     const created = await host.match.create(settings);
     const guest = createCaller(await signedIn());
-    await guest.match.join({ code: created.code });
+    await guest.match.join({ matchId: created.id });
     await host.match.submitMaze({
       matchId: created.id,
       mazeId: await savedMaze(host, "Host"),

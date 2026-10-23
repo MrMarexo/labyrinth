@@ -90,7 +90,7 @@ describe("publishing", () => {
       gateCount: GATED_MAZE_GATE_COUNT,
     } as const;
     const created = await host.match.create(settings);
-    await guest.match.join({ code: created.code });
+    await guest.match.join({ matchId: created.id });
     expect(on(matchChannel(created.id))).toHaveLength(1);
 
     const draft = await host.maze.createDraft({ name: "M", ...settings });

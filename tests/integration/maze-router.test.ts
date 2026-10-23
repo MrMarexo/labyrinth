@@ -391,7 +391,7 @@ async function drawingMatch() {
     cellCount: settings.cellCount,
     gateCount: settings.gateCount,
   });
-  await createCaller(await signedIn()).match.join({ code: created.code });
+  await createCaller(await signedIn()).match.join({ matchId: created.id });
   return { host, hostId: hostCtx.session!.user.id, matchId: created.id };
 }
 

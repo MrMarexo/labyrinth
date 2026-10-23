@@ -102,6 +102,61 @@ describe("match.create", () => {
   });
 });
 
+describe("match.create access and the one-waiting rule", () => {
+  it("stores the requested access, open by default", async () => {
+    const open = await createCaller(await signedIn()).match.create(settings);
+    const locked = await createCaller(await signedIn()).match.create({
+      ...settings,
+      access: "locked",
+    });
+
+    const rows = await db
+      .select({ id: match.id, access: match.access })
+      .from(match)
+      .where(inArray(match.id, [open.id, locked.id]));
+    expect(rows.find((r) => r.id === open.id)?.access).toBe("open");
+    expect(rows.find((r) => r.id === locked.id)?.access).toBe("locked");
+  });
+
+  it("refuses a second match while one is waiting", async () => {
+    const host = createCaller(await signedIn());
+    await host.match.create(settings);
+
+    expect(await rejection(host.match.create(settings))).toEqual({
+      code: "CONFLICT",
+      message: "errors.alreadyWaiting",
+    });
+  });
+
+  it("abandons an expired waiting match and creates the new one", async () => {
+    const host = createCaller(await signedIn());
+    const old = await host.match.create(settings);
+    await db
+      .update(match)
+      // Row 1 of §9.1 is recomputed from `createdAt`, not read from the column.
+      .set({
+        createdAt: new Date(Date.now() - HOURS_24_MS - 2000),
+        deadlineAt: new Date(Date.now() - 1000),
+      })
+      .where(eq(match.id, old.id));
+
+    const next = await host.match.create(settings);
+
+    expect(next.id).not.toBe(old.id);
+    const [row] = await db.select().from(match).where(eq(match.id, old.id));
+    expect(row?.status).toBe("abandoned");
+  });
+
+  it("allows another match once the first has an opponent", async () => {
+    const host = createCaller(await signedIn());
+    const first = await host.match.create(settings);
+    await createCaller(await signedIn()).match.join({ matchId: first.id });
+
+    const second = await host.match.create(settings);
+    expect(second.id).not.toBe(first.id);
+  });
+});
+
 describe("match.join", () => {
   it("seats the second player and moves the match to drawing", async () => {
     const host = createCaller(await signedIn());
@@ -109,7 +164,7 @@ describe("match.join", () => {
     const guestCtx = await signedIn();
     const guest = createCaller(guestCtx);
 
-    const joined = await guest.match.join({ code: created.code });
+    const joined = await guest.match.join({ matchId: created.id });
 
     expect(joined.id).toBe(created.id);
     const [row] = await db.select().from(match).where(eq(match.id, created.id));
@@ -127,31 +182,20 @@ describe("match.join", () => {
     const created = await host.match.create(settings);
     const guest = createCaller(await signedIn());
 
-    await guest.match.join({ code: created.code });
+    await guest.match.join({ matchId: created.id });
 
     const [row] = await db.select().from(match).where(eq(match.id, created.id));
     const gap = row!.deadlineAt.getTime() - row!.lastActivityAt.getTime();
     expect(gap).toBe(HOURS_48_MS);
   });
 
-  it("accepts a lowercase code", async () => {
-    const host = createCaller(await signedIn());
-    const created = await host.match.create(settings);
-    const guest = createCaller(await signedIn());
-
-    const joined = await guest.match.join({
-      code: created.code.toLowerCase(),
-    });
-    expect(joined.id).toBe(created.id);
-  });
-
   it("refuses a third player", async () => {
     const host = createCaller(await signedIn());
     const created = await host.match.create(settings);
-    await createCaller(await signedIn()).match.join({ code: created.code });
+    await createCaller(await signedIn()).match.join({ matchId: created.id });
 
     const third = createCaller(await signedIn());
-    expect(await rejection(third.match.join({ code: created.code }))).toEqual({
+    expect(await rejection(third.match.join({ matchId: created.id }))).toEqual({
       code: "CONFLICT",
       message: "errors.matchFull",
     });
@@ -162,24 +206,27 @@ describe("match.join", () => {
     const host = createCaller(hostCtx);
     const created = await host.match.create(settings);
 
-    expect(await rejection(host.match.join({ code: created.code }))).toEqual({
+    expect(await rejection(host.match.join({ matchId: created.id }))).toEqual({
       code: "CONFLICT",
       message: "errors.alreadyInMatch",
     });
   });
 
-  it("refuses an unknown code", async () => {
+  it("refuses an unknown match id", async () => {
     const guest = createCaller(await signedIn());
-    expect(await rejection(guest.match.join({ code: "ZZZZZZ" }))).toEqual({
-      code: "NOT_FOUND",
-      message: "errors.matchCodeUnknown",
-    });
+    expect(
+      await rejection(guest.match.join({ matchId: crypto.randomUUID() })),
+    ).toEqual({ code: "NOT_FOUND", message: "errors.matchNotFound" });
   });
 
-  it("refuses a malformed code with a message key", async () => {
+  it("refuses a locked match", async () => {
+    const host = createCaller(await signedIn());
+    const created = await host.match.create({ ...settings, access: "locked" });
     const guest = createCaller(await signedIn());
-    expect(await rejection(guest.match.join({ code: "nope" }))).toMatchObject({
-      code: "BAD_REQUEST",
+
+    expect(await rejection(guest.match.join({ matchId: created.id }))).toEqual({
+      code: "CONFLICT",
+      message: "errors.matchLocked",
     });
   });
 
@@ -192,7 +239,7 @@ describe("match.join", () => {
       .where(eq(match.id, created.id));
 
     const guest = createCaller(await signedIn());
-    expect(await rejection(guest.match.join({ code: created.code }))).toEqual({
+    expect(await rejection(guest.match.join({ matchId: created.id }))).toEqual({
       code: "CONFLICT",
       message: "errors.matchExpired",
     });
@@ -204,7 +251,7 @@ describe("match.get", () => {
     const hostCtx = await signedIn();
     const host = createCaller(hostCtx);
     const created = await host.match.create(settings);
-    await createCaller(await signedIn()).match.join({ code: created.code });
+    await createCaller(await signedIn()).match.join({ matchId: created.id });
 
     const view = await host.match.get({ id: created.id });
 
@@ -222,7 +269,7 @@ describe("match.get", () => {
     const hostCtx = await signedIn();
     const host = createCaller(hostCtx);
     const created = await host.match.create(settings);
-    await createCaller(await signedIn()).match.join({ code: created.code });
+    await createCaller(await signedIn()).match.join({ matchId: created.id });
 
     const view = await host.match.get({ id: created.id });
 
@@ -258,7 +305,7 @@ describe("match.list", () => {
     const mine = createCaller(mineCtx);
     const first = await mine.match.create(settings);
     // Leaves `awaiting_opponent`, so the creator may open another match.
-    await createCaller(await signedIn()).match.join({ code: first.code });
+    await createCaller(await signedIn()).match.join({ matchId: first.id });
     const second = await mine.match.create(settings);
     await createCaller(await signedIn()).match.create(settings);
 
@@ -272,7 +319,7 @@ describe("match.list", () => {
     const host = createCaller(await signedIn());
     const created = await host.match.create(settings);
     const guest = createCaller(await signedIn());
-    await guest.match.join({ code: created.code });
+    await guest.match.join({ matchId: created.id });
 
     const listed = await guest.match.list();
     expect(listed.map((m) => m.id)).toContain(created.id);
@@ -284,7 +331,7 @@ describe("match.submitMaze", () => {
     const hostCtx = await signedIn();
     const host = createCaller(hostCtx);
     const created = await host.match.create(settings);
-    await createCaller(await signedIn()).match.join({ code: created.code });
+    await createCaller(await signedIn()).match.join({ matchId: created.id });
     const mazeId = await savedMaze(host);
 
     const result = await host.match.submitMaze({
@@ -309,7 +356,7 @@ describe("match.submitMaze", () => {
   it("marks the maze submitted, so the editor can no longer change it", async () => {
     const host = createCaller(await signedIn());
     const created = await host.match.create(settings);
-    await createCaller(await signedIn()).match.join({ code: created.code });
+    await createCaller(await signedIn()).match.join({ matchId: created.id });
     const mazeId = await savedMaze(host);
 
     await host.match.submitMaze({ matchId: created.id, mazeId });
@@ -335,7 +382,7 @@ describe("match.submitMaze", () => {
     const hostCtx = await signedIn();
     const host = createCaller(hostCtx);
     const created = await host.match.create(settings);
-    await createCaller(await signedIn()).match.join({ code: created.code });
+    await createCaller(await signedIn()).match.join({ matchId: created.id });
     const mazeId = await savedMaze(host);
 
     await host.match.submitMaze({ matchId: created.id, mazeId });
@@ -360,7 +407,7 @@ describe("match.submitMaze", () => {
     const host = createCaller(await signedIn());
     const created = await host.match.create(settings);
     const guest = createCaller(await signedIn());
-    await guest.match.join({ code: created.code });
+    await guest.match.join({ matchId: created.id });
 
     await host.match.submitMaze({
       matchId: created.id,
@@ -380,7 +427,7 @@ describe("match.submitMaze", () => {
     const host = createCaller(await signedIn());
     const created = await host.match.create(settings);
     const guest = createCaller(await signedIn());
-    await guest.match.join({ code: created.code });
+    await guest.match.join({ matchId: created.id });
 
     await host.match.submitMaze({
       matchId: created.id,
@@ -405,7 +452,7 @@ describe("match.submitMaze", () => {
   it("refuses a maze whose settings do not match the match", async () => {
     const host = createCaller(await signedIn());
     const created = await host.match.create({ cellCount: 64, gateCount: 0 });
-    await createCaller(await signedIn()).match.join({ code: created.code });
+    await createCaller(await signedIn()).match.join({ matchId: created.id });
     // The fixture is a 36-cell maze; this match wants 64.
     const mazeId = await savedMaze(host);
 
@@ -420,7 +467,7 @@ describe("match.submitMaze", () => {
   it("refuses a maze that does not validate", async () => {
     const host = createCaller(await signedIn());
     const created = await host.match.create(settings);
-    await createCaller(await signedIn()).match.join({ code: created.code });
+    await createCaller(await signedIn()).match.join({ matchId: created.id });
     // Created but never drawn: no start, no treasure, no cells.
     const empty = await host.maze.createDraft({
       name: "Empty",
@@ -439,7 +486,7 @@ describe("match.submitMaze", () => {
     const host = createCaller(await signedIn());
     const created = await host.match.create(settings);
     const guest = createCaller(await signedIn());
-    await guest.match.join({ code: created.code });
+    await guest.match.join({ matchId: created.id });
     const guestMaze = await savedMaze(guest, "Not yours");
 
     const notMine = await rejection(
@@ -462,7 +509,7 @@ describe("match.submitMaze", () => {
   it("refuses a second submission from the same player", async () => {
     const host = createCaller(await signedIn());
     const created = await host.match.create(settings);
-    await createCaller(await signedIn()).match.join({ code: created.code });
+    await createCaller(await signedIn()).match.join({ matchId: created.id });
     await host.match.submitMaze({
       matchId: created.id,
       mazeId: await savedMaze(host, "First"),
@@ -491,7 +538,7 @@ describe("match.submitMaze", () => {
   it("refuses a submission once the match's deadline has already passed", async () => {
     const host = createCaller(await signedIn());
     const created = await host.match.create(settings);
-    await createCaller(await signedIn()).match.join({ code: created.code });
+    await createCaller(await signedIn()).match.join({ matchId: created.id });
     const mazeId = await savedMaze(host);
 
     await db
@@ -507,7 +554,7 @@ describe("match.submitMaze", () => {
   it("refuses a stranger, indistinguishably from a match that does not exist", async () => {
     const host = createCaller(await signedIn());
     const created = await host.match.create(settings);
-    await createCaller(await signedIn()).match.join({ code: created.code });
+    await createCaller(await signedIn()).match.join({ matchId: created.id });
     const strangerCtx = await signedIn();
     const stranger = createCaller(strangerCtx);
     const theirMaze = await savedMaze(stranger, "Theirs");
@@ -532,12 +579,12 @@ describe("match.submitMaze", () => {
   it("lets a submitted maze be reused against a different opponent", async () => {
     const host = createCaller(await signedIn());
     const first = await host.match.create(settings);
-    await createCaller(await signedIn()).match.join({ code: first.code });
+    await createCaller(await signedIn()).match.join({ matchId: first.id });
     const mazeId = await savedMaze(host, "Reused");
     await host.match.submitMaze({ matchId: first.id, mazeId });
 
     const second = await host.match.create(settings);
-    await createCaller(await signedIn()).match.join({ code: second.code });
+    await createCaller(await signedIn()).match.join({ matchId: second.id });
 
     const result = await host.match.submitMaze({
       matchId: second.id,
@@ -552,7 +599,7 @@ describe("match.submitMaze", () => {
     const rival = createCaller(rivalCtx);
 
     const first = await host.match.create(settings);
-    await rival.match.join({ code: first.code });
+    await rival.match.join({ matchId: first.id });
     const mazeId = await savedMaze(host, "Seen it");
     await host.match.submitMaze({ matchId: first.id, mazeId });
     // The rival must submit too: the match only reaches `running` — the
@@ -564,7 +611,7 @@ describe("match.submitMaze", () => {
     });
 
     const second = await host.match.create(settings);
-    await rival.match.join({ code: second.code });
+    await rival.match.join({ matchId: second.id });
 
     expect(
       await rejection(host.match.submitMaze({ matchId: second.id, mazeId })),
@@ -577,7 +624,7 @@ describe("match.submitMaze", () => {
     const rival = createCaller(rivalCtx);
 
     const first = await host.match.create(settings);
-    await rival.match.join({ code: first.code });
+    await rival.match.join({ matchId: first.id });
     const mazeId = await savedMaze(host, "Never seen");
     await host.match.submitMaze({ matchId: first.id, mazeId });
 
@@ -594,7 +641,7 @@ describe("match.submitMaze", () => {
     // The opponent never saw it, so it is not faced: offered again, and
     // accepted, against the very same opponent.
     const second = await host.match.create(settings);
-    await rival.match.join({ code: second.code });
+    await rival.match.join({ matchId: second.id });
 
     const offered = await host.match.eligibleMazes({ matchId: second.id });
     expect(offered.map((m) => m.id)).toContain(mazeId);
@@ -612,7 +659,7 @@ describe("match.submitMaze", () => {
     const rival = createCaller(rivalCtx);
 
     const first = await host.match.create(settings);
-    await rival.match.join({ code: first.code });
+    await rival.match.join({ matchId: first.id });
     const mazeId = await savedMaze(host, "Seen it, then abandoned");
     await host.match.submitMaze({ matchId: first.id, mazeId });
     await rival.match.submitMaze({
@@ -641,7 +688,7 @@ describe("match.submitMaze", () => {
     expect(abandonedRow?.status).toBe("abandoned");
 
     const second = await host.match.create(settings);
-    await rival.match.join({ code: second.code });
+    await rival.match.join({ matchId: second.id });
 
     const offered = await host.match.eligibleMazes({ matchId: second.id });
     expect(offered.map((m) => m.id)).not.toContain(mazeId);
@@ -656,7 +703,7 @@ describe("match.eligibleMazes", () => {
   it("offers only the caller's mazes at the match's settings", async () => {
     const host = createCaller(await signedIn());
     const created = await host.match.create(settings);
-    await createCaller(await signedIn()).match.join({ code: created.code });
+    await createCaller(await signedIn()).match.join({ matchId: created.id });
 
     const right = await savedMaze(host, "Right size");
     const wrong = await host.maze.createDraft({
@@ -675,7 +722,7 @@ describe("match.eligibleMazes", () => {
     const host = createCaller(await signedIn());
     const rival = createCaller(await signedIn());
     const first = await host.match.create(settings);
-    await rival.match.join({ code: first.code });
+    await rival.match.join({ matchId: first.id });
     const mazeId = await savedMaze(host, "Seen it");
     await host.match.submitMaze({ matchId: first.id, mazeId });
     // Both must submit for the match to reach `running` — see the
@@ -686,7 +733,7 @@ describe("match.eligibleMazes", () => {
     });
 
     const second = await host.match.create(settings);
-    await rival.match.join({ code: second.code });
+    await rival.match.join({ matchId: second.id });
 
     const offered = await host.match.eligibleMazes({ matchId: second.id });
     expect(offered.map((m) => m.id)).not.toContain(mazeId);
@@ -695,7 +742,7 @@ describe("match.eligibleMazes", () => {
   it("omits a draft that has never validated, so the picker never offers what submitMaze would reject", async () => {
     const host = createCaller(await signedIn());
     const created = await host.match.create(settings);
-    await createCaller(await signedIn()).match.join({ code: created.code });
+    await createCaller(await signedIn()).match.join({ matchId: created.id });
 
     // Created but never drawn: no `contentHash`, because `saveDraft` only
     // sets one once the maze validates at these settings.
@@ -712,7 +759,7 @@ describe("match.eligibleMazes", () => {
   it("refuses a stranger, indistinguishably from a match that does not exist", async () => {
     const host = createCaller(await signedIn());
     const created = await host.match.create(settings);
-    await createCaller(await signedIn()).match.join({ code: created.code });
+    await createCaller(await signedIn()).match.join({ matchId: created.id });
     const stranger = createCaller(await signedIn());
 
     const notMine = await rejection(
@@ -736,7 +783,7 @@ describe("match.eligibleMazes data", () => {
     const host = createCaller(hostCtx);
     const guest = createCaller(await signedIn());
     const created = await host.match.create(settings);
-    await guest.match.join({ code: created.code });
+    await guest.match.join({ matchId: created.id });
 
     const mine = await savedMaze(host, "Mine with data");
     const theirs = await savedMaze(guest, "Theirs with data");
@@ -788,7 +835,7 @@ describe("match.cancel", () => {
   it("refuses once the match is drawing", async () => {
     const host = createCaller(await signedIn());
     const created = await host.match.create(settings);
-    await createCaller(await signedIn()).match.join({ code: created.code });
+    await createCaller(await signedIn()).match.join({ matchId: created.id });
 
     expect(await rejection(host.match.cancel({ matchId: created.id }))).toEqual(
       { code: "CONFLICT", message: "errors.matchNotCancellable" },
@@ -817,16 +864,16 @@ describe("match.cancel", () => {
     expect(row?.status).toBe("awaiting_opponent");
   });
 
-  it("leaves the code unknown to anyone joining afterwards", async () => {
+  it("leaves the match unknown to anyone joining afterwards", async () => {
     const host = createCaller(await signedIn());
     const created = await host.match.create(settings);
     await host.match.cancel({ matchId: created.id });
 
     expect(
       await rejection(
-        createCaller(await signedIn()).match.join({ code: created.code }),
+        createCaller(await signedIn()).match.join({ matchId: created.id }),
       ),
-    ).toEqual({ code: "NOT_FOUND", message: "errors.matchCodeUnknown" });
+    ).toEqual({ code: "NOT_FOUND", message: "errors.matchNotFound" });
   });
 });
 
@@ -846,7 +893,7 @@ describe("match.cancel racing match.join", () => {
 
     const [cancelled, joined] = await Promise.allSettled([
       host.match.cancel({ matchId: created.id }),
-      guest.match.join({ code: created.code }),
+      guest.match.join({ matchId: created.id }),
     ]);
 
     const rows = await db.select().from(match).where(eq(match.id, created.id));
@@ -861,7 +908,7 @@ describe("match.cancel racing match.join", () => {
       expect(players).toEqual([]);
       expect(failure(joined)).toEqual({
         code: "NOT_FOUND",
-        message: "errors.matchCodeUnknown",
+        message: "errors.matchNotFound",
       });
     } else {
       // The join won: both are seated and the cancel was refused.
@@ -882,7 +929,7 @@ describe("a deleted used labyrinth", () => {
     const host = createCaller(await signedIn());
     const rival = createCaller(await signedIn());
     const first = await host.match.create(settings);
-    await rival.match.join({ code: first.code });
+    await rival.match.join({ matchId: first.id });
     const mazeId = await savedMaze(host, "Used");
     await host.match.submitMaze({ matchId: first.id, mazeId });
     await rival.match.submitMaze({
@@ -896,7 +943,7 @@ describe("a deleted used labyrinth", () => {
   it("is neither offered nor accepted in a new match", async () => {
     const { host, mazeId } = await usedThenDeleted();
     const next = await host.match.create(settings);
-    await createCaller(await signedIn()).match.join({ code: next.code });
+    await createCaller(await signedIn()).match.join({ matchId: next.id });
 
     const offered = await host.match.eligibleMazes({ matchId: next.id });
     expect(offered.map((m) => m.id)).not.toContain(mazeId);

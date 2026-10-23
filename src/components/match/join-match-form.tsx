@@ -30,10 +30,8 @@ export function JoinMatchForm() {
         event.preventDefault();
         const data = new FormData(event.currentTarget);
         const code = data.get("code");
-        // `matchCodeSchema` uppercases and checks the alphabet server-side;
-        // no client-side copy of that rule, so there is only one place for
-        // it to drift from.
-        join.mutate({ code: typeof code === "string" ? code : "" });
+        // Joining is by match id now; Task 8 replaces this form.
+        join.mutate({ matchId: typeof code === "string" ? code : "" });
       }}
     >
       <h2 className="text-xl font-semibold">{t("joinHeading")}</h2>

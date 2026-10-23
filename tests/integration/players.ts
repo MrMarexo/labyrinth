@@ -48,7 +48,7 @@ export async function runningMatch() {
   const guest = createCaller(guestCtx);
 
   const created = await host.match.create(settings);
-  await guest.match.join({ code: created.code });
+  await guest.match.join({ matchId: created.id });
   await submitGated(host, created.id);
   await submitGated(guest, created.id);
 

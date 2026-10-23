@@ -13,9 +13,9 @@ import { z } from "zod";
 
 import {
   deadlineFor,
+  MATCH_ACCESS,
   makeCode,
   matchChannel,
-  matchCodeSchema,
   runChannel,
 } from "~/match";
 import {
@@ -31,12 +31,13 @@ import {
   participantRows,
   type DbClient,
 } from "~/server/match/access";
+import { seatOpponent } from "~/server/match/seat";
+import { situationFor } from "~/server/match/situation";
+import { closeIfExpired } from "~/server/match/sweep";
 import {
-  situationFor,
-  type MatchRow,
-  type PlayerRow,
-} from "~/server/match/situation";
-import { publishMatchChanged } from "~/server/realtime/events";
+  publishLobbyChanged,
+  publishMatchChanged,
+} from "~/server/realtime/events";
 
 const settingsInput = z.object({
   cellCount: z
@@ -48,6 +49,10 @@ const settingsInput = z.object({
       { message: "maze.format.cellCountNotAPreset" },
     ),
   gateCount: z.number().int().min(0).max(MAX_GATES),
+});
+
+const createInput = settingsInput.extend({
+  access: z.enum(MATCH_ACCESS).default("open"),
 });
 
 /**
@@ -106,9 +111,31 @@ async function mazesFacedBy(
 
 export const matchRouter = createTRPCRouter({
   create: protectedProcedure
-    .input(settingsInput)
+    .input(createInput)
     .mutation(async ({ ctx, input }) => {
       const now = new Date();
+
+      const [waiting] = await ctx.db
+        .select({ id: match.id, deadlineAt: match.deadlineAt })
+        .from(match)
+        .where(
+          and(
+            eq(match.createdById, ctx.session.user.id),
+            eq(match.status, "awaiting_opponent"),
+          ),
+        );
+      if (waiting) {
+        if (waiting.deadlineAt.getTime() > now.getTime()) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "errors.alreadyWaiting",
+          });
+        }
+        // Past its deadline, so it no longer counts; close it here rather
+        // than make the creator wait for the sweep. Another request may have
+        // closed it first, which `closeIfExpired` tolerates.
+        await closeIfExpired(ctx.db, waiting.id, now);
+      }
 
       // The unique index is the real guard against a collision; these
       // attempts just make hitting it vanishingly unlikely before the
@@ -116,13 +143,14 @@ export const matchRouter = createTRPCRouter({
       for (let attempt = 0; attempt < 5; attempt += 1) {
         const code = makeCode((max) => Math.floor(Math.random() * max));
         try {
-          return await ctx.db.transaction(async (tx) => {
+          const created = await ctx.db.transaction(async (tx) => {
             const [row] = await tx
               .insert(match)
               .values({
                 code,
                 cellCount: input.cellCount,
                 gateCount: input.gateCount,
+                access: input.access,
                 createdById: ctx.session.user.id,
                 createdAt: now,
                 lastActivityAt: now,
@@ -146,10 +174,19 @@ export const matchRouter = createTRPCRouter({
 
             return { id: row!.id, code: row!.code };
           });
+          await publishLobbyChanged();
+          return created;
         } catch (error) {
-          const isDuplicateCode =
-            error instanceof Error && error.message.includes("match_code");
-          if (!isDuplicateCode) throw error;
+          const message = error instanceof Error ? error.message : "";
+          // Two concurrent creates both passed the check above; the partial
+          // unique index lets only one through.
+          if (message.includes("match_one_waiting_per_creator")) {
+            throw new TRPCError({
+              code: "CONFLICT",
+              message: "errors.alreadyWaiting",
+            });
+          }
+          if (!message.includes("match_code")) throw error;
         }
       }
 
@@ -160,7 +197,7 @@ export const matchRouter = createTRPCRouter({
     }),
 
   join: protectedProcedure
-    .input(z.object({ code: matchCodeSchema }))
+    .input(z.object({ matchId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const now = new Date();
 
@@ -170,12 +207,12 @@ export const matchRouter = createTRPCRouter({
         const [row] = await tx
           .select()
           .from(match)
-          .where(eq(match.code, input.code))
+          .where(eq(match.id, input.matchId))
           .for("update");
         if (!row) {
           throw new TRPCError({
             code: "NOT_FOUND",
-            message: "errors.matchCodeUnknown",
+            message: "errors.matchNotFound",
           });
         }
 
@@ -206,47 +243,20 @@ export const matchRouter = createTRPCRouter({
           });
         }
 
-        await tx.insert(matchPlayer).values({
-          matchId: row.id,
-          userId: ctx.session.user.id,
-          joinedAt: now,
-        });
+        if (row.access === "locked") {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "errors.matchLocked",
+          });
+        }
 
-        const seated: PlayerRow[] = [
-          ...players,
-          {
-            matchId: row.id,
-            userId: ctx.session.user.id,
-            mazeId: null,
-            joinedAt: now,
-            submittedAt: null,
-            forfeitedAt: null,
-            runState: null,
-            startedAt: null,
-            lastMoveAt: null,
-            finishedAt: null,
-            gaveUpAt: null,
-          },
-        ];
-        const next: MatchRow = {
-          ...row,
-          status: "drawing",
-          lastActivityAt: now,
-        };
-
-        await tx
-          .update(match)
-          .set({
-            status: "drawing",
-            lastActivityAt: now,
-            deadlineAt: deadlineFor(situationFor(next, seated))!,
-          })
-          .where(eq(match.id, row.id));
+        await seatOpponent(tx, row, players, ctx.session.user.id, now);
 
         return { id: row.id };
       });
 
       await publishMatchChanged(joined.id);
+      await publishLobbyChanged();
       return joined;
     }),
 

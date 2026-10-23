@@ -51,7 +51,7 @@ async function savedMaze(caller: Caller, name: string) {
 async function playWith(author: Caller, mazeId: string) {
   const rival = await player();
   const created = await author.match.create(settings);
-  await rival.caller.match.join({ code: created.code });
+  await rival.caller.match.join({ matchId: created.id });
   await author.match.submitMaze({ matchId: created.id, mazeId });
   await rival.caller.match.submitMaze({
     matchId: created.id,
