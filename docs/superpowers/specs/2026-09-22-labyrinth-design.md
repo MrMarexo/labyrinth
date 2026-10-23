@@ -295,6 +295,12 @@ match means playing it exactly as drawn. Wanting something different means
 drawing a new one from scratch. Drafts, which have never been submitted, remain
 freely editable.
 
+A player keeps **at most 10 labyrinths**, in every state. A used maze can be
+deleted: `maze.deletedAt` hides it from its author at once, and the nightly
+cron purges the row once every match that used it ended at least 30 days ago
+(`match.endedAt`); `match_player.maze_id` is `ON DELETE SET NULL` for that.
+See `2026-10-23-labyrinth-library-design.md`.
+
 `deadlineAt` is recomputed on every phase transition and every move, following
 §9.1 — it is a single column rather than six rules scattered across the code,
 so the sweep is one indexed query. `endReason` is `finished | forfeit |
@@ -698,6 +704,11 @@ path its runner took drawn over it as a static polyline. The opponent's maze
 with your path is the payoff of the game. Your maze with theirs is the poor
 man's replay until §10.4 exists, and gives way to it then.
 
+Each drawing is shown for as long as its maze exists; once its author has
+deleted it and the 30-day replay window has closed, it is replaced by a short
+"This labyrinth was deleted" note, while the scores always stay
+(`2026-10-23-labyrinth-library-design.md`).
+
 Both mazes are safe to show: the match is over, and a maze cannot be reused
 against anyone who has faced it in a match that reached `running` (§6, as
 implemented by `mazesFacedBy`).
@@ -724,7 +735,9 @@ While the run is still going, new moves arrive live; a viewer at the end of the
 timeline follows them, and one who has scrubbed back stays put with a "jump to
 live" control. The entry points are the waiting screen after your own finish
 ("watch them live") and the result screen, which keeps its static path summary
-(§10.3.1) and adds a replay link for each run.
+(§10.3.1) and adds a replay link for each run. Replays are kept for 30 days
+after the match ends; after that the links are gone and `run.replay` refuses
+with `errors.replayExpired`.
 
 ### 10.5 Theming
 
@@ -931,3 +944,4 @@ does not need to change to add a lobby later.
 | Connectivity rule | Shape must be orthogonally connected and the treasure must be reachable. Sealed pockets allowed. |
 | ORM | Drizzle. |
 | Auth library | Better Auth (deviation from stock T3, accepted). |
+| Library size and retention | At most 10 labyrinths per player, used ones included; used ones can be deleted. Replays last 30 days after a match ends; a deleted maze's drawing leaves old results then, and its row is purged. Results stay forever. |
