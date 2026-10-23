@@ -101,8 +101,38 @@ describe("match.lobby", () => {
     expect((await find(declinedCtx))?.request).toBe("declined");
   });
 
-  it.todo("request is pending after requestJoin (Task 5)");
-  it.todo("request is declined after declineRequest (Task 5)");
+  it("request is pending after requestJoin", async () => {
+    const creator = createCaller(await signedIn());
+    const viewer = createCaller(await signedIn());
+    const created = await creator.match.create({
+      ...settings,
+      access: "locked",
+    });
+    await viewer.match.requestJoin({ matchId: created.id });
+    const seen = (await viewer.match.lobby()).matches.find(
+      (m) => m.id === created.id,
+    );
+    expect(seen?.request).toBe("pending");
+  });
+
+  it("request is declined after declineRequest", async () => {
+    const creator = createCaller(await signedIn());
+    const viewerCtx = await signedIn();
+    const viewer = createCaller(viewerCtx);
+    const created = await creator.match.create({
+      ...settings,
+      access: "locked",
+    });
+    await viewer.match.requestJoin({ matchId: created.id });
+    await creator.match.declineRequest({
+      matchId: created.id,
+      userId: viewerCtx.session!.user.id,
+    });
+    const seen = (await viewer.match.lobby()).matches.find(
+      (m) => m.id === created.id,
+    );
+    expect(seen?.request).toBe("declined");
+  });
 });
 
 describe("match.preview", () => {
@@ -129,6 +159,13 @@ describe("match.preview", () => {
     const created = await creator.match.create(settings);
     const seen = await creator.match.preview({ matchId: created.id });
     expect(seen.isYours).toBe(true);
+  });
+
+  it("rejects an empty match id instead of previewing the newest match", async () => {
+    const creator = createCaller(await signedIn());
+    const viewer = createCaller(await signedIn());
+    await creator.match.create(settings);
+    await expect(viewer.match.preview({ matchId: "" })).rejects.toThrow();
   });
 
   it("is NOT_FOUND with one message for unknown, expired and drawing", async () => {

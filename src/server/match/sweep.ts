@@ -2,12 +2,16 @@ import { and, asc, eq, inArray, lte } from "drizzle-orm";
 
 import { OPEN_STATUSES, resolveExpiry } from "~/match";
 import type { db as Database } from "~/server/db";
-import { match, matchPlayer } from "~/server/db/schema";
+import { match, matchPlayer, matchRequest } from "~/server/db/schema";
 // `situationFor` lives in its own module, not in the router: a server-side
 // domain helper should not have to be reached through a tRPC router, and the
 // sweep is its second consumer.
 import { situationFor } from "~/server/match/situation";
-import { publishMatchChanged } from "~/server/realtime/events";
+import {
+  publishLobbyChanged,
+  publishMatchChanged,
+  publishUserChanged,
+} from "~/server/realtime/events";
 
 // `resolveExpiry` already no-ops on a terminal status (`deadlineFor` returns
 // null the moment `isTerminal(situation.status)` is true), so this filter is
@@ -148,9 +152,34 @@ export async function sweepExpiredMatches(
     // never throws, so this cannot mask that error. Concurrently, so the
     // batch spends at most one publish timeout on them.
     await Promise.all(closed.map(publishMatchChanged));
+    await publishLobbyAndRequesters(db, due, closed);
   }
 
   // A full batch means there may be more due matches than this call fetched;
   // the next invocation picks up where this one left off, oldest first.
   return { closed: closed.length, capped: due.length === SWEEP_BATCH_LIMIT };
+}
+
+/**
+ * A waiting match that closed leaves the lobby, and its requesters (whose
+ * rows stay until the match is purged) need to refetch their requests.
+ */
+async function publishLobbyAndRequesters(
+  db: typeof Database,
+  due: { id: string; status: string }[],
+  closed: string[],
+): Promise<void> {
+  const waiting = due
+    .filter((m) => closed.includes(m.id) && m.status === "awaiting_opponent")
+    .map((m) => m.id);
+  if (waiting.length === 0) return;
+
+  const requesters = await db
+    .selectDistinct({ userId: matchRequest.userId })
+    .from(matchRequest)
+    .where(inArray(matchRequest.matchId, waiting));
+  await Promise.all([
+    publishLobbyChanged(),
+    ...requesters.map((r) => publishUserChanged(r.userId)),
+  ]);
 }

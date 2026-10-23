@@ -1,6 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import {
   and,
+  asc,
   desc,
   eq,
   gt,
@@ -45,6 +46,7 @@ import { closeIfExpired } from "~/server/match/sweep";
 import {
   publishLobbyChanged,
   publishMatchChanged,
+  publishUserChanged,
 } from "~/server/realtime/events";
 
 const settingsInput = z.object({
@@ -186,11 +188,25 @@ async function mazesFacedBy(
   return faced.map((f) => f.mazeId).filter((id): id is string => id !== null);
 }
 
+/** The match must still be waiting for an opponent and inside its deadline. */
+function waitingOrThrow(
+  row: { status: string; deadlineAt: Date },
+  now: Date,
+): void {
+  if (
+    row.status !== "awaiting_opponent" ||
+    now.getTime() >= row.deadlineAt.getTime()
+  ) {
+    throw new TRPCError({ code: "CONFLICT", message: "errors.matchExpired" });
+  }
+}
+
 export const matchRouter = createTRPCRouter({
   create: protectedProcedure
     .input(createInput)
     .mutation(async ({ ctx, input }) => {
       const now = new Date();
+      let abandonedId: string | null = null;
 
       const [waiting] = await ctx.db
         .select({ id: match.id, deadlineAt: match.deadlineAt })
@@ -211,7 +227,9 @@ export const matchRouter = createTRPCRouter({
         // Past its deadline, so it no longer counts; close it here rather
         // than make the creator wait for the sweep. Another request may have
         // closed it first, which `closeIfExpired` tolerates.
-        await closeIfExpired(ctx.db, waiting.id, now);
+        abandonedId = (await closeIfExpired(ctx.db, waiting.id, now))
+          ? waiting.id
+          : null;
       }
 
       // The unique index is the real guard against a collision; these
@@ -251,6 +269,8 @@ export const matchRouter = createTRPCRouter({
 
             return { id: row!.id, code: row!.code };
           });
+          // A page watching the old match should learn it was abandoned.
+          if (abandonedId) await publishMatchChanged(abandonedId);
           await publishLobbyChanged();
           return created;
         } catch (error) {
@@ -338,17 +358,14 @@ export const matchRouter = createTRPCRouter({
     }),
 
   lobby: protectedProcedure.query(async ({ ctx }) => {
-    const rows = await waitingMatches(
-      ctx.db,
-      ctx.session.user.id,
-      new Date(),
-      { excludeCreator: ctx.session.user.id },
-    );
+    const rows = await waitingMatches(ctx.db, ctx.session.user.id, new Date(), {
+      excludeCreator: ctx.session.user.id,
+    });
     return { you: ctx.session.user.id, matches: rows.map((r) => r.item) };
   }),
 
   preview: protectedProcedure
-    .input(z.object({ matchId: z.string() }))
+    .input(z.object({ matchId: z.string().min(1) }))
     .query(async ({ ctx, input }) => {
       const [found] = await waitingMatches(
         ctx.db,
@@ -500,10 +517,200 @@ export const matchRouter = createTRPCRouter({
    * and no maze can have been submitted to it. Anything past
    * `awaiting_opponent` is refused: the opponent has a stake by then.
    */
+  requestJoin: protectedProcedure
+    .input(z.object({ matchId: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      const now = new Date();
+      const userId = ctx.session.user.id;
+
+      await ctx.db.transaction(async (tx) => {
+        // Locked, so a request racing an accept cannot leave a pending row
+        // on a match that has just become `drawing`.
+        const [row] = await tx
+          .select()
+          .from(match)
+          .where(eq(match.id, input.matchId))
+          .for("update");
+        if (!row) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "errors.matchNotFound",
+          });
+        }
+        if (row.createdById === userId) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "errors.alreadyInMatch",
+          });
+        }
+        waitingOrThrow(row, now);
+        if (row.access !== "locked") {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "errors.matchNotLocked",
+          });
+        }
+
+        const [existing] = await tx
+          .select()
+          .from(matchRequest)
+          .where(
+            and(
+              eq(matchRequest.matchId, row.id),
+              eq(matchRequest.userId, userId),
+            ),
+          );
+        if (existing?.declinedAt) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "errors.requestDeclined",
+          });
+        }
+        if (!existing) {
+          await tx
+            .insert(matchRequest)
+            .values({ matchId: row.id, userId, createdAt: now });
+        }
+      });
+
+      await publishMatchChanged(input.matchId);
+      await publishUserChanged(userId);
+      return { id: input.matchId };
+    }),
+
+  withdrawRequest: protectedProcedure
+    .input(z.object({ matchId: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.db.transaction(async (tx) => {
+        // Locked like every other writer of this match's requests.
+        await tx
+          .select({ id: match.id })
+          .from(match)
+          .where(eq(match.id, input.matchId))
+          .for("update");
+        // A declined row stays: withdrawing must not lift a decline.
+        await tx
+          .delete(matchRequest)
+          .where(
+            and(
+              eq(matchRequest.matchId, input.matchId),
+              eq(matchRequest.userId, ctx.session.user.id),
+              isNull(matchRequest.declinedAt),
+            ),
+          );
+      });
+
+      await publishMatchChanged(input.matchId);
+      await publishUserChanged(ctx.session.user.id);
+      return { id: input.matchId };
+    }),
+
+  requests: protectedProcedure
+    .input(z.object({ matchId: z.string().min(1) }))
+    .query(async ({ ctx, input }) => {
+      const [row] = await ctx.db
+        .select({ createdById: match.createdById })
+        .from(match)
+        .where(eq(match.id, input.matchId));
+      if (row?.createdById !== ctx.session.user.id) notYours();
+
+      return ctx.db
+        .select({
+          userId: matchRequest.userId,
+          name: user.name,
+          createdAt: matchRequest.createdAt,
+        })
+        .from(matchRequest)
+        .innerJoin(user, eq(user.id, matchRequest.userId))
+        .where(
+          and(
+            eq(matchRequest.matchId, input.matchId),
+            isNull(matchRequest.declinedAt),
+          ),
+        )
+        .orderBy(asc(matchRequest.createdAt));
+    }),
+
+  acceptRequest: protectedProcedure
+    .input(z.object({ matchId: z.string().min(1), userId: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      const now = new Date();
+
+      const requesters = await ctx.db.transaction(async (tx) => {
+        const found = await participantRows(
+          tx,
+          input.matchId,
+          ctx.session.user.id,
+          { lock: true },
+        );
+        if (found?.row.createdById !== ctx.session.user.id) notYours();
+        const { row, players } = found;
+        waitingOrThrow(row, now);
+
+        const pending = await tx
+          .select()
+          .from(matchRequest)
+          .where(eq(matchRequest.matchId, row.id));
+        const chosen = pending.find((r) => r.userId === input.userId);
+        if (!chosen || chosen.declinedAt) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "errors.requestGone",
+          });
+        }
+
+        await seatOpponent(tx, row, players, input.userId, now);
+        await tx.delete(matchRequest).where(eq(matchRequest.matchId, row.id));
+        return pending.map((r) => r.userId);
+      });
+
+      await publishMatchChanged(input.matchId);
+      await publishLobbyChanged();
+      await Promise.all(requesters.map(publishUserChanged));
+      return { id: input.matchId };
+    }),
+
+  declineRequest: protectedProcedure
+    .input(z.object({ matchId: z.string().min(1), userId: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      const now = new Date();
+
+      await ctx.db.transaction(async (tx) => {
+        const found = await participantRows(
+          tx,
+          input.matchId,
+          ctx.session.user.id,
+          { lock: true },
+        );
+        if (found?.row.createdById !== ctx.session.user.id) notYours();
+        waitingOrThrow(found.row, now);
+
+        const declined = await tx
+          .update(matchRequest)
+          .set({ declinedAt: now })
+          .where(
+            and(
+              eq(matchRequest.matchId, input.matchId),
+              eq(matchRequest.userId, input.userId),
+            ),
+          )
+          .returning({ userId: matchRequest.userId });
+        if (declined.length === 0) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "errors.requestGone",
+          });
+        }
+      });
+
+      await publishUserChanged(input.userId);
+      return { id: input.matchId };
+    }),
+
   cancel: protectedProcedure
     .input(z.object({ matchId: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      await ctx.db.transaction(async (tx) => {
+      const requesters = await ctx.db.transaction(async (tx) => {
         // Locked like `join`, which locks the same row first, so the status
         // read here is the one the delete acts on.
         const found = await participantRows(
@@ -519,10 +726,18 @@ export const matchRouter = createTRPCRouter({
             message: "errors.matchNotCancellable",
           });
         }
+        // Read before the delete: the cascade takes the rows with the match.
+        const pending = await tx
+          .select({ userId: matchRequest.userId })
+          .from(matchRequest)
+          .where(eq(matchRequest.matchId, found.row.id));
         await tx.delete(match).where(eq(match.id, found.row.id));
+        return pending.map((r) => r.userId);
       });
 
       await publishMatchChanged(input.matchId);
+      await publishLobbyChanged();
+      await Promise.all(requesters.map(publishUserChanged));
       return { id: input.matchId };
     }),
 
