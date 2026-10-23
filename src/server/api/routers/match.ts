@@ -3,6 +3,7 @@ import {
   and,
   desc,
   eq,
+  gt,
   inArray,
   isNotNull,
   isNull,
@@ -14,6 +15,7 @@ import { z } from "zod";
 import {
   deadlineFor,
   MATCH_ACCESS,
+  type MatchAccess,
   makeCode,
   matchChannel,
   runChannel,
@@ -25,7 +27,13 @@ import {
   validateMaze,
 } from "~/maze";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { match, matchPlayer, maze, user } from "~/server/db/schema";
+import {
+  match,
+  matchPlayer,
+  matchRequest,
+  maze,
+  user,
+} from "~/server/db/schema";
 import {
   notYours,
   participantRows,
@@ -54,6 +62,63 @@ const settingsInput = z.object({
 const createInput = settingsInput.extend({
   access: z.enum(MATCH_ACCESS).default("open"),
 });
+
+export type LobbyItem = {
+  id: string;
+  creatorName: string;
+  cellCount: number;
+  gateCount: number;
+  access: MatchAccess;
+  createdAt: Date;
+  deadlineAt: Date;
+  request: "none" | "pending" | "declined";
+};
+
+/**
+ * Waiting, unexpired matches with the caller's own request state. Never
+ * selects `code` or any maze column: the lobby is not a way into a match.
+ */
+async function waitingMatches(db: DbClient, callerId: string, now: Date) {
+  const rows = await db
+    .select({
+      id: match.id,
+      creatorId: match.createdById,
+      creatorName: user.name,
+      cellCount: match.cellCount,
+      gateCount: match.gateCount,
+      access: match.access,
+      createdAt: match.createdAt,
+      deadlineAt: match.deadlineAt,
+      requested: matchRequest.userId,
+      declinedAt: matchRequest.declinedAt,
+    })
+    .from(match)
+    .innerJoin(user, eq(user.id, match.createdById))
+    .leftJoin(
+      matchRequest,
+      and(
+        eq(matchRequest.matchId, match.id),
+        eq(matchRequest.userId, callerId),
+      ),
+    )
+    .where(
+      and(eq(match.status, "awaiting_opponent"), gt(match.deadlineAt, now)),
+    )
+    .orderBy(desc(match.createdAt));
+
+  return rows.map(({ requested, declinedAt, creatorId, ...row }) => ({
+    creatorId,
+    item: {
+      ...row,
+      request:
+        requested === null
+          ? ("none" as const)
+          : declinedAt
+            ? ("declined" as const)
+            : ("pending" as const),
+    } satisfies LobbyItem,
+  }));
+}
 
 /**
  * Every maze of this author that the opponent has already faced in some
@@ -260,6 +325,41 @@ export const matchRouter = createTRPCRouter({
       return joined;
     }),
 
+  lobby: protectedProcedure.query(async ({ ctx }) => {
+    const rows = await waitingMatches(
+      ctx.db,
+      ctx.session.user.id,
+      new Date(),
+    );
+    return {
+      you: ctx.session.user.id,
+      matches: rows
+        .filter((r) => r.creatorId !== ctx.session.user.id)
+        .map((r) => r.item),
+    };
+  }),
+
+  preview: protectedProcedure
+    .input(z.object({ matchId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const rows = await waitingMatches(
+        ctx.db,
+        ctx.session.user.id,
+        new Date(),
+      );
+      const found = rows.find((r) => r.item.id === input.matchId);
+      if (!found) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "errors.matchNotFound",
+        });
+      }
+      return {
+        ...found.item,
+        isYours: found.creatorId === ctx.session.user.id,
+      };
+    }),
+
   get: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
@@ -285,6 +385,8 @@ export const matchRouter = createTRPCRouter({
         id: row.id,
         code: row.code,
         status: row.status,
+        access: row.access,
+        isCreator: row.createdById === ctx.session.user.id,
         cellCount: row.cellCount,
         gateCount: row.gateCount,
         deadlineAt: row.deadlineAt,
