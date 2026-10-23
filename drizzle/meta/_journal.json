@@ -57,6 +57,13 @@
       "when": 1792743386775,
       "tag": "0007_mute_sunset_bain",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792749709360,
+      "tag": "0008_nifty_captain_britain",
+      "breakpoints": true
     }
   ]
 }

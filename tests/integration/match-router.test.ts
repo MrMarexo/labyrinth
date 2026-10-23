@@ -78,9 +78,9 @@ describe("match.create", () => {
   });
 
   it("issues a different code to each match", async () => {
-    const caller = createCaller(await signedIn());
-    const a = await caller.match.create(settings);
-    const b = await caller.match.create(settings);
+    // One waiting match per creator, so each match gets its own.
+    const a = await createCaller(await signedIn()).match.create(settings);
+    const b = await createCaller(await signedIn()).match.create(settings);
     expect(a.code).not.toBe(b.code);
   });
 
@@ -257,6 +257,8 @@ describe("match.list", () => {
     const mineCtx = await signedIn();
     const mine = createCaller(mineCtx);
     const first = await mine.match.create(settings);
+    // Leaves `awaiting_opponent`, so the creator may open another match.
+    await createCaller(await signedIn()).match.join({ code: first.code });
     const second = await mine.match.create(settings);
     await createCaller(await signedIn()).match.create(settings);
 

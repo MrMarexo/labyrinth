@@ -169,9 +169,9 @@ describe("sweepExpiredMatches", () => {
     // suites in the same run also populate — asserting a bound on it would
     // pass even if the sweep closed every open match indiscriminately. What
     // actually matters is that these two specific matches ended up closed.
-    const caller = createCaller(await signedIn());
-    const a = await caller.match.create(settings);
-    const b = await caller.match.create(settings);
+    // One waiting match per creator, so each match gets its own.
+    const a = await createCaller(await signedIn()).match.create(settings);
+    const b = await createCaller(await signedIn()).match.create(settings);
 
     await sweepAll(db, later(HOURS_24_MS + 1000));
 
@@ -184,9 +184,11 @@ describe("sweepExpiredMatches", () => {
   });
 
   it("closes only the match whose deadline has passed, leaving a not-yet-due one alone", async () => {
-    const caller = createCaller(await signedIn());
-    const overdue = await caller.match.create(settings);
-    const notYetDue = await caller.match.create(settings);
+    // One waiting match per creator, so each match gets its own.
+    const overdue = await createCaller(await signedIn()).match.create(settings);
+    const notYetDue = await createCaller(await signedIn()).match.create(
+      settings,
+    );
 
     // Row 1 of §9.1 recomputes its deadline from createdAt + 24h inside
     // resolveExpiry itself — it does not trust the stored deadlineAt column

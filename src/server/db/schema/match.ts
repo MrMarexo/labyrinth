@@ -9,9 +9,10 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
-import { END_REASONS, MATCH_STATUSES } from "~/match";
+import { END_REASONS, MATCH_ACCESS, MATCH_STATUSES } from "~/match";
 import {
   DIRECTIONS,
   SERVER_OUTCOMES,
@@ -51,6 +52,10 @@ export const match = pgTable(
     status: text("status", { enum: MATCH_STATUSES })
       .notNull()
       .default("awaiting_opponent"),
+    // Open matches are listed in the lobby and joined directly; locked ones
+    // are joined by request or by code. Default open: it is the lobby's
+    // common case, and existing rows were already joinable by anyone.
+    access: text("access", { enum: MATCH_ACCESS }).notNull().default("open"),
     createdById: text("created_by_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
@@ -72,6 +77,12 @@ export const match = pgTable(
   (table) => [
     // The sweep's only query: open matches whose deadline has passed.
     index("match_sweep_idx").on(table.status, table.deadlineAt),
+    // A creator has at most one match waiting for an opponent, so the lobby
+    // never lists the same person twice and "my open match" is unambiguous.
+    // Partial: finished and running matches are unlimited.
+    uniqueIndex("match_one_waiting_per_creator")
+      .on(table.createdById)
+      .where(sql`${table.status} = 'awaiting_opponent'`),
     // You cannot win without finding the treasure: a winner is only legal
     // on a match that actually ended in a win, not one the sweep merely
     // gave up on.
@@ -79,6 +90,28 @@ export const match = pgTable(
       "match_winner_requires_win",
       sql`${table.winnerId} IS NULL OR ${table.endReason} IN ('finished', 'forfeit')`,
     ),
+  ],
+);
+
+/**
+ * A request to join a locked match. `declinedAt` keeps a declined row rather
+ * than deleting it, so the requester cannot simply ask again.
+ */
+export const matchRequest = pgTable(
+  "match_request",
+  {
+    matchId: text("match_id")
+      .notNull()
+      .references(() => match.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    declinedAt: timestamp("declined_at"),
+  },
+  (table) => [
+    primaryKey({ columns: [table.matchId, table.userId] }),
+    index("match_request_user_idx").on(table.userId),
   ],
 );
 
