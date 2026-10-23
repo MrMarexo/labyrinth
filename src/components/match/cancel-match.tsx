@@ -8,7 +8,7 @@ import { api } from "~/trpc/react";
 
 /**
  * Cancels a match still waiting for an opponent, after a confirmation step:
- * the match is deleted, and its join code stops working.
+ * the match is deleted, and leaves the lobby.
  */
 export function CancelMatch({
   matchId,
@@ -25,6 +25,7 @@ export function CancelMatch({
     onSuccess: () => {
       setConfirming(false);
       void utils.match.list.invalidate();
+      void utils.match.lobby.invalidate();
       onCancelled?.();
     },
   });

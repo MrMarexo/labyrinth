@@ -39,6 +39,9 @@ export function MatchScreen({
   const refresh = () => {
     void utils.match.get.invalidate({ id: matchId });
     void utils.run.get.invalidate({ matchId });
+    // The creator's request list rides on this channel too; a second
+    // subscription to it from `JoinRequests` would break this one.
+    void utils.match.requests.invalidate({ matchId });
   };
   useChannel(data.channels.match, {
     onEvent: (event) => {

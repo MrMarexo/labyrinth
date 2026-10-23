@@ -5,7 +5,9 @@ import { useState } from "react";
 
 import { CancelMatch } from "~/components/match/cancel-match";
 import { ConfirmUse } from "~/components/match/confirm-use";
+import { JoinRequests } from "~/components/match/join-requests";
 import { MazePicker } from "~/components/match/maze-picker";
+import { ShareMatch } from "~/components/match/share-match";
 import { useRouter } from "~/i18n/navigation";
 import { resolveErrorKey } from "~/lib/resolve-error-key";
 import { isTerminal } from "~/match";
@@ -23,7 +25,6 @@ export type MatchLobbyProps = {
 
 export function MatchLobby({ matchId, initialData }: MatchLobbyProps) {
   const t = useTranslations("lobby");
-  const tm = useTranslations("matches");
   const te = useTranslations();
   const format = useFormatter();
   const utils = api.useUtils();
@@ -65,7 +66,8 @@ export function MatchLobby({ matchId, initialData }: MatchLobbyProps) {
 
   let statusText: string;
   if (data.status === "awaiting_opponent") {
-    statusText = t("waitingForOpponent");
+    statusText =
+      data.access === "locked" ? t("waitingLocked") : t("waitingOpen");
   } else if (data.status === "abandoned") {
     statusText = t("abandoned");
   } else {
@@ -87,9 +89,12 @@ export function MatchLobby({ matchId, initialData }: MatchLobbyProps) {
 
       {data.status === "awaiting_opponent" && (
         <>
-          <p data-match-code={data.code} className="text-sm">
-            {tm("shareCode", { code: data.code })}
-          </p>
+          {data.access === "locked" && data.isCreator && (
+            <>
+              <ShareMatch matchId={matchId} />
+              <JoinRequests matchId={matchId} />
+            </>
+          )}
           <CancelMatch
             matchId={matchId}
             onCancelled={() => router.push("/matches")}

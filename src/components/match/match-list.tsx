@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { CancelMatch } from "~/components/match/cancel-match";
 import { Link } from "~/i18n/navigation";
 import type { MatchStatus } from "~/match";
-import { api } from "~/trpc/react";
+import { api, type RouterOutputs } from "~/trpc/react";
 
 /**
  * Explicit map rather than building the key by string concatenation: adding
@@ -28,13 +28,25 @@ export function MatchList() {
   // player does not see "you have nothing yet" flash before their matches
   // arrive.
   if (isPending) return null;
-  if (!data || data.length === 0) {
-    return <p className="text-muted text-sm">{t("empty")}</p>;
-  }
+
+  return (
+    <section className="space-y-3">
+      <h2 className="text-xl font-semibold">{t("yoursHeading")}</h2>
+      {!data || data.length === 0 ? (
+        <p className="text-muted text-sm">{t("empty")}</p>
+      ) : (
+        <MatchRows matches={data} />
+      )}
+    </section>
+  );
+}
+
+function MatchRows({ matches }: { matches: RouterOutputs["match"]["list"] }) {
+  const t = useTranslations("matches");
 
   return (
     <ul className="divide-border divide-y">
-      {data.map((m) => (
+      {matches.map((m) => (
         <li
           key={m.id}
           data-match-row
@@ -46,14 +58,7 @@ export function MatchList() {
             <p className="text-muted text-sm">
               {t("sizeAndGates", { cells: m.cellCount, gates: m.gateCount })}
             </p>
-            {m.status === "awaiting_opponent" && (
-              <>
-                <p data-match-code={m.code} className="text-sm">
-                  {t("shareCode", { code: m.code })}
-                </p>
-                <CancelMatch matchId={m.id} />
-              </>
-            )}
+            {m.status === "awaiting_opponent" && <CancelMatch matchId={m.id} />}
           </div>
           <Link href={`/matches/${m.id}`} className="underline">
             {t("open")}

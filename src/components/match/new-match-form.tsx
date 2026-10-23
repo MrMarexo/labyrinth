@@ -3,17 +3,57 @@
 import { useTranslations } from "next-intl";
 import { useRef, useState, type KeyboardEvent } from "react";
 
-import { useRouter } from "~/i18n/navigation";
+import { Link, useRouter } from "~/i18n/navigation";
 import { resolveErrorKey } from "~/lib/resolve-error-key";
+import { MATCH_ACCESS, type MatchAccess } from "~/match";
 import { CELL_COUNT_PRESETS, MAX_GATES, type CellCount } from "~/maze";
 import { api } from "~/trpc/react";
 
+const ACCESS_COPY = {
+  open: { label: "accessOpen", hint: "accessOpenHint" },
+  locked: { label: "accessLocked", hint: "accessLockedHint" },
+} as const satisfies Record<MatchAccess, { label: string; hint: string }>;
+
+/**
+ * The New match form, or — since a player hosts one waiting match at a time
+ * — a note pointing at the one they already have.
+ */
 export function NewMatchForm() {
+  const t = useTranslations("matches");
+  const { data: mine, isPending } = api.match.list.useQuery();
+
+  // Same test as `match.create`'s: a waiting match past its deadline no
+  // longer counts, and creating closes it.
+  const waiting = mine?.find(
+    (m) =>
+      m.status === "awaiting_opponent" && m.deadlineAt.getTime() > Date.now(),
+  );
+
+  if (isPending) return null;
+  if (waiting) {
+    return (
+      <div
+        data-already-waiting
+        className="border-border-strong space-y-2 rounded border p-4"
+      >
+        <h2 className="text-xl font-semibold">{t("createHeading")}</h2>
+        <p className="text-sm">{t("alreadyWaiting")}</p>
+        <Link href={`/matches/${waiting.id}`} className="text-sm underline">
+          {t("alreadyWaitingLink")}
+        </Link>
+      </div>
+    );
+  }
+  return <CreateMatchForm />;
+}
+
+function CreateMatchForm() {
   const t = useTranslations("matches");
   const te = useTranslations();
   const router = useRouter();
   const buttonRefs = useRef(new Map<CellCount, HTMLButtonElement>());
   const [cellCount, setCellCount] = useState<CellCount>(CELL_COUNT_PRESETS[0]);
+  const [access, setAccess] = useState<MatchAccess>("open");
 
   const utils = api.useUtils();
   const create = api.match.create.useMutation({
@@ -63,6 +103,7 @@ export function NewMatchForm() {
         create.mutate({
           cellCount,
           gateCount: Number(data.get("gateCount")),
+          access,
         });
       }}
     >
@@ -112,6 +153,36 @@ export function NewMatchForm() {
           className="border-border-strong bg-bg w-full rounded border px-3 py-2"
         />
       </label>
+
+      {/* Native radios: the browser's own arrow-key handling is enough for
+          two options, each of which needs its hint read with it. */}
+      <fieldset className="space-y-2">
+        <legend className="text-sm">{t("access")}</legend>
+        {MATCH_ACCESS.map((option) => (
+          <label key={option} className="flex items-start gap-2">
+            <input
+              type="radio"
+              name="access"
+              value={option}
+              checked={access === option}
+              onChange={() => setAccess(option)}
+              aria-describedby={`new-match-access-${option}-hint`}
+              className="accent-accent mt-1"
+            />
+            <span className="space-y-0.5">
+              <span className="block text-sm font-medium">
+                {t(ACCESS_COPY[option].label)}
+              </span>
+              <span
+                id={`new-match-access-${option}-hint`}
+                className="text-muted block text-sm"
+              >
+                {t(ACCESS_COPY[option].hint)}
+              </span>
+            </span>
+          </label>
+        ))}
+      </fieldset>
 
       {createError && (
         <p role="alert" data-create-error className="text-danger text-sm">
