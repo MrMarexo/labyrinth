@@ -53,8 +53,14 @@ describe("GET /api/cron/sweep", () => {
     );
 
     expect(response.status).toBe(200);
-    const body = (await response.json()) as { closed: number; capped: boolean };
+    const body = (await response.json()) as {
+      closed: number;
+      capped: boolean;
+      purge: { purged: number; capped: boolean };
+    };
     expect(typeof body.closed).toBe("number");
     expect(typeof body.capped).toBe("boolean");
+    expect(typeof body.purge.purged).toBe("number");
+    expect(typeof body.purge.capped).toBe("boolean");
   });
 });

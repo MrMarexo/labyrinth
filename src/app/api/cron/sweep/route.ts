@@ -1,6 +1,7 @@
 import { env } from "~/env";
 import { db } from "~/server/db";
 import { sweepExpiredMatches } from "~/server/match/sweep";
+import { purgeDeletedMazes } from "~/server/maze/purge";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,8 @@ export async function GET(request: Request) {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  const result = await sweepExpiredMatches(db, new Date());
-  return Response.json(result);
+  const now = new Date();
+  const result = await sweepExpiredMatches(db, now);
+  const purge = await purgeDeletedMazes(db, now);
+  return Response.json({ ...result, purge });
 }
