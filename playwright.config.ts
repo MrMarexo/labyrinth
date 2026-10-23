@@ -1,6 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const PORT = 3000;
+// E2E_PORT lets a run sit beside a dev server already holding 3000, which
+// `reuseExistingServer` would otherwise pick up instead of the test build.
+const PORT = Number(process.env.E2E_PORT ?? 3000);
 const baseURL = `http://127.0.0.1:${PORT}`;
 
 export default defineConfig({
@@ -28,6 +30,7 @@ export default defineConfig({
     // rate limiting on and the run fails confusingly.
     env: {
       BETTER_AUTH_URL: baseURL,
+      PORT: String(PORT),
       E2E_DISABLE_RATE_LIMIT: "true",
       E2E_TEST_SUPPORT: "true",
     },
