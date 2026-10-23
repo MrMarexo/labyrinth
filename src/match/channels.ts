@@ -5,6 +5,8 @@
  */
 const RUN_PREFIX = "presence-run_";
 const MATCH_PREFIX = "private-match_";
+const USER_PREFIX = "private-user_";
+const LOBBY = "private-lobby";
 
 /** A runner's moves, as they happen. Presence: the members are the watchers. */
 export function runChannel(matchId: string, runnerId: string): string {
@@ -16,9 +18,21 @@ export function matchChannel(matchId: string): string {
   return `${MATCH_PREFIX}${matchId}`;
 }
 
+/** Payload-free pings for everyone watching the public match lobby. */
+export function lobbyChannel(): "private-lobby" {
+  return LOBBY;
+}
+
+/** Payload-free pings for one user, e.g. "your match was joined". */
+export function userChannel(userId: string): string {
+  return `${USER_PREFIX}${userId}`;
+}
+
 export type ParsedChannel =
   | { kind: "run"; matchId: string; runnerId: string }
-  | { kind: "match"; matchId: string };
+  | { kind: "match"; matchId: string }
+  | { kind: "lobby" }
+  | { kind: "user"; userId: string };
 
 export function parseChannel(name: string): ParsedChannel | null {
   if (name.startsWith(RUN_PREFIX)) {
@@ -31,6 +45,12 @@ export function parseChannel(name: string): ParsedChannel | null {
     if (!matchId || matchId.includes("_")) return null;
     return { kind: "match", matchId };
   }
+  if (name.startsWith(USER_PREFIX)) {
+    const userId = name.slice(USER_PREFIX.length);
+    if (!userId || userId.includes("_")) return null;
+    return { kind: "user", userId };
+  }
+  if (name === LOBBY) return { kind: "lobby" };
   return null;
 }
 

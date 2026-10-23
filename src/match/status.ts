@@ -39,3 +39,8 @@ export function isTerminal(status: MatchStatus): boolean {
 export const OPEN_STATUSES = MATCH_STATUSES.filter(
   (status) => !isTerminal(status),
 );
+
+/** Who may join a match: anyone via the lobby, or only holders of the link. */
+export const MATCH_ACCESS = ["open", "locked"] as const;
+
+export type MatchAccess = (typeof MATCH_ACCESS)[number];
