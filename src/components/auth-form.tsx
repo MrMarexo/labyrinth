@@ -2,11 +2,13 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { hasLocale, useLocale, useTranslations } from "next-intl";
+import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 import { Link, useRouter } from "~/i18n/navigation";
 import { locales } from "~/i18n/routing";
 import { signIn, signUp } from "~/lib/auth-client";
+import { safeNext } from "~/lib/safe-next";
 import { api } from "~/trpc/react";
 
 const MIN_PASSWORD_LENGTH = 10;
@@ -91,6 +93,7 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
   const tError = useTranslations("errors");
   const router = useRouter();
   const locale = useLocale();
+  const next = safeNext(useSearchParams().get("next"));
   const setLocale = api.profile.setLocale.useMutation();
   const queryClient = useQueryClient();
 
@@ -157,7 +160,7 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
       void setLocale.mutateAsync({ locale }).catch(() => {
         // A failed preference save must not block registration.
       });
-      router.replace("/");
+      router.replace(next ?? "/");
       router.refresh();
       return;
     }
@@ -168,9 +171,9 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
       // Signing in on a new browser: adopt the language saved on the
       // account. router.replace also writes the NEXT_LOCALE cookie, so it
       // sticks.
-      router.replace("/", { locale: stored });
+      router.replace(next ?? "/", { locale: stored });
     } else {
-      router.replace("/");
+      router.replace(next ?? "/");
     }
 
     router.refresh();
@@ -292,7 +295,10 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
       </button>
 
       <Link
-        href={mode === "sign-up" ? "/sign-in" : "/sign-up"}
+        href={{
+          pathname: mode === "sign-up" ? "/sign-in" : "/sign-up",
+          query: next ? { next } : undefined,
+        }}
         className="block text-sm underline"
       >
         {mode === "sign-up" ? t("haveAccount") : t("needAccount")}
