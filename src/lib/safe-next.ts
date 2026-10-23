@@ -10,7 +10,10 @@ export function safeNext(value: string | null | undefined): string | null {
   } catch {
     return null;
   }
+  // URL parsers strip tab, CR and LF, so "/\t/evil" would become "//evil".
+  if (/[\u0000-\u001f]/.test(value) || /[\u0000-\u001f]/.test(decoded)) {
+    return null;
+  }
   if (decoded.startsWith("//") || decoded.startsWith("/\\")) return null;
-  if (value.startsWith("//") || value.startsWith("/\\")) return null;
   return value;
 }

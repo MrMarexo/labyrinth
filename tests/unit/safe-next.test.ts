@@ -17,6 +17,10 @@ describe("safeNext", () => {
     "https://evil.example",
     "/%2F%2Fevil",
     "/%5Cevil",
+    "/\t/evil",
+    "/%09/evil",
+    "/%0A/evil",
+    "/\r/evil",
   ])("rejects %j", (value) => {
     expect(safeNext(value)).toBeNull();
   });
