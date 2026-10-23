@@ -12,8 +12,11 @@ re-render it, validate it, and adjudicate movement through it.
 A match runs like this:
 
 1. One player creates a match, choosing the cell budget and the gate count.
-   They get a short join code and a link.
-2. The opponent signs in and joins. Both settings are now frozen for the match.
+   The match is open (anyone may join) or locked (joining sends a request the
+   creator decides on). It appears in the lobby, and a locked match can also be
+   sent as a share link ([match lobby spec](2026-10-23-match-lobby-design.md)).
+2. The opponent finds it in the lobby, or opens the share link, signs in and
+   joins, or is accepted. Both settings are now frozen for the match.
 3. Both players draw a labyrinth, independently and simultaneously.
 4. When both mazes are submitted, both runs unlock. Each player solves the
    **opponent's** maze.
@@ -265,7 +268,7 @@ maze            id, authorId, name, cellCount, gateCount,
                 status (draft | submitted), createdAt, updatedAt
 
 match           id, code unique, cellCount, gateCount,
-                status, createdById, createdAt,
+                access (open | locked), status, createdById, createdAt,
                 lastActivityAt, deadlineAt,
                 winnerId nullable, endReason nullable
 
@@ -278,7 +281,23 @@ match_player    matchId, userId, mazeId,          -- the maze THEY drew
 move            id, matchId, runnerId, seq, dir, outcome,
                 delta jsonb, createdAt
                 unique (matchId, runnerId, seq)
+
+match_request   matchId, userId, createdAt, declinedAt nullable
+                primary key (matchId, userId)
 ```
+
+`match_request` is a player asking to join a locked match. It lives outside
+`match_player` on purpose: a requester row there would pass `participantRows`,
+be admitted by `canSubscribe` (§8) and break every "two players" check. A
+request is pending while `declinedAt` is null; declining keeps the row so that
+player cannot ask again, withdrawing deletes it, and accepting deletes all of
+the match's requests. `match.access` is chosen at creation and never changes.
+A partial unique index on `match(createdById) WHERE status = 'awaiting_opponent'`
+allows each player one waiting match; `match.create` checks first for the
+friendly error, and abandons the caller's own expired waiting match so the
+daily sweep's lag never blocks a new one. `match.code` is now only a label
+(the editor names a draft after it, lists tell matches apart by it); nothing
+joins by it. See the [match lobby spec](2026-10-23-match-lobby-design.md).
 
 The maze a player *solves* is the opponent's `match_player.mazeId`, never their
 own. That join is the only place the mapping exists.
@@ -422,11 +441,19 @@ already discloses the same fact (§9.1).
 **Two channels.** `run-{matchId}-{runnerId}` (presence) carries each move's
 delta with its `seq`; the runner joins it only for the member count, the author
 to watch. `match-{matchId}` (private, both players) carries a payload-free
-"changed" ping on join, submit, give-up, completion and cancel, so the lobby updates
-live and an open run learns at once that the opponent gave up. Pings carry no
+"changed" ping on join, submit, give-up, completion and cancel, so the waiting
+screen and the matches list update live and an open run learns at once that the opponent gave up. Pings carry no
 data — the client refetches through the ordinary procedures, so the channel can
 disclose nothing they would not. A slow poll (60s) remains as the fallback for
 a dropped connection.
+
+**Two more channels** ([match lobby spec](2026-10-23-match-lobby-design.md)). `private-lobby` pings whenever the set of
+waiting matches changes (create, join, accept, cancel) and `private-user_{id}`
+pings one player about their own requests (accepted, declined, match gone).
+Neither names a match, so `canSubscribe` decides them without a participant
+check: the lobby is open to any signed-in user, a user channel only to its
+owner. A requester is deliberately not admitted to the `match` or `run`
+channels.
 
 **Publishing never fails a move.** The server publishes after the transaction
 commits; a publish error is logged and swallowed. A watcher who missed a delta
@@ -468,7 +495,8 @@ awaiting_opponent → drawing → running → complete
                           ↘ abandoned (on expiry)
 ```
 
-- `awaiting_opponent` — created, code issued, nobody has joined.
+- `awaiting_opponent` — created, nobody has joined: the match is in the lobby
+  (until its deadline), and a locked one may hold pending requests ([match lobby spec](2026-10-23-match-lobby-design.md)).
 - `drawing` — both players present, each drawing. Settings frozen.
 - `running` — both mazes submitted. Both runs unlock at once and proceed
   independently.
@@ -480,8 +508,9 @@ awaiting_opponent → drawing → running → complete
 **Cancelling a waiting match.** While a match is still `awaiting_opponent`, its
 creator — the only player in it — can cancel it, from the matches list or the
 lobby, after a confirmation. Cancelling deletes the match row (its one player
-row cascades, and no maze was ever submitted to it), so the join code stops
-working: a later join gets "no match has that code". `match.cancel` locks the
+row cascades, and no maze was ever submitted to it), so the match leaves the lobby and its pending requests go with it (those
+requesters are pinged on their user channel; a later join gets "match not
+found"). `match.cancel` locks the
 match row and re-checks the status, and `join` locks the same row, so a join
 racing the cancel either lands first and the cancel is refused, or waits and
 finds nothing. Any other status is refused (`errors.matchNotCancellable`);
@@ -825,7 +854,9 @@ who did not reach the treasure — is asserted directly rather than inferred.
 **Playwright**, in two projects (desktop Chromium, mobile Safari viewport):
 
 - sign-up, sign-in, sign-out
-- create match, join by code
+- the lobby, requests and share links (`e2e/matchmaking.spec.ts`): create an open
+  or locked match, join from the lobby, request and accept or decline, open a
+  share link signed out. See the [match lobby spec](2026-10-23-match-lobby-design.md)
 - both mazes submitted, match reaches `running`
 - a run that bumps a wall, collects a key, opens its gate, reaches the treasure
 - result stays hidden until the second player finishes, then reveals
@@ -886,7 +917,7 @@ Nightly: the single Pusher smoke test against the real service.
 | 0 — Foundations | Scaffold, Neon + Drizzle, Better Auth email/password, en/sk i18n, theming, app shell, CI, `AGENTS.md`. Sign up, sign in, switch language and theme. |
 | 1 — Maze domain | Format schema, validator, solver, reducer. Headless, fully unit- and property-tested. |
 | 2 — Editor | SVG board, shape mode, detail palette, undo/redo, draft autosave, live validation panel, "my labyrinths" list. Draw and save a labyrinth. |
-| 3 — Match lifecycle | Create with settings, join by code, submit mazes, state machine, expiry. Two accounts reach `running`. |
+| 3 — Match lifecycle | Create with settings, join by code (since replaced by the lobby), submit mazes, state machine, expiry. Two accounts reach `running`. |
 | 4 — The run | Move procedure, fog rendering, penalties, keys and gates, finish, withheld reveal. **First phase where the product exists.** |
 | 5 — Spectate and replay | Publisher abstraction, Pusher, presence badge, viewer with scrubber. |
 | 6 — Polish | Responsive passes, accessibility, empty and error states, history pages, e2e suite completed. |
@@ -907,8 +938,8 @@ table. Nothing in this design blocks either.
 editor's touch ergonomics (§10.2). The purity rule in §5.2 exists so the domain
 layer can be shared with it.
 
-**Public lobby and random matchmaking.** v1 is invite-code only. The data model
-does not need to change to add a lobby later.
+**Random matchmaking.** Players always pick a match themselves, from the lobby
+or a share link. The lobby itself shipped ([match lobby spec](2026-10-23-match-lobby-design.md)).
 
 **OAuth sign-in.** Email and password only. See §5.1.
 
@@ -920,7 +951,7 @@ does not need to change to add a lobby later.
 | What does the runner learn, and when? | Bump-to-learn. Walls are invisible until walked into. |
 | How strictly is "one path to the treasure" read? | At least one solution must exist, via the key-aware search. Loops and alternate routes allowed. |
 | How do keys map to gates? | Matched pairs, colour-coded, one key per gate. |
-| How do players meet? | Invite code and link. Creator sets the settings. |
+| How do players meet? | The lobby (open matches join at once; locked matches take requests the creator accepts or declines) or a share link to a locked match. Creator sets the settings. |
 | How is the winner decided? | Raw penalty count, fewest wins. Asymmetry is part of the game — you drew the maze. |
 | Where does the runner start? | The author places a start marker. |
 | Is there an in-run drawing tool? | No. The editor is drawing-phase only; the discovered map draws itself. |

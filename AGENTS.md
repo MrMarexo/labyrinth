@@ -48,6 +48,8 @@ quietly rather than loudly.
    reads are separate procedures with separate return types.
    `match.eligibleMazes` returns `data` only for the caller's own mazes, for
    the lobby picker's previews: an author-facing read, so it is allowed.
+   `lobby`, `preview` and `requests` read no maze columns: at
+   `awaiting_opponent` there is no maze.
 2. **`src/maze/` and `src/match/` import nothing** from Next, React, tRPC or
    Drizzle. They are pure functions over plain data, shared by the server, the
    live spectator view, the replay view and eventually a mobile client. ESLint
@@ -83,8 +85,12 @@ quietly rather than loudly.
 12. **Every realtime subscription is decided by `canSubscribe`**
     (`src/server/realtime/access.ts`), which applies `maySubscribe`
     (`src/match/watch.ts`). The Pusher auth route and the local stream route
-    both call it; a third transport must too. Publishing happens after the
-    transaction commits, through `publishSafely`, and never fails the caller.
+    both call it; a third transport must too. The `lobby` and `user` channels
+    have no match, so `canSubscribe` decides them without a participant check:
+    lobby for any signed-in user, a user channel for its owner only. A match
+    requester is not a participant and never passes it. Publishing happens
+    after the transaction commits, through `publishSafely`, and never fails the
+    caller.
 
 ## Schema notes
 
