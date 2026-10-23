@@ -62,10 +62,19 @@ export const mazeRouter = createTRPCRouter({
         gateCount: maze.gateCount,
         status: maze.status,
         updatedAt: maze.updatedAt,
+        // The author's own mazes only (filtered below), so returning the
+        // drawing for the list's previews is an author-facing read.
+        data: maze.data,
       })
       .from(maze)
       .where(eq(maze.authorId, ctx.session.user.id))
-      .orderBy(desc(maze.updatedAt)),
+      .orderBy(desc(maze.updatedAt))
+      .then((rows) =>
+        rows.map(({ data, ...row }) => {
+          const parsed = draftMazeSchema.safeParse(data);
+          return { ...row, preview: parsed.success ? parsed.data : null };
+        }),
+      ),
   ),
 
   get: protectedProcedure

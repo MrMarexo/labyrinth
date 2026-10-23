@@ -2,7 +2,16 @@ import { CELL_PX } from "~/components/editor/board";
 import { gateColour } from "~/components/editor/gate-colours";
 import { KeyIcon, StartIcon, TreasureIcon } from "~/components/maze-icons";
 import { mazeViewBox } from "~/lib/maze-view-box";
-import { edgeKey, outlineEdges, type Edge, type Maze } from "~/maze";
+import { edgeKey, outlineEdges, type DraftMaze, type Edge } from "~/maze";
+
+/**
+ * Anything drawable: a finished maze, or a draft that may not have its start
+ * or treasure yet. A `Maze` fits as it is.
+ */
+export type DrawableMaze = Pick<
+  DraftMaze,
+  "cells" | "segments" | "keys" | "start" | "treasure"
+>;
 
 /** Endpoints of the line an edge is drawn as, in board pixels. */
 function edgeLine(edge: Edge) {
@@ -22,7 +31,7 @@ function edgeLine(edge: Edge) {
  * the lobby's previews and the read-only labyrinth page, so none of them can
  * draw a maze differently.
  */
-export function MazeDrawing({ maze }: { maze: Maze }) {
+export function MazeDrawing({ maze }: { maze: DrawableMaze }) {
   return (
     <>
       {maze.cells.map((c) => (
@@ -37,8 +46,12 @@ export function MazeDrawing({ maze }: { maze: Maze }) {
         />
       ))}
 
-      <StartIcon x={maze.start.x} y={maze.start.y} size={CELL_PX} />
-      <TreasureIcon x={maze.treasure.x} y={maze.treasure.y} size={CELL_PX} />
+      {maze.start && (
+        <StartIcon x={maze.start.x} y={maze.start.y} size={CELL_PX} />
+      )}
+      {maze.treasure && (
+        <TreasureIcon x={maze.treasure.x} y={maze.treasure.y} size={CELL_PX} />
+      )}
 
       {maze.keys.map((k) => (
         <KeyIcon
@@ -80,9 +93,10 @@ export function MazeDrawing({ maze }: { maze: Maze }) {
  * A small thumbnail of one of the author's own mazes. Decorative: whatever
  * it sits in names the maze.
  */
-export function MazePreview({ maze }: { maze: Maze }) {
+export function MazePreview({ maze }: { maze: DrawableMaze }) {
   return (
     <svg
+      data-maze-preview
       aria-hidden="true"
       viewBox={mazeViewBox(maze.cells, CELL_PX)}
       className="bg-cell-void aspect-square w-full rounded"

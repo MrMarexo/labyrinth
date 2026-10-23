@@ -218,12 +218,13 @@ describe("maze.list", () => {
     expect(mine.every((m) => m.name !== "Theirs")).toBe(true);
   });
 
-  it("does not return the maze data — the list only needs summaries", async () => {
+  it("returns each of the caller's own drawings as a parsed preview, never the raw data column", async () => {
     const caller = createCaller(await signedIn());
     await caller.maze.createDraft(settings);
     const [summary] = await caller.maze.list();
     expect(summary).toBeDefined();
     expect(summary).not.toHaveProperty("data");
+    expect(summary!.preview).toEqual(emptyDraft());
   });
 });
 

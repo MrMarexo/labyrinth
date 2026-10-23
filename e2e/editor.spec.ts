@@ -354,3 +354,36 @@ test.describe("a stale copy of the editor", () => {
     }
   });
 });
+
+test.describe("the labyrinths list", () => {
+  test("shows each labyrinth as a tile with its preview", async ({ page }) => {
+    await signUpAndOpenNewMaze(page);
+    await page.locator('[data-cell="0,0"]').click();
+    await page.locator('[data-cell="1,0"]').click();
+    await page.locator('[data-cell="2,0"]').click();
+    await expect(page.locator("[data-save-state]")).toHaveAttribute(
+      "data-save-state",
+      "saved",
+    );
+
+    await page.goto("/en/labyrinths");
+    const tile = page.locator("[data-maze-item]");
+    await expect(tile).toHaveCount(1);
+    // A draft with no start or treasure yet still previews its squares, and
+    // the shape's outline.
+    const preview = tile.locator("svg[data-maze-preview]");
+    await expect(preview).toHaveAttribute("aria-hidden", "true");
+    await expect(preview.locator("rect")).toHaveCount(3);
+    await expect(preview.locator("[data-outline]")).toHaveCount(8);
+
+    // Name above the preview, and both open the labyrinth.
+    const name = await tile
+      .getByRole("link", { name: "Test maze" })
+      .boundingBox();
+    const thumb = await preview.boundingBox();
+    expect(name!.y + name!.height).toBeLessThanOrEqual(thumb!.y + 1);
+    await expect(
+      tile.getByRole("button", { name: "Delete Test maze" }),
+    ).toBeVisible();
+  });
+});
