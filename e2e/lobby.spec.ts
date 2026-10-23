@@ -65,6 +65,22 @@ test.describe("the lobby's maze picker", () => {
     ).toBe("pointer");
   });
 
+  test("draws the same tile on /labyrinths and in the picker", async ({
+    players,
+  }) => {
+    const host = await players({ name: "Same", cellCount: 36, gateCount: 0 });
+    const guest = await players({ name: "Other", cellCount: 36, gateCount: 0 });
+    await join(guest, await createMatch(host, { cells: 36, gates: 0 }));
+
+    await host.reload();
+    const picked = await host.locator("[data-maze-option]").boundingBox();
+
+    await host.goto("/en/labyrinths");
+    const listed = await host.locator("[data-maze-item]").boundingBox();
+
+    expect(Math.round(picked!.width)).toBe(Math.round(listed!.width));
+  });
+
   test("offers the use button only while a labyrinth is selected", async ({
     players,
   }) => {

@@ -5,7 +5,7 @@ import { useRef, useState, type KeyboardEvent } from "react";
 
 import { discardsSettled } from "~/components/editor/pending-discards";
 
-import { MazePreview } from "~/components/maze-drawing";
+import { MazeTile, mazeTileClass } from "~/components/maze-tile";
 import { useRouter } from "~/i18n/navigation";
 import { resolveErrorKey } from "~/lib/resolve-error-key";
 import { draftToMaze } from "~/maze";
@@ -95,12 +95,16 @@ export function MazePicker({ match, selected, onSelect }: MazePickerProps) {
               tabIndex={index === tabStopIndex ? 0 : -1}
               onClick={() => onSelect(active ? null : m.id)}
               onKeyDown={handleKeyDown}
-              className={optionClass(active)}
+              className={mazeTileClass({ selected: active, hoverable: true })}
             >
-              <span data-maze-name className="w-full truncate">
-                {m.name}
-              </span>
-              {preview(m.data)}
+              <MazeTile
+                name={
+                  <span data-maze-name className="w-full truncate">
+                    {m.name}
+                  </span>
+                }
+                maze={draftToMaze(m.data)}
+              />
             </button>
           );
         })}
@@ -108,12 +112,6 @@ export function MazePicker({ match, selected, onSelect }: MazePickerProps) {
       {drawNew}
     </div>
   );
-}
-
-/** The maze's thumbnail; nothing for a draft that is somehow incomplete. */
-function preview(data: Parameters<typeof draftToMaze>[0]) {
-  const maze = draftToMaze(data);
-  return maze ? <MazePreview maze={maze} /> : null;
 }
 
 /**
@@ -170,17 +168,4 @@ function DrawNew({ match }: { match: MazePickerProps["match"] }) {
       )}
     </div>
   );
-}
-
-/**
- * A square tile the width of its preview, name on top. Selection is the
- * border alone — an accent outline, never a fill — so the preview stays
- * readable either way.
- */
-function optionClass(active: boolean): string {
-  const base =
-    "flex w-32 flex-col gap-2 rounded-lg border-2 p-2 text-left text-sm sm:w-36";
-  return active
-    ? `${base} border-accent`
-    : `${base} border-border hover:border-border-strong`;
 }

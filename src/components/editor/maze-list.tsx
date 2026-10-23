@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 
-import { MazePreview } from "~/components/maze-drawing";
+import { MazeTile, mazeTileClass } from "~/components/maze-tile";
 import { resolveErrorKey } from "~/lib/resolve-error-key";
 import { Link } from "~/i18n/navigation";
 import { api } from "~/trpc/react";
@@ -40,34 +40,37 @@ export function MazeList() {
           <li
             key={item.id}
             data-maze-item={item.id}
-            className="border-border flex w-40 flex-col gap-2 rounded-lg border-2 p-2 text-sm sm:w-44"
+            className={mazeTileClass()}
           >
-            {/* Not prefetched: the prefetch would cache the editor page
-                with the draft as it is now, and a save still landing from
-                the editor just left would be missing when it opens. */}
-            <Link
-              href={href}
-              prefetch={false}
-              className="truncate font-medium underline"
-            >
-              {item.name}
-            </Link>
-            {/* The preview opens the labyrinth too; the name link above is
-                its accessible name, so this one is hidden from the a11y
-                tree and the tab order rather than announced twice. */}
-            <Link
-              href={href}
-              prefetch={false}
-              tabIndex={-1}
-              aria-hidden="true"
-              className="block"
-            >
-              {item.preview ? (
-                <MazePreview maze={item.preview} />
-              ) : (
-                <div className="bg-cell-void aspect-square w-full rounded" />
+            <MazeTile
+              maze={item.preview}
+              name={
+                // Not prefetched: the prefetch would cache the editor page
+                // with the draft as it is now, and a save still landing from
+                // the editor just left would be missing when it opens.
+                <Link
+                  href={href}
+                  prefetch={false}
+                  className="truncate font-medium underline"
+                >
+                  {item.name}
+                </Link>
+              }
+              // The preview opens the labyrinth too; the name link above is
+              // its accessible name, so this one is hidden from the a11y tree
+              // and the tab order rather than announced twice.
+              wrapPreview={(preview) => (
+                <Link
+                  href={href}
+                  prefetch={false}
+                  tabIndex={-1}
+                  aria-hidden="true"
+                  className="block"
+                >
+                  {preview}
+                </Link>
               )}
-            </Link>
+            />
             <span className="text-muted">
               {t("summary", {
                 squares: item.cellCount,
