@@ -23,7 +23,16 @@ export function MatchResult({ matchId }: { matchId: string }) {
     return <p role="alert">{te(issue.key as never, issue.params as never)}</p>;
   }
 
-  const { outcome, reason, gaveUpBy, decidedBy, you, opponent, mazes } = data;
+  const {
+    outcome,
+    reason,
+    gaveUpBy,
+    decidedBy,
+    you,
+    opponent,
+    mazes,
+    replayable,
+  } = data;
   const name = opponent?.displayName ?? "";
 
   let reasonText: string;
@@ -124,26 +133,40 @@ export function MatchResult({ matchId }: { matchId: string }) {
 
       {mazes && (
         <div className="grid gap-6 md:grid-cols-2">
-          {mazes.theirs && (
+          {mazes.theirs ? (
             <ResultMaze
               which="theirs"
               maze={mazes.theirs.maze}
               path={mazes.theirs.path}
               label={t("theirMaze", { name })}
             />
+          ) : (
+            <figure data-result-maze-deleted="theirs" className="space-y-2">
+              <figcaption className="text-sm font-medium">
+                {t("theirMaze", { name })}
+              </figcaption>
+              <p className="text-muted text-sm">{t("mazeDeleted")}</p>
+            </figure>
           )}
-          {mazes.yours && (
+          {mazes.yours ? (
             <ResultMaze
               which="yours"
               maze={mazes.yours.maze}
               path={mazes.yours.path}
               label={t("yourMaze", { name })}
             />
+          ) : (
+            <figure data-result-maze-deleted="yours" className="space-y-2">
+              <figcaption className="text-sm font-medium">
+                {t("yourMaze", { name })}
+              </figcaption>
+              <p className="text-muted text-sm">{t("mazeDeleted")}</p>
+            </figure>
           )}
         </div>
       )}
 
-      {mazes && (
+      {replayable && (
         <div className="flex flex-wrap gap-4">
           <Link
             href={`/matches/${matchId}/watch?run=mine`}

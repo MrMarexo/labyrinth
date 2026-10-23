@@ -1,4 +1,5 @@
 import { TRPCError } from "@trpc/server";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { env } from "~/env";
@@ -10,8 +11,9 @@ import {
 } from "~/lib/open-maze";
 import { CELL_COUNT_PRESETS, validateMaze } from "~/maze";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { maze } from "~/server/db/schema";
+import { match, maze } from "~/server/db/schema";
 import { servingLoopback } from "~/server/env-guards";
+import { notYours, participantRows } from "~/server/match/access";
 
 /**
  * Callers that predate the `layout` field send none, and mean the open seed.
@@ -137,5 +139,30 @@ export const testSupportRouter = createTRPCRouter({
         .returning({ id: maze.id });
 
       return { id: row!.id };
+    }),
+
+  /**
+   * Moves an ended match's end time `days` into the past, so a spec can
+   * reach what happens once its replay window has closed. Only for a match
+   * the caller played in.
+   */
+  ageMatch: protectedProcedure
+    .input(
+      z.object({ matchId: z.string(), days: z.number().int().min(1).max(400) }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      assertEnabled();
+      const found = await participantRows(
+        ctx.db,
+        input.matchId,
+        ctx.session.user.id,
+      );
+      if (!found) notYours();
+      const endedAt = new Date(Date.now() - input.days * 24 * 60 * 60 * 1000);
+      await ctx.db
+        .update(match)
+        .set({ endedAt })
+        .where(eq(match.id, input.matchId));
+      return { endedAt };
     }),
 });

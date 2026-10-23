@@ -255,6 +255,7 @@
     "finishClose": "Close"
   },
   "result": {
+    "mazeDeleted": "This labyrinth was deleted.",
     "won": "You won.",
     "lost": "You lost.",
     "none": "Nobody won.",

@@ -255,6 +255,7 @@
     "finishClose": "Zavrieť"
   },
   "result": {
+    "mazeDeleted": "Toto bludisko bolo vymazané.",
     "won": "Vyhrali ste.",
     "lost": "Prehrali ste.",
     "none": "Nikto nevyhral.",

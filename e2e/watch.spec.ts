@@ -125,3 +125,50 @@ test.describe("watching and replay", () => {
     await expect(view).toHaveAttribute("data-watch-step", "11", PUSH);
   });
 });
+
+test.describe("an old match", () => {
+  test.describe.configure({ timeout: 90_000 });
+
+  test("keeps its result, drops the replay, and marks a deleted labyrinth", async ({
+    players,
+  }) => {
+    const { host, guest } = await startRunningMatch(players, createMatch);
+    await guest.getByRole("button", { name: "Give up" }).click();
+    await guest.getByRole("button", { name: "Yes, give up" }).click();
+    await expect(host.locator("[data-match-result]")).toBeVisible(PUSH);
+    const resultUrl = host.url();
+    const matchId = resultUrl.split("/").at(-1)!;
+
+    // The host deletes the labyrinth they used.
+    await host.goto("/en/labyrinths");
+    await host.getByRole("button", { name: "Delete Host maze" }).click();
+    await host
+      .getByRole("button", { name: "Confirm delete Host maze" })
+      .click();
+    await expect(host.locator("[data-maze-item]")).toHaveCount(0);
+
+    // A month and a day pass.
+    const aged = await host.evaluate(async (id) => {
+      const response = await fetch("/api/trpc/testSupport.ageMatch", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ json: { matchId: id, days: 31 } }),
+      });
+      return response.ok;
+    }, matchId);
+    expect(aged).toBe(true);
+
+    await host.goto(resultUrl);
+    const result = host.locator("[data-match-result]");
+    await expect(result).toHaveAttribute("data-outcome", "won");
+    await expect(host.locator("[data-replay-link]")).toHaveCount(0);
+    await expect(host.locator('[data-result-maze="theirs"]')).toBeVisible();
+    await expect(host.locator('[data-result-maze="yours"]')).toHaveCount(0);
+    await expect(host.getByText("This labyrinth was deleted.")).toBeVisible();
+
+    await host.goto(`${resultUrl}/watch?run=mine`);
+    await expect(host.locator("[data-watch-error]")).toContainText(
+      "This replay is no longer available.",
+    );
+  });
+});
