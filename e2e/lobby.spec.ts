@@ -1,15 +1,7 @@
 import { expect, type Page } from "@playwright/test";
 
 import { cell, drag } from "./support/board";
-import { createMatch, test } from "./support/match";
-
-/** Joins `code` as `guest`, so the match moves on to `drawing`. */
-async function join(guest: Page, code: string): Promise<void> {
-  await guest.goto("/en/matches");
-  await guest.getByLabel("Join code").fill(code);
-  await guest.getByRole("button", { name: "Join" }).click();
-  await expect(guest).toHaveURL(/\/en\/matches\/[^/]+$/);
-}
+import { createMatch, joinMatch, test } from "./support/match";
 
 test.describe("the lobby's maze picker", () => {
   test("shows a preview of each option, no status label, and always offers a new one", async ({
@@ -21,7 +13,7 @@ test.describe("the lobby's maze picker", () => {
       gateCount: 0,
     });
     const guest = await players({ name: "Other", cellCount: 36, gateCount: 0 });
-    await join(guest, await createMatch(host, { cells: 36, gates: 0 }));
+    await joinMatch(guest, await createMatch(host, { cells: 36, gates: 0 }));
 
     await host.reload();
     const option = host.locator("[data-maze-option]");
@@ -70,7 +62,7 @@ test.describe("the lobby's maze picker", () => {
   }) => {
     const host = await players({ name: "Same", cellCount: 36, gateCount: 0 });
     const guest = await players({ name: "Other", cellCount: 36, gateCount: 0 });
-    await join(guest, await createMatch(host, { cells: 36, gates: 0 }));
+    await joinMatch(guest, await createMatch(host, { cells: 36, gates: 0 }));
 
     await host.reload();
     const picked = await host.locator("[data-maze-option]").boundingBox();
@@ -90,7 +82,7 @@ test.describe("the lobby's maze picker", () => {
       gateCount: 0,
     });
     const guest = await players({ name: "Other", cellCount: 36, gateCount: 0 });
-    await join(guest, await createMatch(host, { cells: 36, gates: 0 }));
+    await joinMatch(guest, await createMatch(host, { cells: 36, gates: 0 }));
 
     await host.reload();
     await expect(
@@ -121,7 +113,7 @@ test.describe("the lobby's maze picker", () => {
       gateCount: 0,
     });
     const guest = await players({ name: "Other", cellCount: 36, gateCount: 0 });
-    await join(guest, await createMatch(host, { cells: 36, gates: 0 }));
+    await joinMatch(guest, await createMatch(host, { cells: 36, gates: 0 }));
 
     await host.reload();
     await expect(
@@ -149,9 +141,9 @@ test.describe("the lobby's maze picker", () => {
   }) => {
     const host = await players({ name: "Seed", cellCount: 64, gateCount: 0 });
     const guest = await players({ name: "Other", cellCount: 36, gateCount: 0 });
-    const code = await createMatch(host, { cells: 36, gates: 0 });
+    const matchId = await createMatch(host, { cells: 36, gates: 0 });
     const matchUrl = host.url();
-    await join(guest, code);
+    await joinMatch(guest, matchId);
 
     await host.reload();
     await host.getByRole("button", { name: "Draw a new one" }).click();
@@ -167,7 +159,7 @@ test.describe("the lobby's maze picker", () => {
 
     await host.goto("/en/labyrinths");
     await expect(
-      host.getByRole("link", { name: `Labyrinth for match ${code}` }),
+      host.getByRole("link", { name: /^Labyrinth for match \S+$/ }),
     ).toHaveCount(1);
   });
 
@@ -176,10 +168,9 @@ test.describe("the lobby's maze picker", () => {
   }) => {
     const host = await players({ name: "Seed", cellCount: 64, gateCount: 0 });
     const guest = await players({ name: "Other", cellCount: 36, gateCount: 0 });
-    const code = await createMatch(host, { cells: 36, gates: 0 });
+    const matchId = await createMatch(host, { cells: 36, gates: 0 });
     const matchUrl = host.url();
-    const matchId = matchUrl.split("/").at(-1)!;
-    await join(guest, code);
+    await joinMatch(guest, matchId);
 
     await host.reload();
     await host.getByRole("button", { name: "Draw a new one" }).click();
@@ -212,7 +203,7 @@ test.describe("the lobby's maze picker", () => {
     await use.click();
     await expect(
       host.getByText(
-        `Use Labyrinth for match ${code} in this match? After that it can't be edited, but you can reuse it in other matches.`,
+        /^Use Labyrinth for match \S+ in this match\? After that it can't be edited, but you can reuse it in other matches\.$/,
       ),
     ).toBeVisible();
     await host.getByRole("button", { name: "Use it", exact: true }).click();
@@ -231,9 +222,8 @@ test.describe("leaving the editor for the lobby", () => {
   }) => {
     const host = await players({ name: "Seed", cellCount: 64, gateCount: 0 });
     const guest = await players({ name: "Other", cellCount: 36, gateCount: 0 });
-    const code = await createMatch(host, { cells: 36, gates: 0 });
-    const matchId = host.url().split("/").at(-1)!;
-    await join(guest, code);
+    const matchId = await createMatch(host, { cells: 36, gates: 0 });
+    await joinMatch(guest, matchId);
 
     await host.reload();
     await host.getByRole("button", { name: "Draw a new one" }).click();
@@ -285,9 +275,8 @@ test.describe("the editor's match check", () => {
       cellCount: 36,
       gateCount: 0,
     });
-    const code = await createMatch(host, { cells: 36, gates: 0 });
-    const matchId = host.url().split("/").at(-1)!;
-    await join(guest, code);
+    const matchId = await createMatch(host, { cells: 36, gates: 0 });
+    await joinMatch(guest, matchId);
 
     /** Opens the player's only labyrinth with `?match=` pointing here. */
     async function openWithMatch(page: Page, name: string) {
@@ -310,40 +299,36 @@ test.describe("the editor's match check", () => {
 });
 
 test.describe("cancelling a waiting match", () => {
-  test("removes it from the list, and its code stops working", async ({
+  test("removes it from the list, and its join page closes", async ({
     players,
   }) => {
     const host = await players({ name: "Host", cellCount: 36, gateCount: 0 });
     const guest = await players({ name: "Guest", cellCount: 36, gateCount: 0 });
-    const code = await createMatch(host, { cells: 36, gates: 0 });
+    const matchId = await createMatch(host, { cells: 36, gates: 0 });
 
     await host.goto("/en/matches");
     const row = host.locator("[data-match-row]", {
-      has: host.locator(`[data-match-code="${code}"]`),
+      has: host.locator(`a[href$="/matches/${matchId}"]`),
     });
     await row.locator("[data-cancel-match]").click();
     await expect(
-      row.getByText("Cancel this match? The join code will stop working."),
+      row.getByText("Cancel this match? It will leave the lobby."),
     ).toBeVisible();
     await row.getByRole("button", { name: "Yes, cancel it" }).click();
     await expect(row).toHaveCount(0);
 
-    await guest.goto("/en/matches");
-    await guest.getByLabel("Join code").fill(code);
-    await guest.getByRole("button", { name: "Join" }).click();
-    await expect(guest.locator("[data-join-error]")).toHaveText(
-      "No match has that code.",
-    );
+    await guest.goto(`/en/matches/${matchId}/join`);
+    await expect(guest.locator("[data-match-closed]")).toBeVisible();
   });
 
   test("from the lobby, returns to the matches list", async ({ players }) => {
     const host = await players({ name: "Host", cellCount: 36, gateCount: 0 });
-    const code = await createMatch(host, { cells: 36, gates: 0 });
+    const matchId = await createMatch(host, { cells: 36, gates: 0 });
 
     await host.locator("[data-cancel-match]").click();
     await host.getByRole("button", { name: "Yes, cancel it" }).click();
 
     await expect(host).toHaveURL(/\/en\/matches$/);
-    await expect(host.locator(`[data-match-code="${code}"]`)).toHaveCount(0);
+    await expect(host.locator(`a[href$="/matches/${matchId}"]`)).toHaveCount(0);
   });
 });

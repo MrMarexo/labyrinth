@@ -2,7 +2,7 @@ import { expect, type Page, type TestInfo } from "@playwright/test";
 
 import type { Direction } from "~/maze";
 
-import type { test } from "./match";
+import { joinMatch, type test } from "./match";
 
 const KEY: Record<Direction, string> = {
   N: "ArrowUp",
@@ -65,11 +65,8 @@ export async function startRunningMatch(
   const host = await players({ name: "Host maze", ...size });
   const guest = await players({ name: "Guest maze", ...size });
 
-  const code = await createMatch(host, { cells: 36, gates: 1 });
-  await guest.goto("/en/matches");
-  await guest.getByLabel("Join code").fill(code);
-  await guest.getByRole("button", { name: "Join" }).click();
-  await expect(guest).toHaveURL(/\/en\/matches\/[^/]+$/);
+  const matchId = await createMatch(host, { cells: 36, gates: 1 });
+  await joinMatch(guest, matchId);
 
   for (const page of [host, guest]) {
     await page.reload();

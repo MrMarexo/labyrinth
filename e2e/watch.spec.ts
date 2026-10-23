@@ -2,7 +2,7 @@ import { expect } from "@playwright/test";
 
 import { GATED_MAZE_ROUTE } from "~/lib/open-maze";
 
-import { createMatch, test } from "./support/match";
+import { createMatch, joinMatch, test } from "./support/match";
 import { closeFinishPopup, startRunningMatch, walk } from "./support/run";
 
 // Well under the 60s fallback poll: passing these proves the push.
@@ -62,11 +62,8 @@ test.describe("watching and replay", () => {
     const size = { cellCount: 36, gateCount: 1, layout: "gated" as const };
     const host = await players({ name: "Host maze", ...size });
     const guest = await players({ name: "Guest maze", ...size });
-    const code = await createMatch(host, { cells: 36, gates: 1 });
-    await guest.goto("/en/matches");
-    await guest.getByLabel("Join code").fill(code);
-    await guest.getByRole("button", { name: "Join" }).click();
-    await expect(guest).toHaveURL(/\/en\/matches\/[^/]+$/);
+    const matchId = await createMatch(host, { cells: 36, gates: 1 });
+    await joinMatch(guest, matchId);
 
     // The host's lobby learns of the join without a reload.
     await expect(host.locator("[data-match-status]")).toHaveAttribute(

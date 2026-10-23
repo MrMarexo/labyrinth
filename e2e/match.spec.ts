@@ -1,6 +1,6 @@
 import { expect } from "@playwright/test";
 
-import { createMatch, test } from "./support/match";
+import { createMatch, joinMatch, test } from "./support/match";
 
 const SIZE = { cellCount: 36, gateCount: 0 };
 
@@ -15,16 +15,13 @@ test.describe("match lifecycle", () => {
     const host = await players({ name: "Host maze", ...SIZE });
     const guest = await players({ name: "Guest maze", ...SIZE });
 
-    const code = await createMatch(host, { cells: 36, gates: 0 });
+    const matchId = await createMatch(host, { cells: 36, gates: 0 });
     await expect(host.locator("[data-match-status]")).toHaveAttribute(
       "data-match-status",
       "awaiting_opponent",
     );
 
-    await guest.goto("/en/matches");
-    await guest.getByLabel("Join code").fill(code);
-    await guest.getByRole("button", { name: "Join" }).click();
-    await expect(guest).toHaveURL(/\/en\/matches\/[^/]+$/);
+    await joinMatch(guest, matchId);
     await expect(guest.locator("[data-match-status]")).toHaveAttribute(
       "data-match-status",
       "drawing",
@@ -64,12 +61,8 @@ test.describe("match lifecycle", () => {
     const host = await players({ name: "One way", ...SIZE });
     const guest = await players({ name: "Theirs", ...SIZE });
 
-    const code = await createMatch(host, { cells: 36, gates: 0 });
-    const matchId = host.url().split("/").at(-1)!;
-    await guest.goto("/en/matches");
-    await guest.getByLabel("Join code").fill(code);
-    await guest.getByRole("button", { name: "Join" }).click();
-    await expect(guest).toHaveURL(/\/en\/matches\/[^/]+$/);
+    const matchId = await createMatch(host, { cells: 36, gates: 0 });
+    await joinMatch(guest, matchId);
 
     await host.reload();
     await host.locator("[data-maze-option]").first().click();
@@ -118,32 +111,33 @@ test.describe("match lifecycle", () => {
     expect(saves).toEqual([]);
   });
 
-  test("an unknown join code is refused with a translated message", async ({
+  test("an unknown match's join page says it is no longer open", async ({
     players,
   }) => {
     const player = await players({ name: "Solo", ...SIZE });
 
-    await player.goto("/en/matches");
-    await player.getByLabel("Join code").fill("ZZZZZZ");
-    await player.getByRole("button", { name: "Join" }).click();
+    await player.goto("/en/matches/00000000-0000-4000-8000-000000000000/join");
 
-    const error = player.locator("[data-join-error]");
-    await expect(error).toBeVisible();
-    await expect(error).toHaveText("No match has that code.");
-    // The key itself must never reach the person.
-    await expect(error).not.toContainText("errors.");
+    await expect(player.locator("[data-match-closed]")).toHaveText(
+      /This match is no longer open\./,
+    );
   });
 
-  test("the matches list shows a created match and its code", async ({
+  test("the matches list shows a created match, without its code", async ({
     players,
   }) => {
     const player = await players({ name: "Listed", ...SIZE });
 
-    const code = await createMatch(player, { cells: 36, gates: 0 });
+    const matchId = await createMatch(player, { cells: 36, gates: 0 });
 
     await player.goto("/en/matches");
     const row = player.locator("[data-match-row]").first();
     await expect(row).toHaveAttribute("data-status", "awaiting_opponent");
-    await expect(row).toContainText(code);
+    await expect(row).toContainText("36 squares, 0 gates");
+    await expect(row.locator("a")).toHaveAttribute(
+      "href",
+      new RegExp(`/matches/${matchId}$`),
+    );
+    await expect(player.locator("[data-match-code]")).toHaveCount(0);
   });
 });

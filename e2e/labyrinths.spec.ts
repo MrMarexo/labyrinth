@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 
-import { createMatch, test } from "./support/match";
+import { createMatch, joinMatch, test } from "./support/match";
 import { startRunningMatch } from "./support/run";
 
 /** A real `maze.createDraft` call through the page's own session. */
@@ -95,11 +95,8 @@ test.describe("/labyrinths", () => {
   }) => {
     const host = await players({ name: "First", cellCount: 36, gateCount: 0 });
     const guest = await players({ name: "Other", cellCount: 36, gateCount: 0 });
-    const code = await createMatch(host, { cells: 36, gates: 0 });
-    await guest.goto("/en/matches");
-    await guest.getByLabel("Join code").fill(code);
-    await guest.getByRole("button", { name: "Join" }).click();
-    await expect(guest).toHaveURL(/\/en\/matches\/[^/]+$/);
+    const matchId = await createMatch(host, { cells: 36, gates: 0 });
+    await joinMatch(guest, matchId);
     const lobby = host.url();
 
     for (let i = 2; i <= 10; i++) {

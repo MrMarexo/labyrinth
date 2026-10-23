@@ -117,22 +117,25 @@ export const test = base.extend<{
   },
 });
 
-/** Reads the join code off the matches page after creating a match. */
+/** Creates a match from the matches page and returns its id, read off the URL. */
 export async function createMatch(
   page: Page,
-  options: { cells: number; gates: number },
+  options: { cells: number; gates: number; access?: "open" | "locked" },
 ): Promise<string> {
   await page.goto("/en/matches");
   await page.getByRole("radio", { name: `${options.cells} squares` }).click();
   await page.getByLabel("Gates").fill(String(options.gates));
+  if (options.access === "locked") {
+    await page.getByRole("radio", { name: /^Locked/ }).click();
+  }
   await page.getByRole("button", { name: "Create match" }).click();
   await expect(page).toHaveURL(/\/en\/matches\/[^/]+$/);
-  // The code is the attribute's value, not something sliced out of the
-  // rendered sentence — `matches.shareCode` puts the code mid-sentence in
-  // Slovak, so `innerText().slice(-6)` only happens to work in English.
-  const code = await page
-    .locator("[data-match-code]")
-    .getAttribute("data-match-code");
-  expect(code).toBeTruthy();
-  return code!;
+  return page.url().split("/").at(-1)!;
+}
+
+/** Opens a match's join page as `guest`, joins, and waits to be seated. */
+export async function joinMatch(guest: Page, matchId: string): Promise<void> {
+  await guest.goto(`/en/matches/${matchId}/join`);
+  await guest.getByRole("button", { name: "Join", exact: true }).click();
+  await expect(guest).toHaveURL(new RegExp(`/en/matches/${matchId}$`));
 }
