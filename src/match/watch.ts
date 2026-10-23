@@ -39,10 +39,11 @@ export function mayReplayOwn(f: WatchFacts): boolean {
  * `f.you` is a participant in `channel.matchId`; this decides which of that
  * match's channels they may join.
  */
-export function maySubscribe(channel: ParsedChannel, f: WatchFacts): boolean {
+export function maySubscribe(
+  channel: Extract<ParsedChannel, { kind: "match" | "run" }>,
+  f: WatchFacts,
+): boolean {
   if (channel.kind === "match") return true;
-  // Lobby and user channels are not match-scoped; they are decided elsewhere.
-  if (channel.kind !== "run") return false;
   // A runner joins their own channel only to count the watchers.
   if (channel.runnerId === f.you.userId) return true;
   if (channel.runnerId === f.opponent?.userId) return mayWatchOpponent(f);

@@ -1,11 +1,20 @@
 import { describe, expect, it } from "vitest";
 
-import { EVENTS, runChannel } from "~/match";
+import {
+  EVENTS,
+  lobbyChannel,
+  matchChannel,
+  runChannel,
+  userChannel,
+} from "~/match";
+import { createCaller } from "~/server/api/root";
+import { db } from "~/server/db";
+import { canSubscribe } from "~/server/realtime/access";
 import { POST as auth } from "~/app/api/realtime/auth/route";
 import { GET as stream } from "~/app/api/realtime/stream/route";
 import { emit, memberCount } from "~/server/realtime/local-bus";
 
-import { runningMatch } from "./players";
+import { runningMatch, signedIn } from "./players";
 
 function streamRequest(channel: string, cookie?: string, signal?: AbortSignal) {
   return new Request(
@@ -150,5 +159,42 @@ describe("POST /api/realtime/auth", () => {
       }),
     );
     expect(res.status).toBe(404);
+  });
+});
+
+describe("canSubscribe lobby and user channels", () => {
+  async function player() {
+    const ctx = await signedIn();
+    return { caller: createCaller(ctx), id: ctx.session!.user.id };
+  }
+
+  it("lets any signed-in user into the lobby", async () => {
+    const a = await player();
+    expect(await canSubscribe(db, a.id, lobbyChannel())).toBe(true);
+  });
+
+  it("lets a user into their own channel only", async () => {
+    const a = await player();
+    const b = await player();
+    expect(await canSubscribe(db, a.id, userChannel(a.id))).toBe(true);
+    expect(await canSubscribe(db, a.id, userChannel(b.id))).toBe(false);
+  });
+
+  it("keeps a requester out of the match's channels", async () => {
+    const creator = await player();
+    const requester = await player();
+    const created = await creator.caller.match.create({
+      cellCount: 36,
+      gateCount: 0,
+      access: "locked",
+    });
+    await requester.caller.match.requestJoin({ matchId: created.id });
+    for (const channel of [
+      matchChannel(created.id),
+      runChannel(created.id, creator.id),
+      runChannel(created.id, requester.id),
+    ]) {
+      expect(await canSubscribe(db, requester.id, channel)).toBe(false);
+    }
   });
 });

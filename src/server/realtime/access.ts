@@ -34,8 +34,10 @@ export async function canSubscribe(
 ): Promise<boolean> {
   const channel = parseChannel(channelName);
   if (!channel) return false;
-  // Lobby and user channels have no match to be a participant of.
-  if (channel.kind === "lobby" || channel.kind === "user") return false;
+  // Lobby and user channels have no match to be a participant of: the lobby
+  // is open to any signed-in user, a user channel only to its owner.
+  if (channel.kind === "lobby") return true;
+  if (channel.kind === "user") return channel.userId === userId;
   const found = await participantRows(db, channel.matchId, userId);
   if (!found) return false;
   return maySubscribe(channel, watchFactsFor(found.row, found.players, userId));
