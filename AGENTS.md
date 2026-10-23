@@ -80,8 +80,9 @@ quietly rather than loudly.
     value in a component will not follow the theme.
 11. **Pages and components never import the database client.** `~/server/db` is
     reachable only from `src/server/**`. Everything under `src/app/` and
-    `src/components/` goes through a tRPC procedure. Layouts are exempt because
-    they read the session directly via `~/server/auth`.
+    `src/components/` goes through a tRPC procedure. Layouts and the
+    `(join)` share-link page (outside `(app)`, with its own session check) are
+    exempt: they read the session via `~/server/auth`.
 12. **Every realtime subscription is decided by `canSubscribe`**
     (`src/server/realtime/access.ts`), which applies `maySubscribe`
     (`src/match/watch.ts`). The Pusher auth route and the local stream route

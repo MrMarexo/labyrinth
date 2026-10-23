@@ -448,7 +448,8 @@ disclose nothing they would not. A slow poll (60s) remains as the fallback for
 a dropped connection.
 
 **Two more channels** ([match lobby spec](2026-10-23-match-lobby-design.md)). `private-lobby` pings whenever the set of
-waiting matches changes (create, join, accept, cancel) and `private-user_{id}`
+waiting matches changes (create, join, accept, cancel, expiry: the sweep
+pings the lobby and pending requesters when it closes a waiting match) and `private-user_{id}`
 pings one player about their own requests (accepted, declined, match gone).
 Neither names a match, so `canSubscribe` decides them without a participant
 check: the lobby is open to any signed-in user, a user channel only to its

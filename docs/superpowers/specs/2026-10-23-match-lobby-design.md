@@ -83,10 +83,13 @@ phone's share sheet (Messages, WhatsApp, …) instead of reading out a code.
   **An expired waiting match does not count.** The sweep runs once a day, so
   a match can sit in `awaiting_opponent` for up to a day after its deadline,
   hidden from the lobby but still matched by the index (which cannot include
-  `now()`). Inside its transaction, `create` therefore first runs
-  `closeIfExpired` on the caller's waiting match, if they have one. That
+  `now()`). `create` therefore first runs
+  `closeIfExpired` on the caller's waiting match, if they have one, in its own
+  transaction just before the create transaction (not inside it). That
   abandons the match exactly as the sweep would, so the old match is gone
-  before the check and the index see it. The `/matches` note and the
+  before the check and the index see it. Running it outside is harmless: the
+  match is already expired, and the unique index plus the `alreadyWaiting`
+  mapping still guard races. The `/matches` note and the
   "already waiting" check both test `status = 'awaiting_opponent' AND
   deadlineAt > now`. *(Builder-writer's call. The alternative, refusing for
   up to a day over a match nobody can join, works against the owner's
@@ -191,6 +194,12 @@ the existing `POLL_MS` as the fallback.
   otherwise ignored. If sign-in switches to the account's saved locale, the
   `next` path's locale prefix is replaced with that locale, so the user lands
   on the join page in their own language.
+
+  *As built:* `?next=` is set by the join page, which lives in its own route
+  group `(join)` and does its own session check, because `(app)/layout.tsx`
+  cannot see the request pathname. Other `(app)` pages still return to `/`
+  after sign-in. Middleware setting an `x-pathname` header would let the
+  layout do this for every `(app)` page; that is the future option.
 
 ### UI (amends §10)
 
