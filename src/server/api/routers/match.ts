@@ -78,7 +78,12 @@ export type LobbyItem = {
  * Waiting, unexpired matches with the caller's own request state. Never
  * selects `code` or any maze column: the lobby is not a way into a match.
  */
-async function waitingMatches(db: DbClient, callerId: string, now: Date) {
+async function waitingMatches(
+  db: DbClient,
+  callerId: string,
+  now: Date,
+  opts: { excludeCreator?: string; matchId?: string } = {},
+) {
   const rows = await db
     .select({
       id: match.id,
@@ -102,7 +107,14 @@ async function waitingMatches(db: DbClient, callerId: string, now: Date) {
       ),
     )
     .where(
-      and(eq(match.status, "awaiting_opponent"), gt(match.deadlineAt, now)),
+      and(
+        eq(match.status, "awaiting_opponent"),
+        gt(match.deadlineAt, now),
+        opts.excludeCreator
+          ? ne(match.createdById, opts.excludeCreator)
+          : undefined,
+        opts.matchId ? eq(match.id, opts.matchId) : undefined,
+      ),
     )
     .orderBy(desc(match.createdAt));
 
@@ -330,24 +342,20 @@ export const matchRouter = createTRPCRouter({
       ctx.db,
       ctx.session.user.id,
       new Date(),
+      { excludeCreator: ctx.session.user.id },
     );
-    return {
-      you: ctx.session.user.id,
-      matches: rows
-        .filter((r) => r.creatorId !== ctx.session.user.id)
-        .map((r) => r.item),
-    };
+    return { you: ctx.session.user.id, matches: rows.map((r) => r.item) };
   }),
 
   preview: protectedProcedure
     .input(z.object({ matchId: z.string() }))
     .query(async ({ ctx, input }) => {
-      const rows = await waitingMatches(
+      const [found] = await waitingMatches(
         ctx.db,
         ctx.session.user.id,
         new Date(),
+        { matchId: input.matchId },
       );
-      const found = rows.find((r) => r.item.id === input.matchId);
       if (!found) {
         throw new TRPCError({
           code: "NOT_FOUND",
