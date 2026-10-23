@@ -1,5 +1,14 @@
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq, inArray, isNotNull, ne, notInArray } from "drizzle-orm";
+import {
+  and,
+  desc,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  ne,
+  notInArray,
+} from "drizzle-orm";
 import { z } from "zod";
 
 import {
@@ -343,6 +352,7 @@ export const matchRouter = createTRPCRouter({
         // so this is exactly the predicate that keeps `submitMaze` from
         // rejecting a choice the picker just offered as valid.
         isNotNull(maze.contentHash),
+        isNull(maze.deletedAt),
       ];
       if (faced.length > 0) conditions.push(notInArray(maze.id, faced));
 
@@ -439,8 +449,12 @@ export const matchRouter = createTRPCRouter({
             and(
               eq(maze.id, input.mazeId),
               eq(maze.authorId, ctx.session.user.id),
+              isNull(maze.deletedAt),
             ),
-          );
+          )
+          // Locked so a concurrent `maze.remove` waits for this submit and
+          // then sees the maze as used, rather than deleting it under us.
+          .for("update");
         // Not yours and not there are the same answer, exactly as the maze
         // router already treats them.
         if (!mazeRow) {

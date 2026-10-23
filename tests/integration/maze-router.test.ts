@@ -339,25 +339,47 @@ describe("maze.remove", () => {
     });
   });
 
-  it("refuses to delete a submitted maze, matching saveDraft's guard", async () => {
+  it("hides a used labyrinth from its author but keeps the row", async () => {
     const caller = createCaller(await signedIn());
     const created = await caller.maze.createDraft(settings);
-    // Nothing in this phase can submit a maze through the API, so the
-    // status is set directly — this is the one case the API cannot arrange.
     await db
       .update(maze)
       .set({ status: "submitted" })
       .where(eq(maze.id, created.id));
 
-    await expect(
-      rejection(caller.maze.remove({ id: created.id })),
-    ).resolves.toEqual({
-      code: "FORBIDDEN",
-      message: "errors.mazeIsSubmitted",
+    expect(await caller.maze.remove({ id: created.id })).toEqual({
+      id: created.id,
     });
 
+    expect((await caller.maze.list()).map((m) => m.id)).not.toContain(
+      created.id,
+    );
+    const notYourMaze = { code: "FORBIDDEN", message: "errors.notYourMaze" };
+    await expect(
+      rejection(caller.maze.get({ id: created.id })),
+    ).resolves.toEqual(notYourMaze);
+    await expect(
+      rejection(caller.maze.remove({ id: created.id })),
+    ).resolves.toEqual(notYourMaze);
+
     const [row] = await db.select().from(maze).where(eq(maze.id, created.id));
-    expect(row).toBeDefined();
+    expect(row?.deletedAt).toBeInstanceOf(Date);
+  });
+
+  it("frees a slot when a used labyrinth is deleted", async () => {
+    const caller = createCaller(await signedIn());
+    for (let i = 0; i < MAZE_LIMIT; i++) {
+      await caller.maze.createDraft(settings);
+    }
+    const [one] = await caller.maze.list();
+    await db
+      .update(maze)
+      .set({ status: "submitted" })
+      .where(eq(maze.id, one!.id));
+    await caller.maze.remove({ id: one!.id });
+    await expect(caller.maze.createDraft(settings)).resolves.toHaveProperty(
+      "id",
+    );
   });
 });
 

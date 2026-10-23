@@ -47,9 +47,16 @@ function assertOwned<T>(row: T | undefined): T {
   return row;
 }
 
-/** The ownership filter every read and write shares. */
+/**
+ * The ownership filter every read and write shares. A deleted maze is no
+ * longer the author's to open, edit or delete again, so it fails this too.
+ */
 function ownedBy(id: string, userId: string) {
-  return and(eq(maze.id, id), eq(maze.authorId, userId));
+  return and(
+    eq(maze.id, id),
+    eq(maze.authorId, userId),
+    isNull(maze.deletedAt),
+  );
 }
 
 /** A draft with no painted squares: nothing in it is worth keeping. */
@@ -313,24 +320,24 @@ export const mazeRouter = createTRPCRouter({
   remove: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      const [found] = await ctx.db
-        .select()
-        .from(maze)
-        .where(ownedBy(input.id, ctx.session.user.id));
-      const row = assertOwned(found);
-
-      if (row.status === "submitted") {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "errors.mazeIsSubmitted",
-        });
-      }
-
+      const mine = ownedBy(input.id, ctx.session.user.id);
+      // A draft goes for good. The status is part of the statement, not a
+      // prior read: a `submitMaze` landing in between must not let a maze a
+      // match now uses be deleted (the foreign key would only null the link).
       const deleted = await ctx.db
         .delete(maze)
-        .where(ownedBy(input.id, ctx.session.user.id))
+        .where(and(mine, eq(maze.status, "draft")))
         .returning({ id: maze.id });
-      assertOwned(deleted[0]);
+      if (deleted[0]) return { id: input.id };
+
+      // A used maze is only hidden: matches that used it keep reading it
+      // until their replay window closes, then the nightly purge removes it.
+      const hidden = await ctx.db
+        .update(maze)
+        .set({ deletedAt: new Date() })
+        .where(and(mine, eq(maze.status, "submitted")))
+        .returning({ id: maze.id });
+      assertOwned(hidden[0]);
       return { id: input.id };
     }),
 });

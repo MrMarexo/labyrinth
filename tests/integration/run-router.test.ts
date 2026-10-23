@@ -339,3 +339,20 @@ describe("run.move", () => {
     );
   });
 });
+
+describe("a labyrinth deleted mid-match", () => {
+  it("still carries the run that walks it", async () => {
+    const { host, guest, guestId, matchId } = await runningMatch();
+    const [mine] = await db
+      .select({ mazeId: matchPlayer.mazeId })
+      .from(matchPlayer)
+      .where(
+        and(eq(matchPlayer.matchId, matchId), eq(matchPlayer.userId, guestId)),
+      );
+    // The guest deletes the labyrinth the host is solving, mid-run.
+    await guest.maze.remove({ id: mine!.mazeId! });
+
+    await walk(host, matchId, GATED_MAZE_ROUTE);
+    expect((await host.run.get({ matchId })).finished).toBe(true);
+  });
+});

@@ -873,3 +873,33 @@ describe("match.cancel racing match.join", () => {
     }
   });
 });
+
+describe("a deleted used labyrinth", () => {
+  /** A labyrinth `host` used in a match that reached running, then deleted. */
+  async function usedThenDeleted() {
+    const host = createCaller(await signedIn());
+    const rival = createCaller(await signedIn());
+    const first = await host.match.create(settings);
+    await rival.match.join({ code: first.code });
+    const mazeId = await savedMaze(host, "Used");
+    await host.match.submitMaze({ matchId: first.id, mazeId });
+    await rival.match.submitMaze({
+      matchId: first.id,
+      mazeId: await savedMaze(rival, "Rival's"),
+    });
+    await host.maze.remove({ id: mazeId });
+    return { host, mazeId };
+  }
+
+  it("is neither offered nor accepted in a new match", async () => {
+    const { host, mazeId } = await usedThenDeleted();
+    const next = await host.match.create(settings);
+    await createCaller(await signedIn()).match.join({ code: next.code });
+
+    const offered = await host.match.eligibleMazes({ matchId: next.id });
+    expect(offered.map((m) => m.id)).not.toContain(mazeId);
+    await expect(
+      rejection(host.match.submitMaze({ matchId: next.id, mazeId })),
+    ).resolves.toEqual({ code: "FORBIDDEN", message: "errors.notYourMaze" });
+  });
+});
