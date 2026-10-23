@@ -49,7 +49,7 @@
       "invalid": "Táto hodnota nie je platná."
     },
     "notYourMaze": "Toto bludisko nie je vaše.",
-    "mazeLimitReached": "Dosiahli ste limit bludísk, ktoré môžete mať. Ak chcete vytvoriť nové, jedno vymažte.",
+    "mazeLimitReached": "Dosiahli ste limit bludísk, ktoré môžete mať. Ak chcete vytvoriť nové, jedno zmažte.",
     "mazeIsSubmitted": "Toto bludisko je odoslané a už sa nedá meniť.",
     "runNotUnlocked": "Behy ešte nie sú odomknuté.",
     "runAlreadyFinished": "Váš beh sa už skončil.",
@@ -92,7 +92,22 @@
     "deleteCancel": "Zrušiť",
     "deleting": "Maže sa…",
     "readOnly": "Toto bludisko už bolo použité v zápase, preto ho nemožno upraviť. Môžete ho znova použiť v iných zápasoch rovnakej veľkosti.",
-    "backToList": "Späť na vaše bludiská"
+    "backToList": "Späť na vaše bludiská",
+    "count": "{count} / {limit} bludísk",
+    "atLimit": "Máte {limit} bludísk, viac ich mať nemôžete. Ak chcete nakresliť ďalšie, jedno zmažte.",
+    "filterState": "Zobraziť",
+    "filterAll": "Všetky",
+    "filterDrafts": "Koncepty",
+    "filterReady": "Pripravené",
+    "filterUsed": "Použité",
+    "filterAny": "Ľubovoľný",
+    "sortLabel": "Zoradiť podľa",
+    "sortEdited": "Naposledy upravené",
+    "sortName": "Názov",
+    "sortSize": "Veľkosť",
+    "noMatches": "Týmto filtrom nezodpovedá žiadne bludisko.",
+    "usedBadge": "Použité",
+    "deleteUsedHint": "Odohrané zápasy si svoje výsledky ponechajú."
   },
   "matches": {
     "title": "Vaše zápasy",
@@ -216,7 +231,8 @@
     "forfeited": "V tomto zápase vám vypršal čas.",
     "opponentForfeited": "Vášmu súperovi vypršal čas.",
     "newMazeName": "Bludisko pre zápas {code}",
-    "creatingNew": "Vytvára sa…"
+    "creatingNew": "Vytvára sa…",
+    "atLimit": "Máte {limit} bludísk, viac ich mať nemôžete. Ak chcete nakresliť nové, jedno zmažte na stránke Bludiská."
   },
   "run": {
     "watching": "{count, plural, one {Sleduje # človek} few {Sledujú # ľudia} other {Sleduje # ľudí}}",
@@ -255,7 +271,7 @@
     "finishClose": "Zavrieť"
   },
   "result": {
-    "mazeDeleted": "Toto bludisko bolo vymazané.",
+    "mazeDeleted": "Toto bludisko bolo zmazané.",
     "won": "Vyhrali ste.",
     "lost": "Prehrali ste.",
     "none": "Nikto nevyhral.",

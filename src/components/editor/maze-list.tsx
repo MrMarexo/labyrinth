@@ -1,7 +1,15 @@
 "use client";
 
-import { useTranslations } from "next-intl";
+import { Lock } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 import { useState } from "react";
+
+import { MazeFilters } from "~/components/editor/maze-filters";
+import {
+  DEFAULT_LIBRARY_VIEW,
+  filterAndSort,
+  sizeOptions,
+} from "~/components/editor/maze-library";
 
 import { MazeTile, mazeTileClass } from "~/components/maze-tile";
 import { resolveErrorKey } from "~/lib/resolve-error-key";
@@ -13,7 +21,9 @@ export function MazeList() {
   const te = useTranslations();
   const utils = api.useUtils();
   const { data, isPending } = api.maze.list.useQuery();
+  const locale = useLocale();
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [chosen, setChosen] = useState(DEFAULT_LIBRARY_VIEW);
   const remove = api.maze.remove.useMutation({
     onSuccess: () => {
       setConfirmingId(null);
@@ -26,97 +36,131 @@ export function MazeList() {
     return <p className="text-muted text-sm">{t("empty")}</p>;
   }
 
+  // A size filter whose last labyrinth was just deleted falls back to "any"
+  // rather than leaving an empty list nobody asked for.
+  const sizes = sizeOptions(data);
+  const view = {
+    ...chosen,
+    squares: sizes.squares.includes(chosen.squares as number)
+      ? chosen.squares
+      : ("any" as const),
+    gates: sizes.gates.includes(chosen.gates as number)
+      ? chosen.gates
+      : ("any" as const),
+  };
+  const shown = filterAndSort(data, view, locale);
+
   return (
-    <ul className="flex flex-wrap gap-4">
-      {data.map((item) => {
-        const pending = remove.isPending && remove.variables?.id === item.id;
-        const deleteError =
-          remove.isError && remove.variables?.id === item.id
-            ? resolveErrorKey(te, remove.error, "errors.unknown")
-            : null;
-        const href = `/labyrinths/${item.id}`;
+    <div className="space-y-4">
+      <MazeFilters view={view} sizes={sizes} onChange={setChosen} />
+      {shown.length === 0 ? (
+        <p className="text-muted text-sm">{t("noMatches")}</p>
+      ) : (
+        <ul className="flex flex-wrap gap-4">
+          {shown.map((item) => {
+            const pending =
+              remove.isPending && remove.variables?.id === item.id;
+            const deleteError =
+              remove.isError && remove.variables?.id === item.id
+                ? resolveErrorKey(te, remove.error, "errors.unknown")
+                : null;
+            const href = `/labyrinths/${item.id}`;
 
-        return (
-          <li
-            key={item.id}
-            data-maze-item={item.id}
-            className={mazeTileClass()}
-          >
-            <MazeTile
-              maze={item.preview}
-              name={
-                // Not prefetched: the prefetch would cache the editor page
-                // with the draft as it is now, and a save still landing from
-                // the editor just left would be missing when it opens.
-                <Link
-                  href={href}
-                  prefetch={false}
-                  className="truncate font-medium underline"
-                >
-                  {item.name}
-                </Link>
-              }
-              // The preview opens the labyrinth too; the name link above is
-              // its accessible name, so this one is hidden from the a11y tree
-              // and the tab order rather than announced twice.
-              wrapPreview={(preview) => (
-                <Link
-                  href={href}
-                  prefetch={false}
-                  tabIndex={-1}
-                  aria-hidden="true"
-                  className="block"
-                >
-                  {preview}
-                </Link>
-              )}
-            />
-            <span className="text-muted">
-              {t("summary", {
-                squares: item.cellCount,
-                gates: item.gateCount,
-              })}
-            </span>
-
-            {confirmingId === item.id ? (
-              <span className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  aria-label={t("confirmDelete", { name: item.name })}
-                  disabled={pending}
-                  onClick={() => remove.mutate({ id: item.id })}
-                  className="text-danger underline disabled:opacity-50"
-                >
-                  {pending ? t("deleting") : t("confirmDeleteShort")}
-                </button>
-                <button
-                  type="button"
-                  disabled={pending}
-                  onClick={() => setConfirmingId(null)}
-                  className="underline disabled:opacity-50"
-                >
-                  {t("deleteCancel")}
-                </button>
-              </span>
-            ) : (
-              <button
-                type="button"
-                aria-label={t("delete", { name: item.name })}
-                onClick={() => setConfirmingId(item.id)}
-                className="text-danger self-start underline"
+            return (
+              <li
+                key={item.id}
+                data-maze-item={item.id}
+                className={mazeTileClass()}
               >
-                {t("deleteShort")}
-              </button>
-            )}
+                <MazeTile
+                  maze={item.preview}
+                  name={
+                    // Not prefetched: the prefetch would cache the editor page
+                    // with the draft as it is now, and a save still landing from
+                    // the editor just left would be missing when it opens.
+                    <Link
+                      href={href}
+                      prefetch={false}
+                      className="truncate font-medium underline"
+                    >
+                      {item.name}
+                    </Link>
+                  }
+                  // The preview opens the labyrinth too; the name link above is
+                  // its accessible name, so this one is hidden from the a11y tree
+                  // and the tab order rather than announced twice.
+                  wrapPreview={(preview) => (
+                    <Link
+                      href={href}
+                      prefetch={false}
+                      tabIndex={-1}
+                      aria-hidden="true"
+                      className="block"
+                    >
+                      {preview}
+                    </Link>
+                  )}
+                />
+                {item.state === "used" && (
+                  <span
+                    data-used-badge
+                    className="text-muted flex items-center gap-1"
+                  >
+                    <Lock aria-hidden="true" className="size-3.5" />
+                    {t("usedBadge")}
+                  </span>
+                )}
+                <span className="text-muted">
+                  {t("summary", {
+                    squares: item.cellCount,
+                    gates: item.gateCount,
+                  })}
+                </span>
 
-            {deleteError && (
-              <p role="alert" data-delete-error className="text-danger">
-                {te(deleteError.key as never, deleteError.params as never)}
-              </p>
-            )}
-          </li>
-        );
-      })}
-    </ul>
+                {confirmingId === item.id && item.state === "used" && (
+                  <p className="text-muted">{t("deleteUsedHint")}</p>
+                )}
+                {confirmingId === item.id ? (
+                  <span className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      aria-label={t("confirmDelete", { name: item.name })}
+                      disabled={pending}
+                      onClick={() => remove.mutate({ id: item.id })}
+                      className="text-danger underline disabled:opacity-50"
+                    >
+                      {pending ? t("deleting") : t("confirmDeleteShort")}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={pending}
+                      onClick={() => setConfirmingId(null)}
+                      className="underline disabled:opacity-50"
+                    >
+                      {t("deleteCancel")}
+                    </button>
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    aria-label={t("delete", { name: item.name })}
+                    onClick={() => setConfirmingId(item.id)}
+                    className="text-danger self-start underline"
+                  >
+                    {t("deleteShort")}
+                  </button>
+                )}
+
+                {deleteError && (
+                  <p role="alert" data-delete-error className="text-danger">
+                    {te(deleteError.key as never, deleteError.params as never)}
+                  </p>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
   );
 }

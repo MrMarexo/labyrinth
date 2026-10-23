@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { resolveErrorKey } from "~/lib/resolve-error-key";
-import { CELL_COUNT_PRESETS, MAX_GATES } from "~/maze";
+import { CELL_COUNT_PRESETS, MAX_GATES, MAZE_LIMIT } from "~/maze";
 import { useRouter } from "~/i18n/navigation";
 import { api } from "~/trpc/react";
 
@@ -20,19 +20,38 @@ export function NewMazeForm() {
       router.push(`/labyrinths/${id}`);
     },
   });
+  // Same query as the list below, so this costs no extra request.
+  const { data: mazes } = api.maze.list.useQuery();
   const createError = create.isError
     ? resolveErrorKey(te, create.error, "errors.unknown")
     : null;
+  const kept = mazes?.length ?? 0;
+  const atLimit = kept >= MAZE_LIMIT;
 
-  if (!open) {
+  if (!open || atLimit) {
     return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="bg-accent text-on-accent rounded px-3 py-2 text-sm"
-      >
-        {t("new")}
-      </button>
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            disabled={atLimit}
+            onClick={() => setOpen(true)}
+            className="bg-accent text-on-accent rounded px-3 py-2 text-sm disabled:opacity-50"
+          >
+            {t("new")}
+          </button>
+          {mazes && (
+            <span data-maze-count className="text-muted text-sm">
+              {t("count", { count: kept, limit: MAZE_LIMIT })}
+            </span>
+          )}
+        </div>
+        {atLimit && (
+          <p className="text-muted text-sm">
+            {t("atLimit", { limit: MAZE_LIMIT })}
+          </p>
+        )}
+      </div>
     );
   }
 

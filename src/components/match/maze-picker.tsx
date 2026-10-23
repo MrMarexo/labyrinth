@@ -8,7 +8,7 @@ import { discardsSettled } from "~/components/editor/pending-discards";
 import { MazeTile, mazeTileClass } from "~/components/maze-tile";
 import { useRouter } from "~/i18n/navigation";
 import { resolveErrorKey } from "~/lib/resolve-error-key";
-import { draftToMaze } from "~/maze";
+import { MAZE_LIMIT, draftToMaze } from "~/maze";
 import { api } from "~/trpc/react";
 
 export type MazePickerProps = {
@@ -140,6 +140,19 @@ function DrawNew({ match }: { match: MazePickerProps["match"] }) {
     ? resolveErrorKey(te, create.error, "errors.unknown")
     : null;
   const busy = waiting || create.isPending || create.isSuccess;
+  // At the limit the server would refuse a new draft, unless one of the
+  // player's own empty drafts at this size can be reused instead.
+  const { data: mazes } = api.maze.list.useQuery();
+  const atLimit =
+    !!mazes &&
+    mazes.length >= MAZE_LIMIT &&
+    !mazes.some(
+      (m) =>
+        m.state === "draft" &&
+        m.cellCount === match.cellCount &&
+        m.gateCount === match.gateCount &&
+        m.preview?.cells.length === 0,
+    );
 
   return (
     <div className="space-y-1">
@@ -147,7 +160,7 @@ function DrawNew({ match }: { match: MazePickerProps["match"] }) {
         type="button"
         data-draw-new
         // Still pending while the editor loads, so it cannot fire twice.
-        disabled={busy}
+        disabled={busy || atLimit}
         onClick={async () => {
           setWaiting(true);
           await discardsSettled();
@@ -161,6 +174,11 @@ function DrawNew({ match }: { match: MazePickerProps["match"] }) {
       >
         {busy ? t("creatingNew") : t("drawNew")}
       </button>
+      {atLimit && (
+        <p className="text-muted text-sm">
+          {t("atLimit", { limit: MAZE_LIMIT })}
+        </p>
+      )}
       {error && (
         <p role="alert" data-draw-new-error className="text-danger text-sm">
           {te(error.key as never, error.params as never)}

@@ -92,7 +92,22 @@
     "deleteCancel": "Cancel",
     "deleting": "Deleting…",
     "readOnly": "This labyrinth has been used in a match, so it can't be edited. You can reuse it in other matches of the same size.",
-    "backToList": "Back to your labyrinths"
+    "backToList": "Back to your labyrinths",
+    "count": "{count} / {limit} labyrinths",
+    "atLimit": "You have {limit} labyrinths, the most you can keep. Delete one to draw another.",
+    "filterState": "Show",
+    "filterAll": "All",
+    "filterDrafts": "Drafts",
+    "filterReady": "Ready",
+    "filterUsed": "Used",
+    "filterAny": "Any",
+    "sortLabel": "Sort by",
+    "sortEdited": "Last edited",
+    "sortName": "Name",
+    "sortSize": "Size",
+    "noMatches": "No labyrinths match these filters.",
+    "usedBadge": "Used",
+    "deleteUsedHint": "Past matches keep their results."
   },
   "matches": {
     "title": "Your matches",
@@ -216,7 +231,8 @@
     "forfeited": "You ran out of time on this one.",
     "opponentForfeited": "Your opponent ran out of time.",
     "newMazeName": "Labyrinth for match {code}",
-    "creatingNew": "Creating…"
+    "creatingNew": "Creating…",
+    "atLimit": "You have {limit} labyrinths, the most you can keep. Delete one on the Labyrinths page to draw a new one."
   },
   "run": {
     "watching": "{count, plural, one {# watching} other {# watching}}",
