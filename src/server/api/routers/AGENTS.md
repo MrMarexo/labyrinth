@@ -15,6 +15,12 @@ Root `AGENTS.md`, invariant 1.
 only a `RunnerDelta`. `run.result` returns both mazes, and only for a terminal
 match in which both players submitted. `run.replay` returns one maze: for `whose: "opponent"` the caller's own maze, which they drew, and for `whose: "mine"` the opponent's, only once the match is terminal and both submitted — the result screen's rule. Its gates are `mayWatchOpponent` and `mayReplayOwn` in `src/match/watch.ts`.
 
+Both are bounded in time (`src/match/retention.ts`): `run.replay` refuses
+once `replayExpired(match.endedAt)`, 30 days after the match ended, and
+`run.result` drops a drawing whose maze its author deleted once that window
+has closed (`drawingDeleted`), while still returning the scores. A purged
+maze leaves `match_player.mazeId` null, so neither may assume it is set.
+
 Those are the only three. A new procedure
 that needs the maze is a design conversation, not an implementation detail.
 

@@ -122,14 +122,14 @@ describe("run.result", () => {
     // route visits 11 cells (10 moved moves plus the start). The bump adds
     // no point.
     const draft = gatedMazeDraft();
-    expect(forHost.mazes!.theirs.maze.cells).toHaveLength(draft.cells.length);
-    expect(forHost.mazes!.theirs.path).toHaveLength(11);
-    expect(forHost.mazes!.theirs.path.at(-1)).toEqual({ x: 5, y: 5 });
-    expect(forHost.mazes!.yours.path).toHaveLength(11);
+    expect(forHost.mazes!.theirs!.maze.cells).toHaveLength(draft.cells.length);
+    expect(forHost.mazes!.theirs!.path).toHaveLength(11);
+    expect(forHost.mazes!.theirs!.path.at(-1)).toEqual({ x: 5, y: 5 });
+    expect(forHost.mazes!.yours!.path).toHaveLength(11);
 
     const forGuest = await guest.run.result({ matchId });
     expect(forGuest).toMatchObject({ outcome: "lost", reason: "treasure" });
-    expect(forGuest.mazes!.theirs.path).toEqual(forHost.mazes!.yours.path);
+    expect(forGuest.mazes!.theirs!.path).toEqual(forHost.mazes!.yours!.path);
   });
 
   it("calls equal bumps a draw, however many more moves one run took", async () => {

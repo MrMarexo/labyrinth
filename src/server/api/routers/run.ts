@@ -5,10 +5,12 @@ import { z } from "zod";
 import {
   deadlineFor,
   decidingField,
+  drawingDeleted,
   elapsedMs,
   isTerminal,
   mayReplayOwn,
   mayWatchOpponent,
+  replayExpired,
   resolveCompletion,
   runChannel,
   type RunFacts,
@@ -380,36 +382,52 @@ export const runRouter = createTRPCRouter({
                 : ("treasure" as const)
               : ("timeout" as const);
 
-      let mazes: {
-        theirs: { maze: Maze; path: Point[] };
-        yours: { maze: Maze; path: Point[] };
-      } | null = null;
+      // Each drawing stands alone: `null` is a maze its author deleted whose
+      // replay window has closed (or that the purge already removed).
+      type Drawing = { maze: Maze; path: Point[] };
+      let mazes: { theirs: Drawing | null; yours: Drawing | null } | null =
+        null;
+      const now = new Date();
 
       if (them && you.submittedAt !== null && them.submittedAt !== null) {
-        const mazeRows = await ctx.db
-          .select({ id: maze.id, data: maze.data })
-          .from(maze)
-          .where(inArray(maze.id, [you.mazeId!, them.mazeId!]));
+        const ids = [you.mazeId, them.mazeId].filter(
+          (id): id is string => id !== null,
+        );
+        const mazeRows =
+          ids.length === 0
+            ? []
+            : await ctx.db
+                .select({
+                  id: maze.id,
+                  data: maze.data,
+                  deletedAt: maze.deletedAt,
+                })
+                .from(maze)
+                .where(inArray(maze.id, ids));
         const log = await ctx.db
           .select({ runnerId: move.runnerId, delta: move.delta })
           .from(move)
           .where(eq(move.matchId, row.id))
           .orderBy(asc(move.seq));
 
-        const load = (id: string) =>
-          mazeSchema.parse(mazeRows.find((m) => m.id === id)!.data);
         // Deltas are start-relative (see RunnerDelta); the result draws on
         // the full maze, so translate back by its start cell.
-        const pathOn = (m: Maze, runnerId: string) =>
-          pathFrom(
+        const drawing = (
+          mazeId: string | null,
+          runnerId: string,
+        ): Drawing | null => {
+          const found = mazeRows.find((m) => m.id === mazeId) ?? null;
+          if (!found || drawingDeleted(found, row.endedAt, now)) return null;
+          const m = mazeSchema.parse(found.data);
+          const path = pathFrom(
             log.filter((l) => l.runnerId === runnerId).map((l) => l.delta),
           ).map((p) => ({ x: p.x + m.start.x, y: p.y + m.start.y }));
+          return { maze: m, path };
+        };
 
-        const theirMaze = load(them.mazeId!);
-        const yourMaze = load(you.mazeId!);
         mazes = {
-          theirs: { maze: theirMaze, path: pathOn(theirMaze, me) },
-          yours: { maze: yourMaze, path: pathOn(yourMaze, them.userId) },
+          theirs: drawing(them.mazeId, me),
+          yours: drawing(you.mazeId, them.userId),
         };
       }
 
@@ -422,6 +440,7 @@ export const runRouter = createTRPCRouter({
               ? ("won" as const)
               : ("lost" as const),
         reason,
+        replayable: mazes !== null && !replayExpired(row.endedAt, now),
         gaveUpBy: quitter
           ? quitter.userId === me
             ? ("you" as const)
@@ -457,6 +476,9 @@ export const runRouter = createTRPCRouter({
       }
       if (input.whose === "mine" && !mayReplayOwn(facts)) {
         refuse("errors.replayNotReady");
+      }
+      if (replayExpired(row.endedAt, new Date())) {
+        refuse("errors.replayExpired");
       }
 
       const you = players.find((p) => p.userId === me)!;

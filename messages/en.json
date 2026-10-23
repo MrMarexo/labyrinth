@@ -39,6 +39,7 @@
   "errors": {
     "watchNotYet": "Finish your own run first.",
     "replayNotReady": "Your run can be replayed once the match is over.",
+    "replayExpired": "This replay is no longer available. Replays are kept for a month after a match ends.",
     "notSignedIn": "You need to sign in to do that.",
     "invalidCredentials": "Wrong email or password.",
     "emailTaken": "That email is already registered.",

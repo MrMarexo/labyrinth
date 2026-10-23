@@ -124,18 +124,22 @@ export function MatchResult({ matchId }: { matchId: string }) {
 
       {mazes && (
         <div className="grid gap-6 md:grid-cols-2">
-          <ResultMaze
-            which="theirs"
-            maze={mazes.theirs.maze}
-            path={mazes.theirs.path}
-            label={t("theirMaze", { name })}
-          />
-          <ResultMaze
-            which="yours"
-            maze={mazes.yours.maze}
-            path={mazes.yours.path}
-            label={t("yourMaze", { name })}
-          />
+          {mazes.theirs && (
+            <ResultMaze
+              which="theirs"
+              maze={mazes.theirs.maze}
+              path={mazes.theirs.path}
+              label={t("theirMaze", { name })}
+            />
+          )}
+          {mazes.yours && (
+            <ResultMaze
+              which="yours"
+              maze={mazes.yours.maze}
+              path={mazes.yours.path}
+              label={t("yourMaze", { name })}
+            />
+          )}
         </div>
       )}
 

@@ -39,6 +39,7 @@
   "errors": {
     "watchNotYet": "Najprv dokončite svoj vlastný beh.",
     "replayNotReady": "Svoj beh si môžete prehrať, keď sa zápas skončí.",
+    "replayExpired": "Tento záznam už nie je dostupný. Záznamy sa uchovávajú mesiac po skončení zápasu.",
     "notSignedIn": "Na túto akciu sa musíte prihlásiť.",
     "invalidCredentials": "Nesprávny e-mail alebo heslo.",
     "emailTaken": "Tento e-mail je už zaregistrovaný.",
