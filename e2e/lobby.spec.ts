@@ -65,6 +65,36 @@ test.describe("the lobby's maze picker", () => {
     ).toBe("pointer");
   });
 
+  test("offers the use button only while a labyrinth is selected", async ({
+    players,
+  }) => {
+    const host = await players({
+      name: "Pickable",
+      cellCount: 36,
+      gateCount: 0,
+    });
+    const guest = await players({ name: "Other", cellCount: 36, gateCount: 0 });
+    await join(guest, await createMatch(host, { cells: 36, gates: 0 }));
+
+    await host.reload();
+    await expect(
+      host.getByRole("heading", { name: "Labyrinths you can use" }),
+    ).toBeVisible();
+    const option = host.locator("[data-maze-option]");
+    const use = host.getByRole("button", { name: "Use this labyrinth" });
+    await expect(option).toHaveAttribute("aria-checked", "false");
+    await expect(use).toHaveCount(0);
+
+    await option.click();
+    await expect(option).toHaveAttribute("aria-checked", "true");
+    await expect(use).toBeVisible();
+
+    // Clicking the selected one again clears the choice.
+    await option.click();
+    await expect(option).toHaveAttribute("aria-checked", "false");
+    await expect(use).toHaveCount(0);
+  });
+
   test("explains an empty list, and still offers a new one", async ({
     players,
   }) => {

@@ -124,10 +124,10 @@ export function MatchLobby({ matchId, initialData }: MatchLobbyProps) {
             }}
           />
 
-          {/* Nothing eligible: drawing a new one is the only way on. */}
-          {!mazes || mazes.length === 0 ? null : confirming ? (
+          {/* Nothing chosen yet (or nothing eligible): no use button. */}
+          {!selectedMaze ? null : confirming ? (
             <ConfirmUse
-              name={selectedMaze?.name ?? ""}
+              name={selectedMaze.name}
               pending={submit.isPending}
               onConfirm={() => {
                 if (!selected) return;
@@ -138,9 +138,8 @@ export function MatchLobby({ matchId, initialData }: MatchLobbyProps) {
           ) : (
             <button
               type="button"
-              disabled={!selected}
               onClick={() => setConfirming(true)}
-              className="bg-accent text-on-accent rounded px-3 py-2 text-sm disabled:opacity-50"
+              className="bg-accent text-on-accent rounded px-3 py-2 text-sm"
             >
               {t("submit")}
             </button>

@@ -145,14 +145,17 @@ test.describe("buttons", () => {
       "not-allowed",
     );
 
+    // The tint is present but transparent at rest, at full spread, so hover
+    // only fades its colour in rather than growing it from the edges.
     const tool = page.getByRole("radio", { name: "Wall" });
-    expect(await tool.evaluate((el) => getComputedStyle(el).boxShadow)).toBe(
-      "none",
-    );
+    const shadow = () => tool.evaluate((el) => getComputedStyle(el).boxShadow);
+    const spread = (s: string) => /(\d+(?:\.\d+)?)px inset/.exec(s)?.[1];
+    const rest = await shadow();
+    expect(rest).toContain("rgba(0, 0, 0, 0)");
+    expect(Number(spread(rest))).toBeGreaterThan(100);
     await tool.hover();
-    await expect
-      .poll(() => tool.evaluate((el) => getComputedStyle(el).boxShadow))
-      .not.toBe("none");
+    await expect.poll(shadow).not.toContain("rgba(0, 0, 0, 0)");
+    expect(spread(await shadow())).toBe(spread(rest));
     expect(await tool.evaluate((el) => getComputedStyle(el).cursor)).toBe(
       "pointer",
     );

@@ -14,7 +14,8 @@ import { api } from "~/trpc/react";
 export type MazePickerProps = {
   match: { id: string; code: string; cellCount: number; gateCount: number };
   selected: string | null;
-  onSelect: (id: string) => void;
+  /** `null` when the player clicks the selected one again to clear it. */
+  onSelect: (id: string | null) => void;
 };
 
 export function MazePicker({ match, selected, onSelect }: MazePickerProps) {
@@ -92,7 +93,7 @@ export function MazePicker({ match, selected, onSelect }: MazePickerProps) {
               aria-checked={active}
               data-maze-option={m.id}
               tabIndex={index === tabStopIndex ? 0 : -1}
-              onClick={() => onSelect(m.id)}
+              onClick={() => onSelect(active ? null : m.id)}
               onKeyDown={handleKeyDown}
               className={optionClass(active)}
             >
