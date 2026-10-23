@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 
-import { emptyDraft } from "~/maze";
+import { MAZE_LIMIT, emptyDraft } from "~/maze";
 import { createCaller } from "~/server/api/root";
 import { createTRPCContext } from "~/server/api/trpc";
 import { auth } from "~/server/auth";
@@ -539,5 +539,99 @@ describe("maze.discardIfEmpty", () => {
       code: "UNAUTHORIZED",
       message: "errors.notSignedIn",
     });
+  });
+});
+
+describe("the labyrinth limit", () => {
+  const limitReached = {
+    code: "FORBIDDEN",
+    message: "errors.mazeLimitReached",
+  };
+
+  async function fill(caller: ReturnType<typeof createCaller>, count: number) {
+    for (let i = 0; i < count; i++) {
+      await caller.maze.createDraft({ ...settings, name: `Maze ${i}` });
+    }
+  }
+
+  it("refuses one more than the limit", async () => {
+    const caller = createCaller(await signedIn());
+    await fill(caller, MAZE_LIMIT);
+    await expect(rejection(caller.maze.createDraft(settings))).resolves.toEqual(
+      limitReached,
+    );
+  });
+
+  it("counts used labyrinths toward the limit", async () => {
+    const caller = createCaller(await signedIn());
+    await fill(caller, MAZE_LIMIT);
+    const [one] = await caller.maze.list();
+    await db
+      .update(maze)
+      .set({ status: "submitted" })
+      .where(eq(maze.id, one!.id));
+    await expect(rejection(caller.maze.createDraft(settings))).resolves.toEqual(
+      limitReached,
+    );
+  });
+
+  it("lets only one of two concurrent creations take the last slot", async () => {
+    const caller = createCaller(await signedIn());
+    await fill(caller, MAZE_LIMIT - 1);
+    const results = await Promise.allSettled([
+      caller.maze.createDraft(settings),
+      caller.maze.createDraft(settings),
+    ]);
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    expect(await caller.maze.list()).toHaveLength(MAZE_LIMIT);
+  });
+
+  it("lets draftForMatch reuse an empty draft at the limit", async () => {
+    const { host, matchId } = await drawingMatch();
+    await fill(host, MAZE_LIMIT);
+    const reused = await host.maze.draftForMatch({ matchId, name: "New" });
+    expect((await host.maze.list()).map((m) => m.id)).toContain(reused.id);
+    expect(await host.maze.list()).toHaveLength(MAZE_LIMIT);
+  });
+
+  it("refuses draftForMatch at the limit when nothing is reusable", async () => {
+    const { host, matchId } = await drawingMatch();
+    await host.maze.createDraft({ ...settings, cellCount: 64 });
+    const [other] = await host.maze.list();
+    for (let i = 1; i < MAZE_LIMIT; i++) {
+      await host.maze.createDraft({ ...settings, cellCount: 64 });
+    }
+    expect(other).toBeDefined();
+    await expect(
+      rejection(host.maze.draftForMatch({ matchId, name: "New" })),
+    ).resolves.toEqual(limitReached);
+  });
+});
+
+describe("maze.list states", () => {
+  it("labels each labyrinth draft, ready or used", async () => {
+    const caller = createCaller(await signedIn());
+    const draft = await caller.maze.createDraft({ ...settings, name: "D" });
+    const ready = await caller.maze.createDraft({
+      name: "R",
+      cellCount: SOLVABLE_MAZE_CELL_COUNT,
+      gateCount: SOLVABLE_MAZE_GATE_COUNT,
+    });
+    await caller.maze.saveDraft({
+      id: ready.id,
+      data: solvableDraft(),
+      expectedVersion: 0,
+    });
+    const used = await caller.maze.createDraft({ ...settings, name: "U" });
+    await db
+      .update(maze)
+      .set({ status: "submitted" })
+      .where(eq(maze.id, used.id));
+
+    const byId = new Map((await caller.maze.list()).map((m) => [m.id, m]));
+    expect(byId.get(draft.id)?.state).toBe("draft");
+    expect(byId.get(ready.id)?.state).toBe("ready");
+    expect(byId.get(used.id)?.state).toBe("used");
+    expect(byId.get(ready.id)).not.toHaveProperty("contentHash");
   });
 });

@@ -48,6 +48,7 @@
       "invalid": "Táto hodnota nie je platná."
     },
     "notYourMaze": "Toto bludisko nie je vaše.",
+    "mazeLimitReached": "Dosiahli ste limit bludísk, ktoré môžete mať. Ak chcete vytvoriť nové, jedno vymažte.",
     "mazeIsSubmitted": "Toto bludisko je odoslané a už sa nedá meniť.",
     "runNotUnlocked": "Behy ešte nie sú odomknuté.",
     "runAlreadyFinished": "Váš beh sa už skončil.",

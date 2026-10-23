@@ -48,6 +48,7 @@
       "invalid": "That value is not valid."
     },
     "notYourMaze": "That labyrinth is not yours.",
+    "mazeLimitReached": "You have reached the limit of labyrinths you can keep. Delete one to make room.",
     "mazeIsSubmitted": "This labyrinth has been submitted and can no longer be changed.",
     "runNotUnlocked": "The runs have not unlocked yet.",
     "runAlreadyFinished": "Your run is already over.",

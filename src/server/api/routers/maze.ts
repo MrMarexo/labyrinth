@@ -1,19 +1,25 @@
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, count, desc, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import {
   CELL_COUNT_PRESETS,
   INCOMPLETE_DRAFT_KEY,
   MAX_GATES,
+  MAZE_LIMIT,
   draftMazeSchema,
   draftToMaze,
   emptyDraft,
+  mazeState,
   validateMaze,
 } from "~/maze";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { maze } from "~/server/db/schema";
-import { notYours, participantRows } from "~/server/match/access";
+import { maze, user } from "~/server/db/schema";
+import {
+  notYours,
+  participantRows,
+  type DbClient,
+} from "~/server/match/access";
 
 const settingsInput = z.object({
   name: z.string().trim().min(1).max(80),
@@ -52,6 +58,51 @@ const isEmptyDraft = and(
   sql`jsonb_array_length(${maze.data} -> 'cells') = 0`,
 );
 
+/**
+ * Inserts an empty draft unless the author already keeps `MAZE_LIMIT`
+ * labyrinths. Their `user` row is locked first, so two tabs racing for the
+ * last slot are serialised and the second one counts the first one's insert.
+ */
+async function createWithinLimit(
+  db: DbClient,
+  values: {
+    authorId: string;
+    name: string;
+    cellCount: number;
+    gateCount: number;
+  },
+): Promise<{ id: string }> {
+  return db.transaction(async (tx) => {
+    await tx
+      .select({ id: user.id })
+      .from(user)
+      .where(eq(user.id, values.authorId))
+      .for("update");
+    const [kept] = await tx
+      .select({ n: count() })
+      .from(maze)
+      .where(and(eq(maze.authorId, values.authorId), isNull(maze.deletedAt)));
+    if ((kept?.n ?? 0) >= MAZE_LIMIT) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "errors.mazeLimitReached",
+      });
+    }
+
+    const [row] = await tx
+      .insert(maze)
+      .values({ ...values, data: emptyDraft() })
+      .returning({ id: maze.id });
+    if (!row) {
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "errors.unknown",
+      });
+    }
+    return row;
+  });
+}
+
 export const mazeRouter = createTRPCRouter({
   list: protectedProcedure.query(async ({ ctx }) =>
     ctx.db
@@ -61,18 +112,25 @@ export const mazeRouter = createTRPCRouter({
         cellCount: maze.cellCount,
         gateCount: maze.gateCount,
         status: maze.status,
+        contentHash: maze.contentHash,
         updatedAt: maze.updatedAt,
         // The author's own mazes only (filtered below), so returning the
         // drawing for the list's previews is an author-facing read.
         data: maze.data,
       })
       .from(maze)
-      .where(eq(maze.authorId, ctx.session.user.id))
+      .where(
+        and(eq(maze.authorId, ctx.session.user.id), isNull(maze.deletedAt)),
+      )
       .orderBy(desc(maze.updatedAt))
       .then((rows) =>
-        rows.map(({ data, ...row }) => {
+        rows.map(({ data, contentHash, ...row }) => {
           const parsed = draftMazeSchema.safeParse(data);
-          return { ...row, preview: parsed.success ? parsed.data : null };
+          return {
+            ...row,
+            state: mazeState({ status: row.status, contentHash }),
+            preview: parsed.success ? parsed.data : null,
+          };
         }),
       ),
   ),
@@ -98,26 +156,14 @@ export const mazeRouter = createTRPCRouter({
 
   createDraft: protectedProcedure
     .input(settingsInput)
-    .mutation(async ({ ctx, input }) => {
-      const [row] = await ctx.db
-        .insert(maze)
-        .values({
-          authorId: ctx.session.user.id,
-          name: input.name,
-          cellCount: input.cellCount,
-          gateCount: input.gateCount,
-          data: emptyDraft(),
-        })
-        .returning({ id: maze.id });
-
-      if (!row) {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "errors.unknown",
-        });
-      }
-      return row;
-    }),
+    .mutation(({ ctx, input }) =>
+      createWithinLimit(ctx.db, {
+        authorId: ctx.session.user.id,
+        name: input.name,
+        cellCount: input.cellCount,
+        gateCount: input.gateCount,
+      }),
+    ),
 
   /**
    * The lobby's "Draw a new one": an empty draft at this match's settings.
@@ -159,23 +205,12 @@ export const mazeRouter = createTRPCRouter({
         .limit(1);
       if (reusable) return reusable;
 
-      const [created] = await ctx.db
-        .insert(maze)
-        .values({
-          authorId: userId,
-          name: input.name,
-          cellCount: row.cellCount,
-          gateCount: row.gateCount,
-          data: emptyDraft(),
-        })
-        .returning({ id: maze.id });
-      if (!created) {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "errors.unknown",
-        });
-      }
-      return created;
+      return createWithinLimit(ctx.db, {
+        authorId: userId,
+        name: input.name,
+        cellCount: row.cellCount,
+        gateCount: row.gateCount,
+      });
     }),
 
   /**
