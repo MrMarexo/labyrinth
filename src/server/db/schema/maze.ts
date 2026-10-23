@@ -41,6 +41,12 @@ export const maze = pgTable(
     status: text("status", { enum: ["draft", "submitted"] })
       .notNull()
       .default("draft"),
+    /**
+     * Set when the author deletes a used maze. It vanishes from everything
+     * the author sees, but matches that used it keep reading it until their
+     * replay window closes; then the nightly purge removes the row.
+     */
+    deletedAt: timestamp("deleted_at"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at")
       .notNull()

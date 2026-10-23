@@ -61,6 +61,13 @@ export const match = pgTable(
       onDelete: "set null",
     }),
     endReason: text("end_reason", { enum: END_REASONS }),
+    /**
+     * When the match became terminal; null while it is open. Stored despite
+     * §6's stance on derivable values: a match the sweep closes has no player
+     * timestamp to derive it from. Replays and deleted mazes are kept for a
+     * window measured from here.
+     */
+    endedAt: timestamp("ended_at"),
   },
   (table) => [
     // The sweep's only query: open matches whose deadline has passed.
@@ -97,8 +104,11 @@ export const matchPlayer = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
+    // Null until that player submits, and again once the purge removes a
+    // deleted maze whose replay window has closed. "Has submitted" is
+    // `submittedAt`, never `mazeId`.
     mazeId: text("maze_id").references(() => maze.id, {
-      onDelete: "restrict",
+      onDelete: "set null",
     }),
     joinedAt: timestamp("joined_at").notNull().defaultNow(),
     submittedAt: timestamp("submitted_at"),

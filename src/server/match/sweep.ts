@@ -94,12 +94,14 @@ export async function closeIfExpired(
               endReason: outcome.endReason,
               winnerId: outcome.winnerId,
               lastActivityAt: now,
+              endedAt: now,
             }
           : {
               status: "abandoned",
               endReason: "abandoned",
               winnerId: null,
               lastActivityAt: now,
+              endedAt: now,
             },
       )
       .where(eq(match.id, matchId));

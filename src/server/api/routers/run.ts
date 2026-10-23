@@ -237,6 +237,7 @@ export const runRouter = createTRPCRouter({
                   winnerId: completion.winnerId,
                   endReason: completion.endReason,
                   lastActivityAt: now,
+                  endedAt: now,
                 }
               : {
                   lastActivityAt: now,
@@ -318,6 +319,7 @@ export const runRouter = createTRPCRouter({
             winnerId: completion.winnerId,
             endReason: completion.endReason,
             lastActivityAt: now,
+            endedAt: now,
           })
           .where(eq(match.id, row.id));
 

@@ -50,6 +50,13 @@
       "when": 1792706660224,
       "tag": "0006_classy_butterfly",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792743386775,
+      "tag": "0007_mute_sunset_bain",
+      "breakpoints": true
     }
   ]
 }
