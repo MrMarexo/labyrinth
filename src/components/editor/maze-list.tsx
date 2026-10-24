@@ -13,7 +13,7 @@ import {
 
 import { MazeTile, mazeTileClass } from "~/components/maze-tile";
 import { resolveErrorKey } from "~/lib/resolve-error-key";
-import { Link } from "~/i18n/navigation";
+import { Link } from "~/components/link";
 import { api } from "~/trpc/react";
 
 export function MazeList() {
@@ -81,7 +81,7 @@ export function MazeList() {
                     <Link
                       href={href}
                       prefetch={false}
-                      className="truncate font-medium underline"
+                      className="truncate font-medium"
                     >
                       {item.name}
                     </Link>

@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl";
 
 import { CELL_PX } from "~/components/editor/board";
 import { MazeDrawing } from "~/components/maze-drawing";
-import { Link } from "~/i18n/navigation";
+import { Link } from "~/components/link";
 import { mazeViewBox } from "~/lib/maze-view-box";
 import type { Maze } from "~/maze";
 
@@ -44,7 +44,7 @@ export function ReadOnlyMaze({
       >
         <MazeDrawing maze={maze} />
       </svg>
-      <Link href="/labyrinths" className="inline-block text-sm underline">
+      <Link href="/labyrinths" className="inline-block text-sm">
         {t("backToList")}
       </Link>
     </div>

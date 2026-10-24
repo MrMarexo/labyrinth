@@ -277,3 +277,34 @@ test.describe("icons", () => {
     }
   });
 });
+
+test.describe("gates by colour", () => {
+  test("the colour picker and the issues show a gate's colour, not its number", async ({
+    page,
+  }) => {
+    await signUpAndOpenNewMaze(page, { gates: 2 });
+    await paintTwoRows(page);
+    await page.getByRole("radio", { name: "Start", exact: true }).click();
+    await cell(page, 0, 0).click();
+    await page.getByRole("radio", { name: "Treasure", exact: true }).click();
+    await cell(page, 5, 1).click();
+    await page.getByRole("radio", { name: "Gate", exact: true }).click();
+
+    // The options are named by number for screen readers, but show none.
+    const second = page.locator('[data-gate-option="2"]');
+    await expect(second).toHaveAccessibleName("Gate 2");
+    await expect(second).toHaveText("");
+
+    await second.click();
+    await edge(page, "V:0,0").click();
+    const issue = page.locator('[data-issue="maze.validate.gateWithoutKey"]');
+    await expect(issue).toHaveText("Gate 2 has no key.");
+    const dot = issue.locator('[data-gate-dot="2"]');
+    await expect(dot).toBeVisible();
+    expect(
+      await dot.evaluate((el) => getComputedStyle(el).backgroundColor),
+    ).toBe(await swatchColour(page, "data-gate-option", 2));
+    // The number is in the text for assistive tech only.
+    await expect(issue.locator(".sr-only")).toHaveText("2");
+  });
+});

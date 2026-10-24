@@ -3,7 +3,8 @@
 import { useTranslations } from "next-intl";
 import { useRef, useState, type KeyboardEvent } from "react";
 
-import { Link, useRouter } from "~/i18n/navigation";
+import { Link } from "~/components/link";
+import { useRouter } from "~/i18n/navigation";
 import { resolveErrorKey } from "~/lib/resolve-error-key";
 import { MATCH_ACCESS, type MatchAccess } from "~/match";
 import { CELL_COUNT_PRESETS, MAX_GATES, type CellCount } from "~/maze";
@@ -38,7 +39,7 @@ export function NewMatchForm() {
       >
         <h2 className="text-xl font-semibold">{t("createHeading")}</h2>
         <p className="text-sm">{t("alreadyWaiting")}</p>
-        <Link href={`/matches/${waiting.id}`} className="text-sm underline">
+        <Link href={`/matches/${waiting.id}`} className="text-sm">
           {t("alreadyWaitingLink")}
         </Link>
       </div>

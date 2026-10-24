@@ -100,3 +100,61 @@ export function RunnerIcon({ x, y, size, ...rest }: IconProps) {
     </g>
   );
 }
+
+/** The keyhole ring in the middle of a gate, in board pixels. */
+const GATE_RING = 6;
+
+/**
+ * A gate on the edge from (x1, y1) to (x2, y2): the edge in the gate's
+ * colour, broken in the middle by a ring, the same keyhole the palette's gate
+ * tool shows. The colour and any dash are set on the `<g>` and inherited, so
+ * a hook or test reads them from the root.
+ */
+export function GateSegment({
+  x1,
+  y1,
+  x2,
+  y2,
+  gate,
+  strokeWidth = 4,
+  style,
+  ...rest
+}: Omit<SVGProps<SVGGElement>, "x1" | "y1" | "x2" | "y2"> & {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  gate: number;
+  strokeWidth?: number;
+}) {
+  const cx = (x1 + x2) / 2;
+  const cy = (y1 + y2) / 2;
+  const length = Math.hypot(x2 - x1, y2 - y1);
+  // Unit vector along the edge, to stop each half at the ring.
+  const ux = (x2 - x1) / length;
+  const uy = (y2 - y1) / length;
+  return (
+    <g
+      {...rest}
+      strokeLinecap="round"
+      fill="none"
+      style={{ stroke: gateColour(gate), ...style }}
+    >
+      <line
+        x1={x1}
+        y1={y1}
+        x2={cx - ux * GATE_RING}
+        y2={cy - uy * GATE_RING}
+        strokeWidth={strokeWidth}
+      />
+      <line
+        x1={cx + ux * GATE_RING}
+        y1={cy + uy * GATE_RING}
+        x2={x2}
+        y2={y2}
+        strokeWidth={strokeWidth}
+      />
+      <circle cx={cx} cy={cy} r={GATE_RING} strokeWidth={strokeWidth * 0.75} />
+    </g>
+  );
+}

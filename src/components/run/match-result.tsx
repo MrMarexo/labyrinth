@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 
 import { ResultMaze } from "~/components/run/result-maze";
-import { Link } from "~/i18n/navigation";
+import { Link } from "~/components/link";
 import { formatElapsed } from "~/lib/format-elapsed";
 import { resolveErrorKey } from "~/lib/resolve-error-key";
 import { api, type RouterOutputs } from "~/trpc/react";
@@ -171,23 +171,19 @@ export function MatchResult({ matchId }: { matchId: string }) {
           <Link
             href={`/matches/${matchId}/watch?run=mine`}
             data-replay-link="mine"
-            className="text-accent underline"
           >
             {t("replayMine")}
           </Link>
           <Link
             href={`/matches/${matchId}/watch?run=opponent`}
             data-replay-link="opponent"
-            className="text-accent underline"
           >
             {t("replayTheirs", { name })}
           </Link>
         </div>
       )}
 
-      <Link href="/matches" className="underline">
-        {t("backToMatches")}
-      </Link>
+      <Link href="/matches">{t("backToMatches")}</Link>
     </section>
   );
 }

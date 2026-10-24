@@ -15,7 +15,7 @@ import { POLL_MS } from "~/components/realtime/poll";
 import { useChannel } from "~/components/realtime/use-channel";
 import { ResultMaze } from "~/components/run/result-maze";
 import { RunBoard, type Bump } from "~/components/run/run-board";
-import { Link } from "~/i18n/navigation";
+import { Link } from "~/components/link";
 import { resolveErrorKey } from "~/lib/resolve-error-key";
 import { EVENTS } from "~/match";
 import {
@@ -74,9 +74,7 @@ export function WatchView({
         <p role="alert" data-watch-error className="text-danger">
           {te(issue.key as never, issue.params as never)}
         </p>
-        <Link href={`/matches/${matchId}`} className="underline">
-          {t("back")}
-        </Link>
+        <Link href={`/matches/${matchId}`}>{t("back")}</Link>
       </div>
     );
   }
@@ -303,7 +301,7 @@ function WatchPlayer({
         />
       </div>
 
-      <Link href={`/matches/${matchId}`} className="inline-block underline">
+      <Link href={`/matches/${matchId}`} className="inline-block">
         {t("back")}
       </Link>
     </div>

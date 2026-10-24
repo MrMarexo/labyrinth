@@ -5,7 +5,8 @@ import { hasLocale, useLocale, useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 
-import { Link, useRouter } from "~/i18n/navigation";
+import { Link } from "~/components/link";
+import { useRouter } from "~/i18n/navigation";
 import { locales } from "~/i18n/routing";
 import { signIn, signUp } from "~/lib/auth-client";
 import { safeNext } from "~/lib/safe-next";
@@ -299,7 +300,7 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
           pathname: mode === "sign-up" ? "/sign-in" : "/sign-up",
           query: next ? { next } : undefined,
         }}
-        className="block text-sm underline"
+        className="block text-sm"
       >
         {mode === "sign-up" ? t("haveAccount") : t("needAccount")}
       </Link>

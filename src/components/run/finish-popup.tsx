@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl";
 import { useEffect, useId, useRef } from "react";
 
 import type { Finish } from "~/components/run/run-view";
-import { Link } from "~/i18n/navigation";
+import { Link } from "~/components/link";
 import { formatElapsed } from "~/lib/format-elapsed";
 import { api } from "~/trpc/react";
 
@@ -75,7 +75,7 @@ export function FinishPopup({
           <Link
             href={`/matches/${matchId}/watch?run=opponent`}
             data-finish-watch-live
-            className="text-accent text-sm underline"
+            className="text-sm"
           >
             {t("watchLive")}
           </Link>

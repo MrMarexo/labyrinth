@@ -21,8 +21,12 @@ import {
   type Point,
   type Tool,
 } from "~/maze";
-import { KeyIcon, StartIcon, TreasureIcon } from "~/components/maze-icons";
-import { gateColour } from "./gate-colours";
+import {
+  GateSegment,
+  KeyIcon,
+  StartIcon,
+  TreasureIcon,
+} from "~/components/maze-icons";
 import {
   cellUnder,
   cellsBetween,
@@ -439,9 +443,7 @@ export function Board({
         return <line {...line} opacity={0.4} className="stroke-wall" />;
       }
       if (tool === "gate" && gate !== null) {
-        return (
-          <line {...line} opacity={0.5} style={{ stroke: gateColour(gate) }} />
-        );
+        return <GateSegment {...line} gate={gate} opacity={0.5} />;
       }
       return null;
     }
@@ -617,22 +619,29 @@ export function Board({
       ))}
 
       {draft.segments.map((segment) => {
+        if (segment.kind === "gate") {
+          return (
+            <GateSegment
+              key={`seg-${edgeKey(segment)}`}
+              data-segment={edgeKey(segment)}
+              data-gate={segment.gate}
+              aria-hidden="true"
+              pointerEvents="none"
+              {...edgeLine(segment)}
+              gate={segment.gate}
+            />
+          );
+        }
         return (
           <line
             key={`seg-${edgeKey(segment)}`}
             data-segment={edgeKey(segment)}
-            data-gate={segment.kind === "gate" ? segment.gate : undefined}
             aria-hidden="true"
             pointerEvents="none"
             {...edgeLine(segment)}
             strokeWidth={4}
             strokeLinecap="round"
-            className={segment.kind === "wall" ? "stroke-wall" : undefined}
-            style={
-              segment.kind === "gate"
-                ? { stroke: gateColour(segment.gate) }
-                : undefined
-            }
+            className="stroke-wall"
           />
         );
       })}

@@ -138,26 +138,40 @@ test.describe("buttons", () => {
     const undo = page.getByRole("button", { name: "Undo" });
     await expect(undo).toBeDisabled();
     await undo.hover({ force: true });
-    expect(await undo.evaluate((el) => getComputedStyle(el).boxShadow)).toBe(
-      "none",
-    );
+    const tint = (el: Element) => getComputedStyle(el, "::after").opacity;
+    expect(await undo.evaluate(tint)).toBe("0");
     expect(await undo.evaluate((el) => getComputedStyle(el).cursor)).toBe(
       "not-allowed",
     );
 
-    // The tint is present but transparent at rest, at full spread, so hover
-    // only fades its colour in rather than growing it from the edges.
+    // The tint is an overlay whose opacity alone changes, so the hover never
+    // repaints the button.
     const tool = page.getByRole("radio", { name: "Wall" });
-    const shadow = () => tool.evaluate((el) => getComputedStyle(el).boxShadow);
-    const spread = (s: string) => /(\d+(?:\.\d+)?)px inset/.exec(s)?.[1];
-    const rest = await shadow();
-    expect(rest).toContain("rgba(0, 0, 0, 0)");
-    expect(Number(spread(rest))).toBeGreaterThan(100);
+    expect(await tool.evaluate(tint)).toBe("0");
     await tool.hover();
-    await expect.poll(shadow).not.toContain("rgba(0, 0, 0, 0)");
-    expect(spread(await shadow())).toBe(spread(rest));
+    await expect.poll(() => tool.evaluate(tint)).toBe("0.1");
     expect(await tool.evaluate((el) => getComputedStyle(el).cursor)).toBe(
       "pointer",
     );
+  });
+});
+
+test.describe("editor palette", () => {
+  test("tools are icons named for assistive tech, with a tooltip on hover", async ({
+    page,
+  }, testInfo) => {
+    await signUpAndOpenNewMaze(page);
+    const gate = page.getByRole("radio", { name: "Gate", exact: true });
+    const tooltip = gate.locator("[data-tooltip]");
+    await expect(gate.locator("svg")).toBeVisible();
+
+    if (testInfo.project.name === "mobile") {
+      await expect(tooltip).toBeHidden();
+      return;
+    }
+    await expect(tooltip).toHaveCSS("opacity", "0");
+    await gate.hover();
+    await expect(tooltip).toHaveText("Gate");
+    await expect(tooltip).toHaveCSS("opacity", "1");
   });
 });

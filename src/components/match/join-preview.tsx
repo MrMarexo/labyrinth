@@ -7,7 +7,8 @@ import { LobbyAction } from "~/components/match/lobby-action";
 import { LockedBadge } from "~/components/match/lobby-list";
 import { POLL_MS } from "~/components/realtime/poll";
 import { useChannel } from "~/components/realtime/use-channel";
-import { Link, useRouter } from "~/i18n/navigation";
+import { Link } from "~/components/link";
+import { useRouter } from "~/i18n/navigation";
 import { EVENTS, userChannel } from "~/match";
 import { api, type RouterOutputs } from "~/trpc/react";
 
@@ -17,9 +18,7 @@ export function MatchClosed() {
   return (
     <div data-match-closed className="space-y-2">
       <p>{t("closed")}</p>
-      <Link href="/matches" className="underline">
-        {t("backToLobby")}
-      </Link>
+      <Link href="/matches">{t("backToLobby")}</Link>
     </div>
   );
 }

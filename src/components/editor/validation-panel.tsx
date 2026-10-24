@@ -1,7 +1,9 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import type { ReactNode } from "react";
 
+import { GateDot } from "~/components/gate-dot";
 import type { TranslatableIssue } from "~/lib/issues";
 
 /**
@@ -45,7 +47,20 @@ export function ValidationPanel({
                   {/* `key` is a runtime string looked up against `t.has`,
                       not a literal from the generated message-key union, so
                       the typed overload of `t` needs a cast here. */}
-                  {t(key as never, issue.params as never)}
+                  {t.rich(
+                    key as never,
+                    {
+                      ...issue.params,
+                      // Gate issues show the gate's colour where its number
+                      // would be; the number is only read aloud.
+                      dot: (chunks: ReactNode) => (
+                        <GateDot
+                          gate={Number(issue.params?.gate)}
+                          label={chunks}
+                        />
+                      ),
+                    } as never,
+                  )}
                 </li>
               );
             })}

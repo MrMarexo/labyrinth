@@ -3,7 +3,9 @@
 import { useTranslations } from "next-intl";
 import { useRef, type KeyboardEvent } from "react";
 
+import { iconButtonClass, Tooltip } from "~/components/tooltip";
 import type { Tool } from "~/maze";
+import { ToolIcon } from "./tool-icons";
 
 export type ShapeToolsProps = {
   tool: Tool;
@@ -79,9 +81,11 @@ export function ShapeTools({ tool, onTool, used, budget }: ShapeToolsProps) {
               tabIndex={index === tabStopIndex ? 0 : -1}
               onClick={() => onTool(option)}
               onKeyDown={handleKeyDown}
-              className={buttonClass(active)}
+              aria-label={labelFor(option)}
+              className={iconButtonClass(active)}
             >
-              {labelFor(option)}
+              <ToolIcon tool={option} />
+              <Tooltip label={labelFor(option)} />
             </button>
           );
         })}
@@ -92,10 +96,4 @@ export function ShapeTools({ tool, onTool, used, budget }: ShapeToolsProps) {
       </p>
     </div>
   );
-}
-
-function buttonClass(active: boolean): string {
-  return active
-    ? "bg-accent text-on-accent rounded px-3 py-2 text-sm"
-    : "border-border-strong rounded border px-3 py-2 text-sm";
 }

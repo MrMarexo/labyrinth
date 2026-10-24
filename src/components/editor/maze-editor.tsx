@@ -1,8 +1,10 @@
 "use client";
 
+import { Redo2, Undo2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 
+import { iconButtonClass, Tooltip } from "~/components/tooltip";
 import type { TranslatableIssue } from "~/lib/issues";
 import { resolveErrorKey } from "~/lib/resolve-error-key";
 import {
@@ -549,17 +551,21 @@ export function MazeEditor({
             type="button"
             onClick={() => dispatch({ type: "undo" })}
             disabled={state.past.length === 0 || locked}
-            className="border-border-strong rounded border px-3 py-2 text-sm disabled:opacity-50"
+            aria-label={t("editor.undo")}
+            className={`${iconButtonClass(false)} disabled:opacity-50`}
           >
-            {t("editor.undo")}
+            <Undo2 aria-hidden="true" className="size-5" />
+            <Tooltip label={t("editor.undo")} />
           </button>
           <button
             type="button"
             onClick={() => dispatch({ type: "redo" })}
             disabled={state.future.length === 0 || locked}
-            className="border-border-strong rounded border px-3 py-2 text-sm disabled:opacity-50"
+            aria-label={t("editor.redo")}
+            className={`${iconButtonClass(false)} disabled:opacity-50`}
           >
-            {t("editor.redo")}
+            <Redo2 aria-hidden="true" className="size-5" />
+            <Tooltip label={t("editor.redo")} />
           </button>
         </div>
 

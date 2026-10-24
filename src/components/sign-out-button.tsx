@@ -3,7 +3,9 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 
+import { linkClassName } from "~/components/link";
 import { useRouter } from "~/i18n/navigation";
+import { cn } from "~/lib/cn";
 import { signOut } from "~/lib/auth-client";
 
 export function SignOutButton() {
@@ -14,7 +16,7 @@ export function SignOutButton() {
   return (
     <button
       type="button"
-      className="text-sm underline"
+      className={cn(linkClassName, "text-sm")}
       onClick={async () => {
         await signOut();
         // The browser's QueryClient is a module-level singleton (see
