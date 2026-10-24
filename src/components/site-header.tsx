@@ -3,7 +3,7 @@ import { getTranslations } from "next-intl/server";
 
 import { SettingsMenu } from "~/components/settings-menu";
 import { SignOutButton } from "~/components/sign-out-button";
-import { Link } from "~/i18n/navigation";
+import { Link } from "~/components/link";
 import { getSession } from "~/server/auth";
 
 export async function SiteHeader() {
@@ -18,10 +18,10 @@ export async function SiteHeader() {
       <div className="flex items-center gap-3">
         {session && (
           <nav className="flex items-center gap-3">
-            <Link href="/matches" className="text-sm underline">
+            <Link href="/matches" className="text-sm">
               {t("nav.matches")}
             </Link>
-            <Link href="/labyrinths" className="text-sm underline">
+            <Link href="/labyrinths" className="text-sm">
               {t("nav.labyrinths")}
             </Link>
           </nav>
@@ -31,10 +31,10 @@ export async function SiteHeader() {
           <SignOutButton />
         ) : (
           <>
-            <Link href="/sign-in" className="text-sm underline">
+            <Link href="/sign-in" className="text-sm">
               {t("nav.signIn")}
             </Link>
-            <Link href="/sign-up" className="text-sm underline">
+            <Link href="/sign-up" className="text-sm">
               {t("nav.signUp")}
             </Link>
           </>

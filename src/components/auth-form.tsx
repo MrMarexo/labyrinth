@@ -4,7 +4,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { hasLocale, useLocale, useTranslations } from "next-intl";
 import { useState } from "react";
 
-import { Link, useRouter } from "~/i18n/navigation";
+import { Link } from "~/components/link";
+import { useRouter } from "~/i18n/navigation";
 import { locales } from "~/i18n/routing";
 import { signIn, signUp } from "~/lib/auth-client";
 import { api } from "~/trpc/react";
@@ -293,7 +294,7 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
 
       <Link
         href={mode === "sign-up" ? "/sign-in" : "/sign-up"}
-        className="block text-sm underline"
+        className="block text-sm"
       >
         {mode === "sign-up" ? t("haveAccount") : t("needAccount")}
       </Link>

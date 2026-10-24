@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 
 import { CancelMatch } from "~/components/match/cancel-match";
-import { Link } from "~/i18n/navigation";
+import { Link } from "~/components/link";
 import type { MatchStatus } from "~/match";
 import { api } from "~/trpc/react";
 
@@ -55,9 +55,7 @@ export function MatchList() {
               </>
             )}
           </div>
-          <Link href={`/matches/${m.id}`} className="underline">
-            {t("open")}
-          </Link>
+          <Link href={`/matches/${m.id}`}>{t("open")}</Link>
         </li>
       ))}
     </ul>

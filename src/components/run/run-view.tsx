@@ -8,7 +8,7 @@ import { isTypingTarget } from "~/components/keyboard";
 import { useChannel } from "~/components/realtime/use-channel";
 import { RunBoard, type Bump } from "~/components/run/run-board";
 import { useMoveQueue, type DeltaKind } from "~/components/run/use-move-queue";
-import { Link } from "~/i18n/navigation";
+import { Link } from "~/components/link";
 import { resolveErrorKey } from "~/lib/resolve-error-key";
 import {
   heldKeys,
@@ -288,7 +288,7 @@ export function RunView({
             <Link
               href={`/matches/${matchId}/watch?run=opponent`}
               data-watch-live
-              className="text-accent inline-block text-sm underline"
+              className="inline-block text-sm"
             >
               {t("watchLive")}
             </Link>

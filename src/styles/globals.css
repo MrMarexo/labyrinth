@@ -81,6 +81,12 @@
   --color-wall: var(--wall);
 }
 
+/* On the root, not just the body: the canvas past the body — overscroll,
+   and below a short page — takes the root's background. */
+html {
+  background-color: var(--bg);
+}
+
 body {
   background-color: var(--bg);
   color: var(--fg);
@@ -93,9 +99,10 @@ body {
  * get the cursor but no transition or tint — a swipe repaints dozens of them.
  *
  * Every enabled button tints on hover in its own text colour, drawn as an
- * inset shadow so it lies over whatever background the button has. Nothing
- * here uses a ring (also a box-shadow), so the two never compete; focus is
- * the browser's outline.
+ * ::after overlay between its background and its content. Only the overlay's
+ * opacity animates, which the compositor handles without repainting; the
+ * inset box-shadow this replaced repainted a 100vmax spread every frame and
+ * made hover lag.
  */
 @layer base {
   button:not(:disabled),
@@ -111,19 +118,28 @@ body {
     cursor: not-allowed;
   }
 
-  /*
-   * The tint is always there, transparent until hover, so only its colour
-   * animates. Transitioning from `none` would grow the spread from zero
-   * instead, and the fill would arrive all at once at the end.
-   */
-  button:not(:disabled) {
-    box-shadow: inset 0 0 0 100vmax transparent;
+  /* `isolation` keeps the z-index -1 overlay above the button's own
+     background rather than behind its parent. Utilities such as `absolute`
+     still override the `relative`. */
+  button {
+    position: relative;
+    isolation: isolate;
+  }
+
+  button::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background-color: currentColor;
+    opacity: 0;
+    pointer-events: none;
   }
 
   @media (hover: hover) {
-    button:not(:disabled):hover {
-      box-shadow: inset 0 0 0 100vmax
-        color-mix(in oklch, currentColor 10%, transparent);
+    button:not(:disabled):hover::after {
+      opacity: 0.1;
     }
   }
 
@@ -131,10 +147,13 @@ body {
     button,
     a,
     select {
-      transition-property:
-        color, background-color, border-color, opacity, box-shadow;
+      transition-property: color, background-color, border-color, opacity;
       transition-duration: 150ms;
       transition-timing-function: ease-out;
+    }
+
+    button::after {
+      transition: opacity 100ms ease-out;
     }
   }
 }
