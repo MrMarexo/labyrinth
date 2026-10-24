@@ -8,6 +8,7 @@ import {
   inArray,
   isNotNull,
   isNull,
+  lte,
   ne,
   notInArray,
 } from "drizzle-orm";
@@ -15,15 +16,18 @@ import { z } from "zod";
 
 import {
   deadlineFor,
+  holdsPlayer,
+  isTerminal,
   MATCH_ACCESS,
   type MatchAccess,
+  type MatchStatus,
   makeCode,
   matchChannel,
   runChannel,
 } from "~/match";
 import {
   CELL_COUNT_PRESETS,
-  MAX_GATES,
+  MAX_GATE_COUNT,
   draftMazeSchema,
   validateMaze,
 } from "~/maze";
@@ -40,6 +44,7 @@ import {
   participantRows,
   type DbClient,
 } from "~/server/match/access";
+import { assertFree } from "~/server/match/active";
 import { seatOpponent } from "~/server/match/seat";
 import { situationFor } from "~/server/match/situation";
 import { closeIfExpired } from "~/server/match/sweep";
@@ -58,7 +63,7 @@ const settingsInput = z.object({
         (CELL_COUNT_PRESETS as readonly number[]).includes(n),
       { message: "maze.format.cellCountNotAPreset" },
     ),
-  gateCount: z.number().int().min(0).max(MAX_GATES),
+  gateCount: z.number().int().min(0).max(MAX_GATE_COUNT),
 });
 
 const createInput = settingsInput.extend({
@@ -208,27 +213,24 @@ export const matchRouter = createTRPCRouter({
       const now = new Date();
       let abandonedId: string | null = null;
 
-      const [waiting] = await ctx.db
-        .select({ id: match.id, deadlineAt: match.deadlineAt })
+      // A waiting match past its deadline no longer counts, but the
+      // partial unique index below still would; close it here rather than
+      // make the creator wait for the sweep. Another request may have closed
+      // it first, which `closeIfExpired` tolerates. A live one is refused by
+      // `assertFree` inside the transaction.
+      const [expired] = await ctx.db
+        .select({ id: match.id })
         .from(match)
         .where(
           and(
             eq(match.createdById, ctx.session.user.id),
             eq(match.status, "awaiting_opponent"),
+            lte(match.deadlineAt, now),
           ),
         );
-      if (waiting) {
-        if (waiting.deadlineAt.getTime() > now.getTime()) {
-          throw new TRPCError({
-            code: "CONFLICT",
-            message: "errors.alreadyWaiting",
-          });
-        }
-        // Past its deadline, so it no longer counts; close it here rather
-        // than make the creator wait for the sweep. Another request may have
-        // closed it first, which `closeIfExpired` tolerates.
-        abandonedId = (await closeIfExpired(ctx.db, waiting.id, now))
-          ? waiting.id
+      if (expired) {
+        abandonedId = (await closeIfExpired(ctx.db, expired.id, now))
+          ? expired.id
           : null;
       }
 
@@ -239,6 +241,13 @@ export const matchRouter = createTRPCRouter({
         const code = makeCode((max) => Math.floor(Math.random() * max));
         try {
           const created = await ctx.db.transaction(async (tx) => {
+            await assertFree(
+              tx,
+              ctx.session.user.id,
+              now,
+              "errors.alreadyActive",
+              "errors.alreadyWaiting",
+            );
             const [row] = await tx
               .insert(match)
               .values({
@@ -275,8 +284,9 @@ export const matchRouter = createTRPCRouter({
           return created;
         } catch (error) {
           const message = error instanceof Error ? error.message : "";
-          // Two concurrent creates both passed the check above; the partial
-          // unique index lets only one through.
+          // A backstop: the player lock in `assertFree` already keeps two
+          // concurrent creates apart, and the partial unique index lets only
+          // one through regardless.
           if (message.includes("match_one_waiting_per_creator")) {
             throw new TRPCError({
               code: "CONFLICT",
@@ -346,6 +356,7 @@ export const matchRouter = createTRPCRouter({
             message: "errors.matchLocked",
           });
         }
+        await assertFree(tx, ctx.session.user.id, now, "errors.alreadyActive");
 
         await seatOpponent(tx, row, players, ctx.session.user.id, now);
 
@@ -437,14 +448,8 @@ export const matchRouter = createTRPCRouter({
     }),
 
   list: protectedProcedure.query(async ({ ctx }) => {
-    const mine = await ctx.db
-      .select({ matchId: matchPlayer.matchId })
-      .from(matchPlayer)
-      .where(eq(matchPlayer.userId, ctx.session.user.id));
-
-    if (mine.length === 0) return [];
-
-    return ctx.db
+    const now = new Date();
+    const rows = await ctx.db
       .select({
         id: match.id,
         code: match.code,
@@ -454,15 +459,26 @@ export const matchRouter = createTRPCRouter({
         deadlineAt: match.deadlineAt,
         winnerId: match.winnerId,
         createdAt: match.createdAt,
+        finishedAt: matchPlayer.finishedAt,
+        gaveUpAt: matchPlayer.gaveUpAt,
+        forfeitedAt: matchPlayer.forfeitedAt,
       })
-      .from(match)
-      .where(
-        inArray(
-          match.id,
-          mine.map((m) => m.matchId),
-        ),
-      )
+      .from(matchPlayer)
+      .innerJoin(match, eq(match.id, matchPlayer.matchId))
+      .where(eq(matchPlayer.userId, ctx.session.user.id))
       .orderBy(desc(match.createdAt));
+
+    // The match that holds the caller first, then the rest still going (a
+    // finished run waiting on the opponent's), then the ones that are over;
+    // newest first within each.
+    const rank = (r: { active: boolean; status: MatchStatus }) =>
+      r.active ? 0 : isTerminal(r.status) ? 2 : 1;
+    return rows
+      .map(({ finishedAt, gaveUpAt, forfeitedAt, ...row }) => ({
+        ...row,
+        active: holdsPlayer(row, { finishedAt, gaveUpAt, forfeitedAt }, now),
+      }))
+      .sort((a, b) => rank(a) - rank(b));
   }),
 
   eligibleMazes: protectedProcedure
@@ -545,6 +561,7 @@ export const matchRouter = createTRPCRouter({
             message: "errors.matchNotLocked",
           });
         }
+        await assertFree(tx, userId, now, "errors.alreadyActive");
 
         const [existing] = await tx
           .select()
@@ -654,6 +671,7 @@ export const matchRouter = createTRPCRouter({
           });
         }
 
+        await assertFree(tx, input.userId, now, "errors.requesterActive");
         await seatOpponent(tx, row, players, input.userId, now);
         await tx.delete(matchRequest).where(eq(matchRequest.matchId, row.id));
         return pending.map((r) => r.userId);

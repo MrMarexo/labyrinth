@@ -12,10 +12,13 @@ import {
 
 import {
   MAX_BOUNDING_BOX,
+  brushCells,
   cellKey,
   edgeKey,
+  edgeTouches,
   isInteriorEdge,
   outlineEdges,
+  type BrushSize,
   type DraftMaze,
   type Edge,
   type Point,
@@ -104,13 +107,22 @@ type Stroke = {
   pointerId: number;
   /** Last pointer position, in cell units. */
   last: { x: number; y: number };
+  /** What the press landed on. */
+  pressed: Target | null;
+  /** Whether the pointer has since been over any other target. */
+  strayed: boolean;
 };
 
 export type BoardProps = {
   draft: DraftMaze;
   tool: Tool;
-  /** False once the square budget is spent, so paint previews nothing. */
-  canPaint: boolean;
+  /**
+   * Squares left in the budget. Paint previews no more than this many, in
+   * `brushCells` order — the order `paintCells` paints them in.
+   */
+  paintsLeft: number;
+  /** Squares per side that paint and erase-square cover. */
+  brush: BrushSize;
   /**
    * The gate or key number the gate or key tool places, or null when the
    * maze has no gates to number.
@@ -125,6 +137,11 @@ export type BoardProps = {
   onStrokeBegin: () => void;
   onStrokeCell: (at: Point) => void;
   onStrokeEdge: (edge: Edge) => void;
+  /**
+   * A stroke released on the square it was pressed on, never having left
+   * it: a tap, not a drag. Called before `onStrokeEnd`, inside the stroke.
+   */
+  onStrokeTap: (at: Point) => void;
   onStrokeEnd: () => void;
 };
 
@@ -137,7 +154,8 @@ export type BoardProps = {
 export function Board({
   draft,
   tool,
-  canPaint,
+  paintsLeft,
+  brush,
   gate,
   locked,
   onCell,
@@ -145,6 +163,7 @@ export function Board({
   onStrokeBegin,
   onStrokeCell,
   onStrokeEdge,
+  onStrokeTap,
   onStrokeEnd,
 }: BoardProps) {
   const t = useTranslations("editor");
@@ -191,11 +210,19 @@ export function Board({
   const svgRef = useRef<SVGSVGElement>(null);
   const strokeRef = useRef<Stroke | null>(null);
 
-  /** Closes the open stroke, if any. Safe to call more than once. */
-  function finishStroke() {
-    if (!strokeRef.current) return;
+  /**
+   * Closes the open stroke, if any. Safe to call more than once. Only a real
+   * release (`released`) can make it a tap: a cancelled or abandoned stroke
+   * never is.
+   */
+  function finishStroke(released = false) {
+    const stroke = strokeRef.current;
+    if (!stroke) return;
     strokeRef.current = null;
     document.documentElement.classList.remove("select-none");
+    if (released && !stroke.strayed && stroke.pressed?.kind === "cell") {
+      onStrokeTap(stroke.pressed.at);
+    }
     onStrokeEnd();
   }
   // Read by the window listener below, which is attached once.
@@ -312,7 +339,7 @@ export function Board({
     if (EDGE_TOOLS.has(tool)) {
       const edge = nearestInteriorEdge(p, painted);
       if (edge) return { kind: "edge", edge };
-      // The eraser falls back to the square, to take a key off it.
+      // The eraser falls back to the square, to clear everything on it.
       if (tool !== "erase") return null;
     }
     const at = cellUnder(p);
@@ -357,7 +384,12 @@ export function Board({
     // Captured so the stroke keeps its moves and its release even when the
     // pointer leaves the board. The press itself has already been dispatched
     // to the rect under it, so the browser still focuses that rect.
-    strokeRef.current = { pointerId: event.pointerId, last: p };
+    strokeRef.current = {
+      pointerId: event.pointerId,
+      last: p,
+      pressed: targetAt(p),
+      strayed: false,
+    };
     // A swipe that strays off the board would otherwise select page text.
     // Not preventDefault on the press: that would stop the rect taking focus.
     document.documentElement.classList.add("select-none");
@@ -383,6 +415,9 @@ export function Board({
       if (!p) return;
       strokeAlong(stroke.last, p);
       stroke.last = p;
+      if (targetKey(targetAt(p)) !== targetKey(stroke.pressed)) {
+        stroke.strayed = true;
+      }
       return;
     }
 
@@ -396,7 +431,7 @@ export function Board({
 
   function handlePointerEnd(event: PointerEvent<SVGSVGElement>) {
     if (strokeRef.current?.pointerId !== event.pointerId) return;
-    finishStroke();
+    finishStroke(event.type === "pointerup");
   }
 
   /**
@@ -453,35 +488,75 @@ export function Board({
     const isPainted = painted.has(key);
     const cell = { ...common, "data-hover-cell": key } as const;
     const icon = { ...cell, x: at.x, y: at.y, size: CELL_PX } as const;
-    const square = {
-      ...cell,
-      x: at.x * CELL_PX,
-      y: at.y * CELL_PX,
-      width: CELL_PX,
-      height: CELL_PX,
-      opacity: 0.35,
-    } as const;
     const cx = (at.x + 0.5) * CELL_PX;
     const cy = (at.y + 0.5) * CELL_PX;
 
+    // Every square of the brush the stamp would change, so a 2×2 previews
+    // as a block — and only the part of it that would actually change.
+    const stamp = (
+      show: (key: string) => boolean,
+      className: string,
+      limit = Infinity,
+    ) => {
+      const squares = brushCells(at, brush)
+        .filter((p) => show(cellKey(p)))
+        .slice(0, limit);
+      if (squares.length === 0) return null;
+      return (
+        <g {...cell}>
+          {squares.map((p) => (
+            <rect
+              key={cellKey(p)}
+              x={p.x * CELL_PX}
+              y={p.y * CELL_PX}
+              width={CELL_PX}
+              height={CELL_PX}
+              opacity={0.35}
+              className={className}
+            />
+          ))}
+        </g>
+      );
+    };
+
     switch (tool) {
       case "paint":
-        return !isPainted && canPaint ? (
-          <rect {...square} className="fill-accent" />
-        ) : null;
+        return stamp((k) => !painted.has(k), "fill-accent", paintsLeft);
       case "erase-cell":
-        return isPainted ? <rect {...square} className="fill-danger" /> : null;
-      case "erase":
-        return keyGateAt.has(key) ? (
-          <circle
-            {...cell}
-            cx={cx}
-            cy={cy}
-            r={CELL_PX * 0.22}
-            opacity={0.6}
-            className="fill-danger"
-          />
-        ) : null;
+        return stamp((k) => painted.has(k), "fill-danger");
+      case "erase": {
+        // Everything `clearCell` would take: what sits on the square, and
+        // every wall and gate on its sides.
+        const holdsSomething =
+          keyGateAt.has(key) ||
+          (draft.start !== null && cellKey(draft.start) === key) ||
+          (draft.treasure !== null && cellKey(draft.treasure) === key);
+        const sides = draft.segments.filter((s) => edgeTouches(s, at));
+        if (!holdsSomething && sides.length === 0) return null;
+        return (
+          <g {...cell}>
+            {holdsSomething && (
+              <circle
+                cx={cx}
+                cy={cy}
+                r={CELL_PX * 0.22}
+                opacity={0.6}
+                className="fill-danger"
+              />
+            )}
+            {sides.map((s) => (
+              <line
+                key={edgeKey(s)}
+                {...edgeLine(s)}
+                strokeWidth={6}
+                strokeLinecap="round"
+                opacity={0.6}
+                className="stroke-danger"
+              />
+            ))}
+          </g>
+        );
+      }
       case "key":
         return isPainted && gate !== null ? (
           <KeyIcon {...icon} gate={gate} opacity={0.5} />

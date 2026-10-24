@@ -201,12 +201,6 @@ test.describe("the lobby's maze picker", () => {
     await expect(use).toBeEnabled();
     await expect(use).toHaveText("Use in this match");
     await use.click();
-    await expect(
-      host.getByText(
-        /^Use Labyrinth for match \S+ in this match\? After that it can't be edited, but you can reuse it in other matches\.$/,
-      ),
-    ).toBeVisible();
-    await host.getByRole("button", { name: "Use it", exact: true }).click();
 
     await expect(host).toHaveURL(matchUrl);
     await expect(host.locator("[data-you-submitted]")).toHaveAttribute(
@@ -246,7 +240,10 @@ test.describe("leaving the editor for the lobby", () => {
     await host.getByRole("radio", { name: "Erase square" }).click();
     await host.locator('[data-cell="0,0"]').click();
     await host.getByRole("link", { name: "Matches" }).click();
-    await host.locator(`a[href$="/matches/${matchId}"]`).click();
+    await host
+      .locator("[data-current-match]")
+      .getByRole("link", { name: "Continue" })
+      .click();
     await host.getByRole("button", { name: "Draw a new one" }).click();
     await expect(host).toHaveURL(/\/en\/labyrinths\/[^/?]+\?match=/);
 

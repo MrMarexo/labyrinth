@@ -5,11 +5,20 @@ import { toTranslatableIssues, type TranslatableIssue } from "~/lib/issues";
 /** Spec §3.3. The cap is set by what fits a desktop board, not by storage. */
 export const MAX_BOUNDING_BOX = 16;
 
-/** Spec §3.3. Keeps the solver's state space at cells × 2^8. */
+/**
+ * Spec §3.3. The format's cap on gate ids, which keeps the solver's state
+ * space at cells × 2^8. New mazes and matches offer fewer (`GATE_COUNT_OPTIONS`);
+ * this stays at 8 so mazes saved under the old limit still parse.
+ */
 export const MAX_GATES = 8;
 
+/** Spec §3.3. The gate counts a new maze or match may choose. */
+export const GATE_COUNT_OPTIONS = [0, 1, 2, 3, 4, 5] as const;
+export type GateCount = (typeof GATE_COUNT_OPTIONS)[number];
+export const MAX_GATE_COUNT = Math.max(...GATE_COUNT_OPTIONS);
+
 /** Spec §3.3. The author paints exactly this many cells. */
-export const CELL_COUNT_PRESETS = [36, 64, 100, 144] as const;
+export const CELL_COUNT_PRESETS = [36, 64, 100, 144, 196, 256] as const;
 export type CellCount = (typeof CELL_COUNT_PRESETS)[number];
 
 export const ORIENTATIONS = ["H", "V"] as const;

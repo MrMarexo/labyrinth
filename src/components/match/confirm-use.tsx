@@ -12,9 +12,9 @@ export type ConfirmUseProps = {
 };
 
 /**
- * The last step before a labyrinth goes into a match, shared by the lobby's
- * picker and the editor's "Use in this match": it says what submitting
- * costs, since a submitted labyrinth can never be edited again.
+ * The last step before the lobby's picker puts a labyrinth into a match: it
+ * says what submitting costs, since a submitted labyrinth can never be
+ * edited again.
  */
 export function ConfirmUse({
   name,

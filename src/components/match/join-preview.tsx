@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 import { useEffect, useRef } from "react";
 
-import { LobbyAction } from "~/components/match/lobby-action";
+import { LobbyAction, LobbyBlockedNote } from "~/components/match/lobby-action";
 import { LockedBadge } from "~/components/match/lobby-list";
 import { POLL_MS } from "~/components/realtime/poll";
 import { useChannel } from "~/components/realtime/use-channel";
@@ -87,6 +87,7 @@ export function JoinPreview({
         {tm("sizeAndGates", { cells: data.cellCount, gates: data.gateCount })}
       </p>
       {data.access === "locked" && <LockedBadge />}
+      <LobbyBlockedNote />
       <LobbyAction
         matchId={matchId}
         access={data.access}

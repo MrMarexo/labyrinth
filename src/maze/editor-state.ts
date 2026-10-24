@@ -1,6 +1,12 @@
 import type { DraftMaze } from "./draft";
-import type { Orientation, Point } from "./format";
-import { cellKey, edgeKey, isInteriorEdge, step, type Edge } from "./geometry";
+import { MAX_BOUNDING_BOX, type Point } from "./format";
+import {
+  cellKey,
+  edgeKey,
+  edgeTouches,
+  isInteriorEdge,
+  type Edge,
+} from "./geometry";
 
 export type Tool =
   | "paint"
@@ -11,6 +17,25 @@ export type Tool =
   | "start"
   | "treasure"
   | "erase";
+
+/** Squares per side that one paint or erase touches. */
+export const BRUSH_SIZES = [1, 2] as const;
+export type BrushSize = (typeof BRUSH_SIZES)[number];
+
+/**
+ * The squares a brush of `size` covers when it lands on `at`: `at` and the
+ * squares right of and below it, shifted back so the block stays whole at
+ * the frame's far edges.
+ */
+export function brushCells(at: Point, size: BrushSize): Point[] {
+  const x0 = Math.min(at.x, MAX_BOUNDING_BOX - size);
+  const y0 = Math.min(at.y, MAX_BOUNDING_BOX - size);
+  const cells: Point[] = [];
+  for (let y = y0; y < y0 + size; y += 1) {
+    for (let x = x0; x < x0 + size; x += 1) cells.push({ x, y });
+  }
+  return cells;
+}
 
 export type EditorState = {
   draft: DraftMaze;
@@ -28,6 +53,9 @@ export type EditorAction =
   /** `limit` is the square budget: no new square once it is reached. */
   | { type: "paintCell"; at: Point; limit?: number }
   | { type: "eraseCell"; at: Point }
+  /** One brush stamp: every square in `cells`, as a single edit. */
+  | { type: "paintCells"; cells: Point[]; limit?: number }
+  | { type: "eraseCells"; cells: Point[] }
   | { type: "placeSegment"; edge: Edge; kind: "wall" }
   /**
    * Places gate `gate`, moving it if it is already elsewhere. `gateCount` is
@@ -45,7 +73,13 @@ export type EditorAction =
   | { type: "setWall"; edge: Edge }
   /** Refused for an id outside 1..gateCount, like a gate. */
   | { type: "placeKey"; at: Point; gate: number; gateCount: number }
-  | { type: "removeKey"; at: Point }
+  /**
+   * The eraser on a square: everything on it and on its four sides — key,
+   * start, treasure, walls, gates — but never the square itself.
+   */
+  | { type: "clearCell"; at: Point }
+  /** The eraser dragged over a square: its key, start or treasure only. */
+  | { type: "clearItems"; at: Point }
   | { type: "placeStart"; at: Point }
   | { type: "placeTreasure"; at: Point }
   | { type: "undo" }
@@ -71,9 +105,9 @@ export function initialEditorState(draft: DraftMaze): EditorState {
  * The editor used to accept a wall or gate on any edge, including one with a
  * void square on one side. The validator rejects those (`segmentOutsideShape`)
  * and the board no longer offers them as targets, so a draft holding one
- * could never be fixed. They are dropped on load, along with any dropped
- * gate's key, so the cleanup doesn't just trade one error for
- * `keyWithoutGate`.
+ * could never be fixed. They are dropped on load. A dropped gate's key
+ * stays, as it does whenever a gate goes: the author places the gate again
+ * or removes the key.
  *
  * Returns `draft` itself when nothing is dropped. The editor's autosave skips
  * a draft that is reference-equal to the one it loaded, so a clean draft is
@@ -84,14 +118,7 @@ function dropSegmentsOutsideShape(draft: DraftMaze): DraftMaze {
   const painted = new Set(draft.cells.map(cellKey));
   const segments = draft.segments.filter((s) => isInteriorEdge(s, painted));
   if (segments.length === draft.segments.length) return draft;
-
-  let keys = draft.keys;
-  for (const dropped of draft.segments) {
-    if (dropped.kind === "gate" && !isInteriorEdge(dropped, painted)) {
-      keys = releaseKeyForGate(keys, dropped.gate);
-    }
-  }
-  return { ...draft, segments, keys };
+  return { ...draft, segments };
 }
 
 export function cellsUsed(draft: DraftMaze): number {
@@ -172,6 +199,18 @@ export function editorReducer(
 
 function applyEdit(draft: DraftMaze, action: EditorAction): DraftMaze {
   switch (action.type) {
+    case "paintCells":
+      return action.cells.reduce(
+        (d, at) => applyEdit(d, { type: "paintCell", at, limit: action.limit }),
+        draft,
+      );
+
+    case "eraseCells":
+      return action.cells.reduce(
+        (d, at) => applyEdit(d, { type: "eraseCell", at }),
+        draft,
+      );
+
     case "paintCell": {
       if (draft.cells.some((c) => cellKey(c) === cellKey(action.at)))
         return draft;
@@ -183,32 +222,12 @@ function applyEdit(draft: DraftMaze, action: EditorAction): DraftMaze {
     case "eraseCell": {
       const gone = cellKey(action.at);
       if (!draft.cells.some((c) => cellKey(c) === gone)) return draft;
-
-      // Anything that referenced the square goes with it, or the draft would
-      // hold a wall with nothing on one side and a start in empty space.
-      const cells = draft.cells.filter((c) => cellKey(c) !== gone);
-      const segments = draft.segments.filter((s) => !touches(s, action.at));
-      // Only the keys of gates this erase removed: a key placed before its
-      // gate has no gate to lose, and stays.
-      const removedGates = new Set(
-        draft.segments.flatMap((s) =>
-          s.kind === "gate" && touches(s, action.at) ? [s.gate] : [],
-        ),
-      );
-
+      // Everything on the square and its sides goes with it, or the draft
+      // would hold a wall with nothing on one side and a start in empty space.
+      const cleared = applyEdit(draft, { type: "clearCell", at: action.at });
       return {
-        ...draft,
-        cells,
-        segments,
-        keys: draft.keys.filter(
-          (k) => cellKey(k) !== gone && !removedGates.has(k.gate),
-        ),
-        start:
-          draft.start && cellKey(draft.start) === gone ? null : draft.start,
-        treasure:
-          draft.treasure && cellKey(draft.treasure) === gone
-            ? null
-            : draft.treasure,
+        ...cleared,
+        cells: draft.cells.filter((c) => cellKey(c) !== gone),
       };
     }
 
@@ -230,22 +249,17 @@ function applyEdit(draft: DraftMaze, action: EditorAction): DraftMaze {
         return applyEdit(draft, { type: "removeSegment", edge: action.edge });
       }
 
+      // A gate this replaces keeps its key, like any removed gate.
       const without = draft.segments.filter((s) => edgeKey(s) !== id);
-      const keys = releaseKeyForGate(
-        draft.keys,
-        existing?.kind === "gate" ? existing.gate : undefined,
-      );
 
       if (action.kind === "wall") {
         return {
           ...draft,
           segments: [...without, { ...action.edge, kind: "wall" }],
-          keys,
         };
       }
 
-      // Each gate id appears once, so placing gate N elsewhere moves it. Its
-      // key stays: the gate it opens still exists.
+      // Each gate id appears once, so placing gate N elsewhere moves it.
       const { gate } = action;
       return {
         ...draft,
@@ -253,7 +267,6 @@ function applyEdit(draft: DraftMaze, action: EditorAction): DraftMaze {
           ...without.filter((s) => s.kind !== "gate" || s.gate !== gate),
           { ...action.edge, kind: "gate", gate },
         ],
-        keys,
       };
     }
 
@@ -271,16 +284,12 @@ function applyEdit(draft: DraftMaze, action: EditorAction): DraftMaze {
 
     case "removeSegment": {
       const id = edgeKey(action.edge);
-      const removed = draft.segments.find((s) => edgeKey(s) === id);
-      if (!removed) return draft;
-
+      if (!draft.segments.some((s) => edgeKey(s) === id)) return draft;
+      // A removed gate's key stays where the author put it: placing the
+      // gate again pairs them up, and the validator flags it until then.
       return {
         ...draft,
         segments: draft.segments.filter((s) => edgeKey(s) !== id),
-        keys: releaseKeyForGate(
-          draft.keys,
-          removed.kind === "gate" ? removed.gate : undefined,
-        ),
       };
     }
 
@@ -298,10 +307,32 @@ function applyEdit(draft: DraftMaze, action: EditorAction): DraftMaze {
       };
     }
 
-    case "removeKey": {
+    case "clearItems": {
       const at = cellKey(action.at);
-      if (!draft.keys.some((k) => cellKey(k) === at)) return draft;
-      return { ...draft, keys: draft.keys.filter((k) => cellKey(k) !== at) };
+      const keys = draft.keys.filter((k) => cellKey(k) !== at);
+      const start =
+        draft.start && cellKey(draft.start) === at ? null : draft.start;
+      const treasure =
+        draft.treasure && cellKey(draft.treasure) === at
+          ? null
+          : draft.treasure;
+      if (
+        keys.length === draft.keys.length &&
+        start === draft.start &&
+        treasure === draft.treasure
+      ) {
+        return draft;
+      }
+      return { ...draft, keys, start, treasure };
+    }
+
+    case "clearCell": {
+      const cleared = applyEdit(draft, { type: "clearItems", at: action.at });
+      const segments = cleared.segments.filter(
+        (s) => !edgeTouches(s, action.at),
+      );
+      if (segments.length === cleared.segments.length) return cleared;
+      return { ...cleared, segments };
     }
 
     case "placeStart":
@@ -313,29 +344,6 @@ function applyEdit(draft: DraftMaze, action: EditorAction): DraftMaze {
     default:
       return draft;
   }
-}
-
-/** True when one of the edge's two cells is `at`. */
-function touches(
-  edge: { o: Orientation; x: number; y: number },
-  at: Point,
-): boolean {
-  const here = { x: edge.x, y: edge.y };
-  const other = edge.o === "H" ? step(here, "S") : step(here, "E");
-  return cellKey(here) === cellKey(at) || cellKey(other) === cellKey(at);
-}
-
-/**
- * Removes whichever key is paired with `gate`, or returns `keys` unchanged
- * when `gate` is undefined. The one place that enforces "a key cannot
- * outlive its gate" — `placeSegment` and `removeSegment` both route through
- * it rather than each filtering `keys` themselves.
- */
-function releaseKeyForGate(
-  keys: DraftMaze["keys"],
-  gate: number | undefined,
-): DraftMaze["keys"] {
-  return gate === undefined ? keys : keys.filter((k) => k.gate !== gate);
 }
 
 /** The gate ids that have a gate placed, or with "key", a key placed. */

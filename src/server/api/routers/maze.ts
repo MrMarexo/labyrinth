@@ -4,12 +4,12 @@ import { z } from "zod";
 
 import {
   CELL_COUNT_PRESETS,
-  INCOMPLETE_DRAFT_KEY,
-  MAX_GATES,
+  MAX_GATE_COUNT,
   MAZE_LIMIT,
   draftMazeSchema,
   draftToMaze,
   emptyDraft,
+  incompleteDraftIssues,
   mazeState,
   validateMaze,
 } from "~/maze";
@@ -31,7 +31,7 @@ const settingsInput = z.object({
         (CELL_COUNT_PRESETS as readonly number[]).includes(n),
       { message: "maze.format.cellCountNotAPreset" },
     ),
-  gateCount: z.number().int().min(0).max(MAX_GATES),
+  gateCount: z.number().int().min(0).max(MAX_GATE_COUNT),
 });
 
 /**
@@ -312,7 +312,12 @@ export const mazeRouter = createTRPCRouter({
       if (validation?.ok) return { valid: true as const, issues: [], version };
       return {
         valid: false as const,
-        issues: validation?.issues ?? [{ key: INCOMPLETE_DRAFT_KEY }],
+        issues:
+          validation?.issues ??
+          incompleteDraftIssues(input.data, {
+            cellCount: row.cellCount,
+            gateCount: row.gateCount,
+          }),
         version,
       };
     }),

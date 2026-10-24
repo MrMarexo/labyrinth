@@ -39,6 +39,9 @@ export function MatchScreen({
   const refresh = () => {
     void utils.match.get.invalidate({ id: matchId });
     void utils.run.get.invalidate({ matchId });
+    // A finished run or a closed match frees the player: the matches page
+    // must not keep this one as the match that holds them.
+    void utils.match.list.invalidate();
     // The creator's request list rides on this channel too; a second
     // subscription to it from `JoinRequests` would break this one.
     void utils.match.requests.invalidate({ matchId });

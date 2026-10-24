@@ -8,17 +8,19 @@ import { iconButtonClass, Tooltip } from "~/components/tooltip";
 import type { TranslatableIssue } from "~/lib/issues";
 import { resolveErrorKey } from "~/lib/resolve-error-key";
 import {
-  INCOMPLETE_DRAFT_KEY,
+  brushCells,
   cellsUsed,
   draftToMaze,
   edgeKey,
   editorReducer,
   gatesPlaced,
+  incompleteDraftIssues,
   initialEditorState,
   keysPlaced,
   lowestUnplaced,
   placedNumbers,
   validateMaze,
+  type BrushSize,
   type EditorAction,
   type DraftMaze,
   type Edge,
@@ -37,7 +39,6 @@ const AUTOSAVE_MS = 800;
 
 export type MazeEditorProps = {
   id: string;
-  name: string;
   initial: DraftMaze;
   /** The server's version of `initial`, which the first save must match. */
   version: number;
@@ -49,7 +50,6 @@ export type MazeEditorProps = {
 
 export function MazeEditor({
   id,
-  name,
   initial,
   version,
   cellCount,
@@ -70,6 +70,8 @@ export function MazeEditor({
     initialEditorState,
   );
   const [tool, setTool] = useState<Tool>("paint");
+  // Squares per side for paint and erase-square; other tools ignore it.
+  const [brush, setBrush] = useState<BrushSize>(1);
   // The gate or key number the gate and key tools place. Set to the default
   // each time one of those tools is activated, then only by the author.
   const [chosen, setChosen] = useState<number | null>(null);
@@ -325,8 +327,11 @@ export function MazeEditor({
 
   // Autosave. Debounced at AUTOSAVE_MS: every edit resets the timer, so a
   // burst of clicks produces one request after the author pauses, not one
-  // per click.
+  // per click. Held for the whole of a stroke, so a drag that pauses
+  // mid-row still saves once, after the release.
+  const inStroke = state.strokeBase !== null;
   useEffect(() => {
+    if (inStroke) return;
     // Covers the first render: `state.draft` is the same reference as
     // `lastSentRef.current` (both set from `initial`) until a real edit
     // replaces it, so a freshly loaded draft is never written straight back.
@@ -337,7 +342,7 @@ export function MazeEditor({
     const timer = setTimeout(() => maybeSend(), AUTOSAVE_MS);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.draft]);
+  }, [state.draft, inStroke]);
 
   // Unmount only (empty deps): flush whatever the debounce above hasn't sent
   // yet, rather than losing up to AUTOSAVE_MS of drawing to a navigation.
@@ -365,7 +370,7 @@ export function MazeEditor({
     ? validation.ok
       ? []
       : validation.issues
-    : [{ key: INCOMPLETE_DRAFT_KEY }];
+    : incompleteDraftIssues(state.draft, { cellCount, gateCount });
 
   // "saved" only once the server holds exactly the live draft: not while the
   // debounce is pending, and not while any request is still in flight, since
@@ -388,9 +393,8 @@ export function MazeEditor({
     if (locked) return;
     switch (tool) {
       case "paint":
-        return dispatch({ type: "paintCell", at, limit: cellCount });
       case "erase-cell":
-        return dispatch({ type: "eraseCell", at });
+        return stamp(at);
       case "start":
         return dispatch({ type: "placeStart", at });
       case "treasure":
@@ -405,10 +409,20 @@ export function MazeEditor({
               gateCount,
             });
       case "erase":
-        return dispatch({ type: "removeKey", at });
+        return dispatch({ type: "clearCell", at });
       default:
         return undefined;
     }
+  }
+
+  /** Paints or erases every square the brush covers at `at`. */
+  function stamp(at: Point) {
+    const cells = brushCells(at, brush);
+    return dispatch(
+      tool === "paint"
+        ? { type: "paintCells", cells, limit: cellCount }
+        : { type: "eraseCells", cells },
+    );
   }
 
   /**
@@ -455,10 +469,16 @@ export function MazeEditor({
 
   function onStrokeCell(at: Point) {
     if (locked) return;
-    if (tool === "paint")
-      return dispatch({ type: "paintCell", at, limit: cellCount });
-    if (tool === "erase-cell") return dispatch({ type: "eraseCell", at });
-    if (tool === "erase") return dispatch({ type: "removeKey", at });
+    if (tool === "paint" || tool === "erase-cell") return stamp(at);
+    // A drag takes only what sits on the squares it crosses; their walls
+    // go only where the drag runs along them, as edges. A tap clears the
+    // whole square (`onStrokeTap`).
+    if (tool === "erase") return dispatch({ type: "clearItems", at });
+  }
+
+  function onStrokeTap(at: Point) {
+    if (locked) return;
+    if (tool === "erase") dispatch({ type: "clearCell", at });
   }
 
   function onStrokeEdge(edge: Edge) {
@@ -487,7 +507,8 @@ export function MazeEditor({
       <Board
         draft={state.draft}
         tool={tool}
-        canPaint={cellsUsed(state.draft) < cellCount}
+        paintsLeft={Math.max(0, cellCount - cellsUsed(state.draft))}
+        brush={brush}
         gate={chosen}
         locked={locked}
         onCell={onCell}
@@ -495,6 +516,7 @@ export function MazeEditor({
         onStrokeBegin={onStrokeBegin}
         onStrokeCell={onStrokeCell}
         onStrokeEdge={onStrokeEdge}
+        onStrokeTap={onStrokeTap}
         onStrokeEnd={onStrokeEnd}
       />
 
@@ -504,6 +526,8 @@ export function MazeEditor({
           onTool={selectTool}
           used={cellsUsed(state.draft)}
           budget={cellCount}
+          brush={brush}
+          onBrush={setBrush}
         />
         <DetailTools
           tool={tool}
@@ -578,7 +602,6 @@ export function MazeEditor({
         {forMatch && (
           <UseInMatch
             mazeId={id}
-            name={name}
             match={forMatch}
             // The server must hold exactly what is on screen before it is
             // submitted, so a pending autosave keeps this disabled.

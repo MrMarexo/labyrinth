@@ -56,7 +56,6 @@ export default async function EditorPage({
       <h1 className="text-2xl font-bold">{row.name}</h1>
       <MazeEditor
         id={row.id}
-        name={row.name}
         initial={parsed.data}
         version={row.version}
         cellCount={row.cellCount}

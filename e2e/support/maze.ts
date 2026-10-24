@@ -21,7 +21,10 @@ export async function signUpAndOpenNewMaze(
   await page.getByRole("button", { name: "New labyrinth" }).click();
   await page.getByLabel("Name").fill("Test maze");
   if (options.gates !== undefined) {
-    await page.getByLabel("Gates").fill(String(options.gates));
+    await page
+      .getByRole("radiogroup", { name: "Gates" })
+      .getByRole("radio", { name: String(options.gates), exact: true })
+      .click();
   }
   await page.getByRole("button", { name: "Create" }).click();
   await expect(page.locator("svg[data-board]")).toBeVisible();

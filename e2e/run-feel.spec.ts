@@ -77,6 +77,41 @@ test.describe("how the run feels", () => {
     );
   });
 
+  test("moves pressed while an unknown edge waits are dropped", async ({
+    players,
+  }, testInfo) => {
+    const { host } = await startRunningMatch(players, createMatch);
+    await walk(host, ["S"], testInfo);
+
+    let sent = 0;
+    await host.route("**/api/trpc/run.move*", async (route) => {
+      sent += 1;
+      await new Promise((resolve) => setTimeout(resolve, SERVER_DELAY_MS));
+      await route.continue();
+    });
+    const runner = host.locator("[data-runner-at]");
+
+    await press(host, "E", testInfo);
+    await expect(host.locator("[data-run-pending]")).toBeAttached();
+    // Spammed while the answer is outstanding: none of these may play out
+    // once it lands.
+    await press(host, "E", testInfo);
+    await press(host, "N", testInfo);
+    await press(host, "E", testInfo);
+    await expect(runner).toHaveAttribute("data-runner-at", "1,1", {
+      timeout: 10_000,
+    });
+    await expect(host.locator("[data-run-pending]")).toHaveCount(0);
+    await host.waitForTimeout(SERVER_DELAY_MS * 2);
+    expect(sent).toBe(1);
+    await expect(runner).toHaveAttribute("data-runner-at", "1,1");
+    await expect(host.locator("[data-moves]")).toHaveAttribute(
+      "data-moves",
+      "2",
+    );
+    await host.unroute("**/api/trpc/run.move*");
+  });
+
   test("an edge between two explored squares is dashed until tried", async ({
     players,
   }, testInfo) => {
@@ -93,6 +128,16 @@ test.describe("how the run feels", () => {
     await expect(untested).toHaveCount(0);
   });
 
+  test("the start door is drawn faint, so the runner reads on top of it", async ({
+    players,
+  }) => {
+    const { host } = await startRunningMatch(players, createMatch);
+    await expect(host.locator("[data-run-start]")).toHaveAttribute(
+      "opacity",
+      "0.15",
+    );
+  });
+
   test("a collected key is drawn faint", async ({ players }, testInfo) => {
     const { host } = await startRunningMatch(players, createMatch);
     await walk(host, ["S", "S"], testInfo);
@@ -102,17 +147,19 @@ test.describe("how the run feels", () => {
     );
   });
 
-  test("a bump pulses the runner once, and it settles", async ({
+  test("a bump pulses the runner and the wall once, and both settle", async ({
     players,
   }, testInfo) => {
     const { host } = await startRunningMatch(players, createMatch);
     // The pulse lasts about 200ms, too short to poll for reliably; a
     // mutation observer sees it however briefly it is there.
     await host.evaluate(() => {
-      const seen = window as unknown as { pulsed?: boolean };
+      const seen = window as unknown as { pulsed?: boolean; swelled?: boolean };
       seen.pulsed = false;
+      seen.swelled = false;
       new MutationObserver(() => {
         if (document.querySelector("[data-bump-pulse]")) seen.pulsed = true;
+        if (document.querySelector("[data-bump-wall]")) seen.swelled = true;
       }).observe(document.body, {
         subtree: true,
         childList: true,
@@ -125,9 +172,55 @@ test.describe("how the run feels", () => {
         host.evaluate(() => (window as unknown as { pulsed?: boolean }).pulsed),
       )
       .toBe(true);
+    expect(
+      await host.evaluate(
+        () => (window as unknown as { swelled?: boolean }).swelled,
+      ),
+    ).toBe(true);
     await expect(host.locator("[data-bump-pulse]")).toHaveCount(0, {
       timeout: 1000,
     });
+    // The wall goes back to its normal width rather than staying swollen.
+    await expect(host.locator("[data-bump-wall]")).toHaveCount(0, {
+      timeout: 1000,
+    });
+  });
+
+  test("finding a key shows a notice that goes away on its own", async ({
+    players,
+  }, testInfo) => {
+    const { host } = await startRunningMatch(players, createMatch);
+    const toast = host.locator("[data-found-toast]");
+
+    // Down onto the key.
+    await walk(host, ["S", "S"], testInfo);
+    await expect(toast).toHaveAttribute("data-found-toast", "key");
+    await expect(toast).toHaveText("Key found");
+    // It never gets in the way of the board or the d-pad.
+    await expect(toast).toHaveCSS("pointer-events", "none");
+    await expect(toast).toHaveCount(0, { timeout: 5000 });
+
+    // Back up and onto it again: already held, nothing new.
+    await walk(host, ["N", "S"], testInfo);
+    await host.waitForTimeout(300);
+    await expect(toast).toHaveCount(0);
+  });
+
+  test("bumping a gate shows a notice the first time only", async ({
+    players,
+  }, testInfo) => {
+    const { host } = await startRunningMatch(players, createMatch);
+    const toast = host.locator("[data-found-toast]");
+
+    // East along the top, down to the gate without its key.
+    await walk(host, ["E", "E", "E", "E", "E", "S", "S", "S"], testInfo);
+    await expect(toast).toHaveAttribute("data-found-toast", "gate");
+    await expect(toast).toHaveText("Gate found");
+    await expect(toast).toHaveCount(0, { timeout: 5000 });
+
+    await walk(host, ["S"], testInfo);
+    await host.waitForTimeout(300);
+    await expect(toast).toHaveCount(0);
   });
 
   test("the treasure opens a popup once, which Escape closes", async ({

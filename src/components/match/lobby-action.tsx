@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 
+import { useActiveMatch } from "~/components/match/match-list";
 import { useRouter } from "~/i18n/navigation";
 import { resolveErrorKey } from "~/lib/resolve-error-key";
 import type { MatchAccess } from "~/match";
@@ -9,6 +10,18 @@ import { api, type RouterOutputs } from "~/trpc/react";
 
 type RequestState =
   RouterOutputs["match"]["lobby"]["matches"][number]["request"];
+
+/** Why the lobby's buttons are disabled, shown once above them. */
+export function LobbyBlockedNote() {
+  const tm = useTranslations("matches");
+  const { active } = useActiveMatch();
+  if (!active) return null;
+  return (
+    <p data-lobby-blocked className="text-muted text-sm">
+      {tm("lobbyBlocked")}
+    </p>
+  );
+}
 
 /**
  * The one button a waiting match offers someone else: Join an open match,
@@ -29,6 +42,10 @@ export function LobbyAction({
   const te = useTranslations();
   const router = useRouter();
   const utils = api.useUtils();
+  // In a match already: joining and asking are refused (one at a time), so
+  // they are not offered. Withdrawing a request still is.
+  const { active } = useActiveMatch();
+  const blocked = active !== null;
 
   // Both views read the request state from their own query; refreshing both
   // is cheaper than knowing which one this button sits in.
@@ -59,7 +76,7 @@ export function LobbyAction({
       <button
         type="button"
         data-request-state="open"
-        disabled={join.isPending}
+        disabled={blocked || join.isPending}
         onClick={() => join.mutate({ matchId })}
         className="bg-accent text-on-accent rounded px-3 py-2 text-sm disabled:opacity-50"
       >
@@ -97,7 +114,7 @@ export function LobbyAction({
       <button
         type="button"
         data-request-state="none"
-        disabled={requestJoin.isPending}
+        disabled={blocked || requestJoin.isPending}
         onClick={() => requestJoin.mutate({ matchId })}
         className="bg-accent text-on-accent rounded px-3 py-2 text-sm disabled:opacity-50"
       >

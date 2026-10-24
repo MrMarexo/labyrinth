@@ -57,6 +57,8 @@
     "moveOutOfOrder": "Ťah prišiel mimo poradia. Váš pohľad bol obnovený.",
     "notYourMatch": "Tento zápas nie je váš.",
     "alreadyWaiting": "Už máte zápas, ktorý čaká na súpera.",
+    "alreadyActive": "Už ste v zápase. Ďalší môžete založiť alebo sa k nemu pripojiť, keď v ňom dokončíte svoj beh.",
+    "requesterActive": "Tento hráč sa medzitým pripojil k inému zápasu.",
     "matchLocked": "Tento zápas je zamknutý. Požiadajte o pripojenie.",
     "matchNotLocked": "Tento zápas je otvorený, môžete sa pripojiť priamo.",
     "requestDeclined": "Vašu žiadosť o pripojenie zamietli.",
@@ -85,6 +87,8 @@
     "new": "Nové bludisko",
     "name": "Názov",
     "squares": "Políčka",
+    "size": "Veľkosť",
+    "sizeOption": "{cells, plural, one {# políčko} few {# políčka} other {# políčok}}",
     "gates": "Brány",
     "create": "Vytvoriť",
     "empty": "Zatiaľ ste nenakreslili žiadne bludisko.",
@@ -143,7 +147,11 @@
     "accessLocked": "Zamknutý",
     "accessLockedHint": "Hráči požiadajú o pripojenie a vy vyberiete. Odkaz pošlite kamarátovi.",
     "alreadyWaiting": "Už máte zápas, ktorý čaká na súpera. Ďalší môžete založiť, keď sa začne alebo skončí.",
-    "alreadyWaitingLink": "Prejsť na čakajúci zápas"
+    "alreadyWaitingLink": "Prejsť na čakajúci zápas",
+    "alreadyActive": "Práve hráte zápas. Ďalší môžete založiť, keď v ňom dokončíte svoj beh.",
+    "currentHeading": "Váš aktuálny zápas",
+    "continue": "Pokračovať",
+    "lobbyBlocked": "K zápasu sa môžete pripojiť, keď dokončíte svoj beh v aktuálnom."
   },
   "maze": {
     "format": {
@@ -174,7 +182,9 @@
       "gateWithTwoKeys": "Brána <dot>{gate}</dot> má viac než jeden kľúč.",
       "keyWithoutGate": "Existuje kľúč od brány <dot>{gate}</dot>, ale taká brána neexistuje.",
       "treasureUnreachable": "Zo štartu sa k pokladu nedá dostať.",
-      "incomplete": "Umiestnite štart a poklad a bude hotovo."
+      "missingGates": "Umiestnite ešte {missing, plural, one {# bránu} few {# brány} other {# brán}}.",
+      "missingStart": "Umiestnite štart.",
+      "missingTreasure": "Umiestnite poklad."
     }
   },
   "editor": {
@@ -192,6 +202,8 @@
     "shapeToolsLabel": "Nástroj tvaru",
     "paint": "Kresliť",
     "eraseCell": "Zmazať políčko",
+    "brushLabel": "Veľkosť štetca",
+    "brushSize": "Štetec {size} × {size}",
     "budget": "{used} / {budget} políčok",
     "detailToolsLabel": "Nástroj detailov",
     "wall": "Stena",
@@ -293,6 +305,8 @@
     "announceKey": "Našli ste kľúč {gate}.",
     "announceThroughGate": "Otvorili ste bránu {gate}.",
     "announceTreasure": "Našli ste poklad!",
+    "foundKey": "Našli ste kľúč",
+    "foundGate": "Našli ste bránu",
     "finishedWaiting": "Našli ste poklad s {penalties, plural, one {# nárazom} few {# nárazmi} other {# nárazmi}} za {moves, plural, one {# ťah} few {# ťahy} other {# ťahov}}. Výsledok uvidíte, keď súper dobehne do cieľa alebo mu vyprší čas.",
     "giveUp": "Vzdať sa",
     "confirmGiveUp": "Vzdať sa? {name} okamžite vyhráva a nedá sa to vrátiť späť.",

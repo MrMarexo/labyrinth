@@ -1,4 +1,5 @@
 import type { TranslatableIssue } from "~/lib/issues";
+import type { DraftMaze } from "./draft";
 import { MAX_BOUNDING_BOX, type Maze } from "./format";
 import { cellKey, edgeKey, step } from "./geometry";
 
@@ -35,9 +36,48 @@ export const MAZE_ISSUE_KEYS = [
   "maze.validate.gateWithTwoKeys",
   "maze.validate.keyWithoutGate",
   "maze.validate.treasureUnreachable",
+  "maze.validate.missingGates",
+  "maze.validate.missingStart",
+  "maze.validate.missingTreasure",
 ] as const;
 
 export type MazeIssueKey = (typeof MAZE_ISSUE_KEYS)[number];
+
+/**
+ * What a draft with no start or no treasure still lacks — the author's
+ * to-do list until there is a `Maze` for `validateMaze` to check. Covers
+ * only what is missing, not what is wrong: the full rules run once the
+ * start and treasure are both down.
+ */
+export function incompleteDraftIssues(
+  draft: DraftMaze,
+  settings: MazeSettings,
+): TranslatableIssue[] {
+  const issues: TranslatableIssue[] = [];
+  const add = (key: MazeIssueKey, params?: Record<string, string | number>) =>
+    issues.push(params ? { key, params } : { key });
+
+  if (draft.cells.length !== settings.cellCount) {
+    add("maze.validate.wrongCellCount", {
+      actual: draft.cells.length,
+      expected: settings.cellCount,
+    });
+  }
+
+  const gates = new Set(
+    draft.segments.flatMap((s) => (s.kind === "gate" ? [s.gate] : [])),
+  );
+  const missing = settings.gateCount - gates.size;
+  if (missing > 0) add("maze.validate.missingGates", { missing });
+  const keyed = new Set(draft.keys.map((k) => k.gate));
+  for (const gate of [...gates].sort((a, b) => a - b)) {
+    if (!keyed.has(gate)) add("maze.validate.gateWithoutKey", { gate });
+  }
+
+  if (draft.start === null) add("maze.validate.missingStart");
+  if (draft.treasure === null) add("maze.validate.missingTreasure");
+  return issues;
+}
 
 /**
  * The eleven structural rules from spec §4.1. Returns every issue it finds

@@ -46,6 +46,18 @@ async function savedMaze(
 
 const settings = { cellCount: 36 as const, gateCount: 0 };
 
+/**
+ * Ends a match outright, so its players may start another (one active match
+ * at a time). What the tests below care about is who submitted what, which
+ * this leaves alone.
+ */
+async function endMatch(matchId: string) {
+  await db
+    .update(match)
+    .set({ status: "abandoned", endReason: "abandoned", endedAt: new Date() })
+    .where(eq(match.id, matchId));
+}
+
 describe("match.create", () => {
   it("issues a code and seats the creator", async () => {
     const ctx = await signedIn();
@@ -147,13 +159,16 @@ describe("match.create access and the one-waiting rule", () => {
     expect(row?.status).toBe("abandoned");
   });
 
-  it("allows another match once the first has an opponent", async () => {
+  it("still refuses another match once the first has an opponent", async () => {
     const host = createCaller(await signedIn());
     const first = await host.match.create(settings);
     await createCaller(await signedIn()).match.join({ matchId: first.id });
 
-    const second = await host.match.create(settings);
-    expect(second.id).not.toBe(first.id);
+    // Drawing holds the player just as waiting did (one active match).
+    expect(await rejection(host.match.create(settings))).toEqual({
+      code: "CONFLICT",
+      message: "errors.alreadyActive",
+    });
   });
 });
 
@@ -304,8 +319,8 @@ describe("match.list", () => {
     const mineCtx = await signedIn();
     const mine = createCaller(mineCtx);
     const first = await mine.match.create(settings);
-    // Leaves `awaiting_opponent`, so the creator may open another match.
     await createCaller(await signedIn()).match.join({ matchId: first.id });
+    await endMatch(first.id);
     const second = await mine.match.create(settings);
     await createCaller(await signedIn()).match.create(settings);
 
@@ -582,6 +597,7 @@ describe("match.submitMaze", () => {
     await createCaller(await signedIn()).match.join({ matchId: first.id });
     const mazeId = await savedMaze(host, "Reused");
     await host.match.submitMaze({ matchId: first.id, mazeId });
+    await endMatch(first.id);
 
     const second = await host.match.create(settings);
     await createCaller(await signedIn()).match.join({ matchId: second.id });
@@ -609,6 +625,7 @@ describe("match.submitMaze", () => {
       matchId: first.id,
       mazeId: await savedMaze(rival, "Rival's own"),
     });
+    await endMatch(first.id);
 
     const second = await host.match.create(settings);
     await rival.match.join({ matchId: second.id });
@@ -731,6 +748,7 @@ describe("match.eligibleMazes", () => {
       matchId: first.id,
       mazeId: await savedMaze(rival, "Rival's own"),
     });
+    await endMatch(first.id);
 
     const second = await host.match.create(settings);
     await rival.match.join({ matchId: second.id });
@@ -937,6 +955,7 @@ describe("a deleted used labyrinth", () => {
       mazeId: await savedMaze(rival, "Rival's"),
     });
     await host.maze.remove({ id: mazeId });
+    await endMatch(first.id);
     return { host, mazeId };
   }
 

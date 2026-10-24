@@ -124,7 +124,10 @@ export async function createMatch(
 ): Promise<string> {
   await page.goto("/en/matches");
   await page.getByRole("radio", { name: `${options.cells} squares` }).click();
-  await page.getByLabel("Gates").fill(String(options.gates));
+  await page
+    .getByRole("radiogroup", { name: "Gates" })
+    .getByRole("radio", { name: String(options.gates), exact: true })
+    .click();
   if (options.access === "locked") {
     await page.getByRole("radio", { name: /^Locked/ }).click();
   }

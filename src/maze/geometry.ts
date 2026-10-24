@@ -44,6 +44,16 @@ export function edgeKey(e: Edge): string {
 
 const DIRECTIONS: readonly Direction[] = ["N", "S", "W", "E"];
 
+/** True when one of the edge's two cells is `at`. */
+export function edgeTouches(
+  edge: { o: Orientation; x: number; y: number },
+  at: Point,
+): boolean {
+  const here = { x: edge.x, y: edge.y };
+  const other = edge.o === "H" ? step(here, "S") : step(here, "E");
+  return cellKey(here) === cellKey(at) || cellKey(other) === cellKey(at);
+}
+
 /**
  * Every edge with exactly one painted side: the shape's outline, including
  * the border of any unpainted hole inside it. Edges on the frame border come

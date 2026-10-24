@@ -4,7 +4,7 @@ import { Lock } from "lucide-react";
 import { useFormatter, useNow, useTranslations } from "next-intl";
 import { useEffect, useRef } from "react";
 
-import { LobbyAction } from "~/components/match/lobby-action";
+import { LobbyAction, LobbyBlockedNote } from "~/components/match/lobby-action";
 import { POLL_MS } from "~/components/realtime/poll";
 import { useChannel } from "~/components/realtime/use-channel";
 import { useRouter } from "~/i18n/navigation";
@@ -89,6 +89,7 @@ export function LobbyList() {
   return (
     <section className="space-y-3">
       <h2 className="text-xl font-semibold">{t("heading")}</h2>
+      <LobbyBlockedNote />
       {!data || data.matches.length === 0 ? (
         <p data-lobby-empty className="text-muted text-sm">
           {t("empty")}

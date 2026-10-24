@@ -16,6 +16,38 @@
       transform: scale(1.35);
     }
   }
+
+  /* The bumped wall's thick copy, fading into the wall drawn under it. */
+  --animate-bump-wall: bump-wall 200ms ease-out forwards;
+
+  @keyframes bump-wall {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
+  }
+
+  /* A find notice: in quickly, held, out slowly. Matches FOUND_MS. It moves
+     by `transform`: Tailwind's centring uses `translate`, which this must
+     not override. */
+  --animate-found-toast: found-toast 2500ms ease-out forwards;
+
+  @keyframes found-toast {
+    0% {
+      opacity: 0;
+      transform: translateY(-0.25rem);
+    }
+    8%,
+    80% {
+      opacity: 1;
+      transform: none;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
 }
 
 :root {

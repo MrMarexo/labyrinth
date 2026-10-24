@@ -1,94 +1,76 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useRef, type KeyboardEvent } from "react";
 
+import { RadioButtons } from "~/components/radio-buttons";
 import { iconButtonClass, Tooltip } from "~/components/tooltip";
-import type { Tool } from "~/maze";
-import { ToolIcon } from "./tool-icons";
+import { BRUSH_SIZES, type BrushSize, type Tool } from "~/maze";
+import { BrushIcon, ToolIcon } from "./tool-icons";
 
 export type ShapeToolsProps = {
   tool: Tool;
   onTool: (tool: Tool) => void;
   used: number;
   budget: number;
+  brush: BrushSize;
+  onBrush: (brush: BrushSize) => void;
 };
 
 /** The two tools this palette offers, in display and arrow-key order. */
 const SHAPE_TOOLS: readonly Tool[] = ["paint", "erase-cell"];
 
-export function ShapeTools({ tool, onTool, used, budget }: ShapeToolsProps) {
+export function ShapeTools({
+  tool,
+  onTool,
+  used,
+  budget,
+  brush,
+  onBrush,
+}: ShapeToolsProps) {
   const t = useTranslations("editor");
-  const buttonRefs = useRef(new Map<Tool, HTMLButtonElement>());
 
-  function labelFor(option: Tool): string {
+  function toolLabel(option: Tool): string {
     return option === "paint" ? t("paint") : t("eraseCell");
   }
-
-  // `tool` is shared with Task 6's detail palette, so it can hold a value
-  // neither of these two buttons represents (e.g. "wall"). The group still
-  // needs exactly one tab stop — the same rule a native radio group follows
-  // when none of its inputs is checked — so the first option is the fallback
-  // stop rather than leaving the group untabbable.
-  const activeIndex = SHAPE_TOOLS.indexOf(tool);
-  const tabStopIndex = activeIndex === -1 ? 0 : activeIndex;
-
-  // A native radio group moves both focus and the checked state together on
-  // an arrow key, regardless of the group's visual orientation — all four
-  // arrow keys cycle, not just the two matching this row's layout. Selecting
-  // also moves DOM focus to the newly active button, so the roving tabIndex
-  // below and the actual focus target never disagree.
-  function handleKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
-    let nextIndex: number;
-    switch (event.key) {
-      case "ArrowRight":
-      case "ArrowDown":
-        nextIndex = (tabStopIndex + 1) % SHAPE_TOOLS.length;
-        break;
-      case "ArrowLeft":
-      case "ArrowUp":
-        nextIndex =
-          (tabStopIndex - 1 + SHAPE_TOOLS.length) % SHAPE_TOOLS.length;
-        break;
-      default:
-        return;
-    }
-    event.preventDefault();
-    const next = SHAPE_TOOLS[nextIndex]!;
-    onTool(next);
-    buttonRefs.current.get(next)?.focus();
+  function brushLabel(size: BrushSize): string {
+    return t("brushSize", { size });
   }
 
   return (
     <div className="space-y-3">
-      <div
-        role="radiogroup"
-        aria-label={t("shapeToolsLabel")}
-        className="flex gap-2"
-      >
-        {SHAPE_TOOLS.map((option, index) => {
-          const active = tool === option;
-          return (
-            <button
-              key={option}
-              ref={(el) => {
-                if (el) buttonRefs.current.set(option, el);
-                else buttonRefs.current.delete(option);
-              }}
-              type="button"
-              role="radio"
-              aria-checked={active}
-              tabIndex={index === tabStopIndex ? 0 : -1}
-              onClick={() => onTool(option)}
-              onKeyDown={handleKeyDown}
-              aria-label={labelFor(option)}
-              className={iconButtonClass(active)}
-            >
+      <div className="flex flex-wrap gap-4">
+        {/* `tool` is shared with the detail palette, so it can hold a value
+            neither button represents; RadioButtons keeps a tab stop anyway. */}
+        <RadioButtons
+          aria-label={t("shapeToolsLabel")}
+          options={SHAPE_TOOLS}
+          value={tool}
+          onChange={onTool}
+          optionLabel={toolLabel}
+          renderOption={(option) => (
+            <>
               <ToolIcon tool={option} />
-              <Tooltip label={labelFor(option)} />
-            </button>
-          );
-        })}
+              <Tooltip label={toolLabel(option)} />
+            </>
+          )}
+          buttonClass={iconButtonClass}
+          className="flex gap-2"
+        />
+        <RadioButtons
+          aria-label={t("brushLabel")}
+          options={BRUSH_SIZES}
+          value={brush}
+          onChange={onBrush}
+          optionLabel={brushLabel}
+          renderOption={(size) => (
+            <>
+              <BrushIcon size={size} />
+              <Tooltip label={brushLabel(size)} />
+            </>
+          )}
+          buttonClass={iconButtonClass}
+          className="flex gap-2"
+        />
       </div>
 
       <p data-budget className="text-sm">

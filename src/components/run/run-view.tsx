@@ -6,11 +6,13 @@ import { useEffect, useState } from "react";
 import { gateColour } from "~/components/editor/gate-colours";
 import { isTypingTarget } from "~/components/keyboard";
 import { useChannel } from "~/components/realtime/use-channel";
+import { FoundToast, type Found } from "~/components/run/found-toast";
 import { RunBoard, type Bump } from "~/components/run/run-board";
 import { useMoveQueue, type DeltaKind } from "~/components/run/use-move-queue";
 import { Link } from "~/components/link";
 import { resolveErrorKey } from "~/lib/resolve-error-key";
 import {
+  discovery,
   heldKeys,
   recordDelta,
   type Direction,
@@ -68,6 +70,7 @@ export function RunView({
   useChannel(runChannel, { onMembers: setMembers });
   const watchers = Math.max(0, members - 1);
   const [bump, setBump] = useState<Bump | null>(null);
+  const [found, setFound] = useState<Found | null>(null);
   const [announcement, setAnnouncement] = useState("");
   const [confirming, setConfirming] = useState(false);
   // The match is `running` until the sweep closes it, so a refused move past
@@ -106,6 +109,15 @@ export function RunView({
   }
 
   const onDelta = (delta: RunnerDelta, kind: DeltaKind, matchOver: boolean) => {
+    const before = utils.run.get.getData({ matchId });
+    const newlyFound =
+      // The finishing move opens the finish popup instead.
+      kind !== "confirmed" &&
+      !delta.finished &&
+      before &&
+      before.moves < delta.moves
+        ? discovery(before.map, delta)
+        : null;
     utils.run.get.setData({ matchId }, (old) => {
       // Already drawn: a confirmed prediction, or an answer a refetch beat.
       if (!old || old.moves >= delta.moves) return old;
@@ -123,6 +135,7 @@ export function RunView({
     });
     if (kind === "confirmed") return;
     setAnnouncement(announce(delta));
+    if (newlyFound) setFound({ ...newlyFound, id: delta.moves });
     if (delta.outcome.startsWith("blocked") && delta.revealedSegment) {
       setBump({ segment: delta.revealedSegment, id: delta.moves });
     }
@@ -251,13 +264,16 @@ export function RunView({
         <p aria-live="polite" data-run-announcement className="sr-only">
           {announcement}
         </p>
-        <RunBoard
-          map={data.map}
-          at={data.at}
-          heldKeys={data.heldKeys}
-          bump={bump}
-          lean={lean}
-        />
+        <div className="relative">
+          <RunBoard
+            map={data.map}
+            at={data.at}
+            heldKeys={data.heldKeys}
+            bump={bump}
+            lean={lean}
+          />
+          <FoundToast found={found} />
+        </div>
         <p className="text-muted text-sm">{t("hint")}</p>
       </div>
 

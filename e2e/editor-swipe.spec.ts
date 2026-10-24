@@ -23,6 +23,67 @@ test.describe("drawing with a swipe", () => {
     await expect(page.getByRole("button", { name: "Undo" })).toBeDisabled();
   });
 
+  test("a drag saves once, after the release, even when it pauses mid-stroke", async ({
+    page,
+  }) => {
+    await signUpAndOpenNewMaze(page);
+    let saves = 0;
+    page.on("request", (r) => {
+      if (r.url().includes("/api/trpc/maze.saveDraft")) saves += 1;
+    });
+
+    const a = await centre(cell(page, 0, 0));
+    const b = await centre(cell(page, 3, 0));
+    const c = await centre(cell(page, 6, 0));
+    await page.mouse.move(a.x, a.y);
+    await page.mouse.down();
+    await page.mouse.move(b.x, b.y, { steps: 8 });
+    // Longer than the autosave debounce, with the button still down.
+    await page.waitForTimeout(1500);
+    expect(saves).toBe(0);
+
+    const saved = page.waitForResponse((r) =>
+      r.url().includes("/api/trpc/maze.saveDraft"),
+    );
+    await page.mouse.move(c.x, c.y, { steps: 8 });
+    await page.mouse.up();
+    await saved;
+    await page.waitForTimeout(1500);
+    expect(saves).toBe(1);
+  });
+
+  test("the 2×2 brush paints and erases a block per square, one Undo per drag", async ({
+    page,
+  }) => {
+    await signUpAndOpenNewMaze(page);
+    await page.getByRole("radio", { name: "Brush 2 × 2" }).click();
+
+    // Each square the drag crosses stamps it and its right and lower
+    // neighbours: two full rows, x 0 to 4.
+    await drag(page, cell(page, 0, 0), cell(page, 3, 0));
+    await expect(page.locator("[data-budget]")).toHaveText("10 / 36 squares");
+    for (const [x, y] of [
+      [4, 0],
+      [0, 1],
+      [4, 1],
+    ] as const) {
+      await expect(cell(page, x, y)).toHaveAttribute(
+        "aria-label",
+        /, painted$/,
+      );
+    }
+
+    await page.getByRole("radio", { name: "Erase square" }).click();
+    await cell(page, 0, 0).click();
+    await expect(page.locator("[data-budget]")).toHaveText("6 / 36 squares");
+
+    // The tap was one undo step, and so was the whole drag.
+    await page.getByRole("button", { name: "Undo" }).click();
+    await expect(page.locator("[data-budget]")).toHaveText("10 / 36 squares");
+    await page.getByRole("button", { name: "Undo" }).click();
+    await expect(page.locator("[data-budget]")).toHaveText("0 / 36 squares");
+  });
+
   test("a wall drag lays a wall on every edge it follows, and a drag starting on a wall removes them", async ({
     page,
   }) => {
@@ -73,6 +134,55 @@ test.describe("drawing with a swipe", () => {
     await expect(page.locator("[data-segment]")).toHaveCount(2);
     await expect(page.locator('[data-segment="H:0,0"]')).toHaveCount(1);
     await expect(page.locator('[data-segment="H:5,0"]')).toHaveCount(1);
+  });
+
+  test("the eraser on a square's middle clears the walls round it and what sits on it", async ({
+    page,
+  }) => {
+    await signUpAndOpenNewMaze(page);
+    await drag(page, cell(page, 0, 0), cell(page, 5, 0));
+    await drag(page, cell(page, 0, 1), cell(page, 5, 1));
+
+    await page.getByRole("radio", { name: "Wall" }).click();
+    const edge = (name: string) => page.locator(`[data-edge="${name}"]`);
+    await edge("H:2,0").click();
+    await edge("V:2,0").click();
+    await edge("H:4,0").click();
+    await page.getByRole("radio", { name: "Start", exact: true }).click();
+    await cell(page, 2, 0).click();
+
+    await page.getByRole("radio", { name: "Erase", exact: true }).click();
+    // Dead centre: too far from any edge to hit one, so it lands on the square.
+    const middle = await centre(cell(page, 2, 0));
+    await page.mouse.click(middle.x, middle.y);
+
+    // Both walls on (2,0)'s sides are gone; the one elsewhere stays.
+    await expect(page.locator("[data-segment]")).toHaveCount(1);
+    await expect(page.locator('[data-segment="H:4,0"]')).toHaveCount(1);
+    await expect(cell(page, 2, 0)).toHaveAttribute("aria-label", /, painted$/);
+    await expect(page.locator("[data-start]")).toHaveCount(0);
+  });
+
+  test("an eraser drag through squares takes what sits on them, not the walls along them", async ({
+    page,
+  }) => {
+    await signUpAndOpenNewMaze(page);
+    await drag(page, cell(page, 0, 0), cell(page, 5, 0));
+    await drag(page, cell(page, 0, 1), cell(page, 5, 1));
+
+    await page.getByRole("radio", { name: "Wall" }).click();
+    const edge = (name: string) => page.locator(`[data-edge="${name}"]`);
+    await edge("H:1,0").click();
+    await edge("H:3,0").click();
+    await page.getByRole("radio", { name: "Start", exact: true }).click();
+    await cell(page, 2, 0).click();
+
+    // Along row 0's centres: over the start, alongside both walls.
+    await page.getByRole("radio", { name: "Erase", exact: true }).click();
+    await drag(page, cell(page, 0, 0), cell(page, 4, 0));
+
+    await expect(page.locator("[data-start]")).toHaveCount(0);
+    await expect(page.locator("[data-segment]")).toHaveCount(2);
   });
 
   test("painting stops at the square budget", async ({ page }) => {

@@ -13,13 +13,6 @@ import {
 import { api } from "~/trpc/react";
 
 /**
- * One move waiting behind an unknown edge's answer. Key auto-repeat fires
- * every ~30ms, far faster than a round trip; a deeper queue would keep the
- * runner walking for a second after the key was released (spec §7.3).
- */
-const MAX_WAITING = 1;
-
-/**
  * How far known-passage moves may run ahead of the server. Each is certain,
  * but each is still a request, and a held key in a long known corridor
  * should not pile up more than a few.
@@ -53,8 +46,9 @@ type Outgoing = { seq: number; dir: Direction; predicted: RunnerDelta | null };
  * A move through a known passage is certain (`predictMove`), so it is drawn
  * at once and sent behind; the server's answer only has to agree. Any other
  * move is drawn only once the server answers (§7.3) — the runner leans
- * toward it meanwhile (`lean`), which is cosmetic — and nothing after it can
- * be predicted until then, because where the runner stands depends on it.
+ * toward it meanwhile (`lean`), which is cosmetic — and input is ignored
+ * until then: where the runner stands depends on the answer, and a move
+ * pressed blind would play out after the player has seen what happened.
  *
  * Any disagreement or refusal drops everything queued, refetches `run.get`
  * and re-seeds `seq` from the server's `nextSeq`.
@@ -68,7 +62,6 @@ export function useMoveQueue(
   const utils = api.useUtils();
   const move = api.run.move.useMutation();
   const outbox = useRef<Outgoing[]>([]);
-  const waiting = useRef<Direction[]>([]);
   // An unpredicted move is queued or in flight: nothing can be predicted
   // past it.
   const unresolved = useRef(false);
@@ -100,7 +93,6 @@ export function useMoveQueue(
     resyncing.current = true;
     drawn.current = [];
     outbox.current = [];
-    waiting.current = [];
     unresolved.current = false;
     setLean(null);
     latest.current.handlers.onResync();
@@ -113,8 +105,7 @@ export function useMoveQueue(
     }
   }, [matchId, utils]);
 
-  // `commit` starts the pump and the pump commits the next waiting move, so
-  // one of them reaches the other through a ref.
+  // `commit` starts the pump, which is defined after it.
   const pumpRef = useRef<() => Promise<void>>(async () => undefined);
 
   const commit = useCallback((dir: Direction) => {
@@ -166,9 +157,6 @@ export function useMoveQueue(
         setLean(null);
         remember(result.delta);
         onDelta(result.delta, "answered", result.matchOver);
-        if (result.delta.finished || result.matchOver) waiting.current = [];
-        const next = waiting.current.shift();
-        if (next) commit(next);
       }
       if (result.matchOver) {
         // Predictions queued behind this move were drawn but never sent.
@@ -196,13 +184,12 @@ export function useMoveQueue(
       drawn.current = [];
       void utils.run.get.invalidate({ matchId });
       outbox.current = [];
-      waiting.current = [];
       unresolved.current = false;
       setLean(null);
       latest.current.handlers.onMatchOver(failed);
     }
     void pump();
-  }, [matchId, move, utils, resync, commit]);
+  }, [matchId, move, utils, resync]);
 
   useEffect(() => {
     pumpRef.current = pump;
@@ -210,11 +197,7 @@ export function useMoveQueue(
 
   const enqueue = useCallback(
     (dir: Direction) => {
-      if (resyncing.current) return;
-      if (unresolved.current) {
-        if (waiting.current.length < MAX_WAITING) waiting.current.push(dir);
-        return;
-      }
+      if (resyncing.current || unresolved.current) return;
       if (outbox.current.length >= MAX_AHEAD) return;
       commit(dir);
     },

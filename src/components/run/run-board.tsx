@@ -43,7 +43,8 @@ const LEAN_MS = 90;
 const SETTLE_MS = 120;
 const PULSE_MS = 200;
 const ZOOM_MS = 200;
-/** Something already found: a key picked up, the treasure reached. */
+/** Something already found or left behind: a key picked up, the treasure
+ * reached, the start door. */
 const TAKEN_OPACITY = 0.15;
 
 const LEAN_VECTOR: Record<Direction, Point> = {
@@ -276,8 +277,15 @@ export function RunBoard({ map, at, heldKeys, bump, lean }: RunBoardProps) {
         </g>
       ))}
 
-      {/* The run starts at the origin: discovered coordinates are relative. */}
-      <StartIcon x={0} y={0} size={CELL_PX} />
+      {/* The run starts at the origin: discovered coordinates are relative.
+          Faint like the taken markers, so the runner reads on top of it. */}
+      <StartIcon
+        x={0}
+        y={0}
+        size={CELL_PX}
+        opacity={TAKEN_OPACITY}
+        data-run-start=""
+      />
 
       {untestedEdges(map).map((e) => (
         <line
@@ -296,7 +304,18 @@ export function RunBoard({ map, at, heldKeys, bump, lean }: RunBoardProps) {
         drawSegment(s, `seg-${edgeKey(s)}`, { strokeWidth: 4, hook: true }),
       )}
 
-      {bump && drawSegment(bump.segment, "bump", { strokeWidth: 6 })}
+      {/* Only while pulsing: left on, the thick copy would keep the wall
+          swollen until the next bump. */}
+      {bump && pulsing && (
+        <g
+          key={bump.id}
+          data-bump-wall=""
+          aria-hidden="true"
+          className="motion-safe:animate-bump-wall"
+        >
+          {drawSegment(bump.segment, "bump", { strokeWidth: 6 })}
+        </g>
+      )}
 
       <g
         aria-hidden="true"

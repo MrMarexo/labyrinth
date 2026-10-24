@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 
-import type { Tool } from "~/maze";
+import type { BrushSize, Tool } from "~/maze";
 
 /**
  * Palette icons, one per tool. Key, start and treasure are the glyphs the
@@ -54,6 +54,24 @@ function Glyph({ children }: { children: ReactNode }) {
     >
       {children}
     </svg>
+  );
+}
+
+/** One square, or a 2×2 block of them: the squares a brush stamp covers. */
+export function BrushIcon({ size }: { size: BrushSize }) {
+  return (
+    <Glyph>
+      {size === 1 ? (
+        <rect x={7} y={7} width={10} height={10} rx={1.5} />
+      ) : (
+        <>
+          <rect x={3} y={3} width={8} height={8} rx={1.5} />
+          <rect x={13} y={3} width={8} height={8} rx={1.5} />
+          <rect x={3} y={13} width={8} height={8} rx={1.5} />
+          <rect x={13} y={13} width={8} height={8} rx={1.5} />
+        </>
+      )}
+    </Glyph>
   );
 }
 

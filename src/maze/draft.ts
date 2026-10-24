@@ -45,10 +45,6 @@ export function emptyDraft(): DraftMaze {
   };
 }
 
-/** Emitted by the router and the editor when a draft has no start or
- * treasure yet — kept here since `draftToMaze` is what decides completeness. */
-export const INCOMPLETE_DRAFT_KEY = "maze.validate.incomplete";
-
 /**
  * Upgrades a draft to a `Maze`, or returns null when it is not yet complete.
  * This is a shape conversion only — it says nothing about whether the maze is

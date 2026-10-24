@@ -57,6 +57,8 @@
     "moveOutOfOrder": "That move arrived out of order. Your view has been refreshed.",
     "notYourMatch": "That match is not yours.",
     "alreadyWaiting": "You already have a match waiting for an opponent.",
+    "alreadyActive": "You are already in a match. You can start or join another once your run in it is over.",
+    "requesterActive": "That player has joined another match in the meantime.",
     "matchLocked": "That match is locked. Ask to join instead.",
     "matchNotLocked": "That match is open, so you can join it directly.",
     "requestDeclined": "Your request to join was declined.",
@@ -85,6 +87,8 @@
     "new": "New labyrinth",
     "name": "Name",
     "squares": "Squares",
+    "size": "Size",
+    "sizeOption": "{cells, plural, one {# square} other {# squares}}",
     "gates": "Gates",
     "create": "Create",
     "empty": "You have not drawn any labyrinths yet.",
@@ -143,7 +147,11 @@
     "accessLocked": "Locked",
     "accessLockedHint": "Players ask to join and you choose. Share the link with a friend.",
     "alreadyWaiting": "You already have a match waiting for an opponent. You can start another once it begins or ends.",
-    "alreadyWaitingLink": "Go to your waiting match"
+    "alreadyWaitingLink": "Go to your waiting match",
+    "alreadyActive": "You are in a match right now. You can start another once your run in it is over.",
+    "currentHeading": "Your current match",
+    "continue": "Continue",
+    "lobbyBlocked": "You can join a match once your run in the current one is over."
   },
   "maze": {
     "format": {
@@ -174,7 +182,9 @@
       "gateWithTwoKeys": "Gate <dot>{gate}</dot> has more than one key.",
       "keyWithoutGate": "There is a key for gate <dot>{gate}</dot>, but no such gate.",
       "treasureUnreachable": "There is no route from the start to the treasure.",
-      "incomplete": "Place a start and a treasure to finish."
+      "missingGates": "Place {missing, plural, one {# more gate} other {# more gates}}.",
+      "missingStart": "Place the start.",
+      "missingTreasure": "Place the treasure."
     }
   },
   "editor": {
@@ -192,6 +202,8 @@
     "shapeToolsLabel": "Shape tool",
     "paint": "Paint",
     "eraseCell": "Erase square",
+    "brushLabel": "Brush size",
+    "brushSize": "Brush {size} × {size}",
     "budget": "{used} / {budget} squares",
     "detailToolsLabel": "Detail tool",
     "wall": "Wall",
@@ -293,6 +305,8 @@
     "announceKey": "You found key {gate}.",
     "announceThroughGate": "You opened gate {gate}.",
     "announceTreasure": "You found the treasure!",
+    "foundKey": "Key found",
+    "foundGate": "Gate found",
     "finishedWaiting": "You found the treasure with {penalties, plural, one {# bump} other {# bumps}} in {moves, plural, one {# move} other {# moves}}. The result is revealed once your opponent finishes or runs out of time.",
     "giveUp": "Give up",
     "confirmGiveUp": "Give up? {name} wins immediately, and this cannot be undone.",

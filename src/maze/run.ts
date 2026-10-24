@@ -102,6 +102,33 @@ export function recordDelta(
   return { cells, segments, passages };
 }
 
+/** Something a move showed the runner for the first time. */
+export type Discovery = { kind: "key" | "gate"; gate: number };
+
+/**
+ * What `delta` found that `map` (the runner's map before it) did not hold: a
+ * key not yet held, or a gate not yet seen, bumped or walked through. A
+ * revisit or a second bump finds nothing, though the reducer reports a key
+ * cell's key on every visit.
+ */
+export function discovery(
+  map: DiscoveredMap,
+  delta: RunnerDelta,
+): Discovery | null {
+  const key = delta.revealedCell?.key;
+  if (key !== undefined && !heldKeys(map).includes(key)) {
+    return { kind: "key", gate: key };
+  }
+  const segment = delta.revealedSegment;
+  if (
+    segment?.kind === "gate" &&
+    !map.segments.some((s) => edgeKey(s) === edgeKey(segment))
+  ) {
+    return { kind: "gate", gate: segment.gate };
+  }
+  return null;
+}
+
 /**
  * Keys are acquired by stepping onto them, and stepping onto a cell reveals
  * it with its key, so the keys held are exactly the keys on revealed cells.

@@ -6,6 +6,7 @@ import { cellKey, edgeBetween, edgeKey, step } from "~/maze/geometry";
 import { applyMove, initialRunState } from "~/maze/reduce";
 import {
   advanceRun,
+  discovery,
   emptyMap,
   freshRun,
   heldKeys,
@@ -238,5 +239,46 @@ describe("the map holds nothing the runner has not touched", () => {
         },
       ),
     );
+  });
+});
+
+describe("discovery", () => {
+  /** What each move of `dirs` discovered, against the map before it. */
+  function discoveries(dirs: readonly Direction[]) {
+    let map = emptyMap();
+    return walk(corridor(), dirs).deltas.map((delta) => {
+      const found = discovery(map, delta);
+      map = recordDelta(map, delta);
+      return found;
+    });
+  }
+
+  it("finds a key on the first visit only", () => {
+    expect(discoveries(["W", "E", "W"])).toEqual([
+      { kind: "key", gate: 1 },
+      null,
+      null,
+    ]);
+  });
+
+  it("finds a gate on the first bump only", () => {
+    expect(discoveries(["E", "E"])).toEqual([{ kind: "gate", gate: 1 }, null]);
+  });
+
+  it("finds a gate first walked through with its key", () => {
+    expect(discoveries(["W", "E", "E"])).toEqual([
+      { kind: "key", gate: 1 },
+      null,
+      { kind: "gate", gate: 1 },
+    ]);
+  });
+
+  it("does not find an already bumped gate again when opening it", () => {
+    expect(discoveries(["E", "W", "E", "E"])).toEqual([
+      { kind: "gate", gate: 1 },
+      { kind: "key", gate: 1 },
+      null,
+      null,
+    ]);
   });
 });

@@ -16,15 +16,19 @@ export type IconProps = Omit<SVGProps<SVGGElement>, "x" | "y"> & {
   size: number;
 };
 
-/** A lucide glyph's box inside its square: 70% of it, centred. */
-function glyphBox(x: number, y: number, size: number) {
+/** A lucide glyph's box inside its square: `scale` of it, centred. */
+function glyphBox(x: number, y: number, size: number, scale = 0.7) {
+  const inset = (1 - scale) / 2;
   return {
-    x: (x + 0.15) * size,
-    y: (y + 0.15) * size,
-    width: size * 0.7,
-    height: size * 0.7,
+    x: (x + inset) * size,
+    y: (y + inset) * size,
+    width: size * scale,
+    height: size * scale,
   };
 }
+
+/** Keys sit a little smaller than the other markers. */
+const KEY_SCALE = 0.55;
 
 export function KeyIcon({
   x,
@@ -36,7 +40,7 @@ export function KeyIcon({
   return (
     <g {...rest} aria-hidden="true">
       <Key
-        {...glyphBox(x, y, size)}
+        {...glyphBox(x, y, size, KEY_SCALE)}
         aria-hidden="true"
         strokeWidth={2.5}
         style={{ color: gateColour(gate) }}
@@ -71,11 +75,7 @@ export function TreasureIcon({ x, y, size, ...rest }: IconProps) {
   );
 }
 
-/**
- * The runner: a person, no disc. A thick stroke in the background colour is
- * drawn under the glyph so the figure stays readable on top of the start
- * door and on any square, without a circle behind it.
- */
+/** The runner: a person, a little larger than the other markers. */
 export function RunnerIcon({ x, y, size, ...rest }: IconProps) {
   const box = {
     x: (x + 0.1) * size,
@@ -85,12 +85,6 @@ export function RunnerIcon({ x, y, size, ...rest }: IconProps) {
   };
   return (
     <g {...rest} aria-hidden="true">
-      <PersonStanding
-        {...box}
-        aria-hidden="true"
-        strokeWidth={5}
-        className="text-bg"
-      />
       <PersonStanding
         {...box}
         aria-hidden="true"

@@ -1,9 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useState } from "react";
 
-import { ConfirmUse } from "~/components/match/confirm-use";
 import { useRouter } from "~/i18n/navigation";
 import { resolveErrorKey } from "~/lib/resolve-error-key";
 import { api } from "~/trpc/react";
@@ -11,24 +9,24 @@ import { api } from "~/trpc/react";
 /**
  * The editor's way back to the match it was opened from (spec §10.2):
  * once the maze is valid and saved, submit it there and return to the
- * match, which shows the lobby or the run.
+ * match, which shows the lobby or the run. No confirmation step: the
+ * author opened the editor to draw for this match, so asking again is
+ * redundant.
  */
 export function UseInMatch({
   mazeId,
-  name,
   match,
   ready,
 }: {
   mazeId: string;
-  name: string;
   match: { id: string; code: string };
   ready: boolean;
 }) {
   const t = useTranslations("editor");
+  const tl = useTranslations("lobby");
   const te = useTranslations();
   const router = useRouter();
   const utils = api.useUtils();
-  const [confirming, setConfirming] = useState(false);
   const submit = api.match.submitMaze.useMutation({
     onSuccess: async () => {
       await Promise.all([
@@ -46,25 +44,15 @@ export function UseInMatch({
 
   return (
     <div className="space-y-2">
-      {confirming ? (
-        <ConfirmUse
-          name={name}
-          pending={pending}
-          ready={ready}
-          onConfirm={() => submit.mutate({ matchId: match.id, mazeId })}
-          onCancel={() => setConfirming(false)}
-        />
-      ) : (
-        <button
-          type="button"
-          data-use-in-match
-          disabled={!ready}
-          onClick={() => setConfirming(true)}
-          className="bg-accent text-on-accent rounded px-3 py-2 text-sm disabled:opacity-50"
-        >
-          {t("useInMatch")}
-        </button>
-      )}
+      <button
+        type="button"
+        data-use-in-match
+        disabled={!ready || pending}
+        onClick={() => submit.mutate({ matchId: match.id, mazeId })}
+        className="bg-accent text-on-accent rounded px-3 py-2 text-sm disabled:opacity-50"
+      >
+        {pending ? tl("submitting") : t("useInMatch")}
+      </button>
       {error && (
         <p role="alert" data-submit-error className="text-danger text-sm">
           {te(error.key as never, error.params as never)}

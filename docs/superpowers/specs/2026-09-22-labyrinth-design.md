@@ -143,9 +143,12 @@ reuse a maze they have already drawn.
 
 ### 3.3 Limits
 
-- `cellCount` presets: 36, 64, 100, 144. Set per match.
-- `gateCount`: 0–8. Set per match. The cap keeps the solver's state space small
-  (§4.2).
+- `cellCount` presets: 36, 64, 100, 144, 196, 256. Set per match. 256 fills
+  the whole 16 × 16 frame, so at that size the shape is fixed and only the
+  walls, gates and keys are the author's.
+- `gateCount`: 0–5. Set per match. The format still accepts gate ids up to 8
+  (the original cap, which keeps the solver's state space small, §4.2), so
+  mazes saved before the cap was lowered still parse.
 - Bounding box of the drawn shape: at most 16 × 16.
 
 The 16 × 16 cap is set by the desktop board, not by storage. Wall edges need a
@@ -295,7 +298,17 @@ the match's requests. `match.access` is chosen at creation and never changes.
 A partial unique index on `match(createdById) WHERE status = 'awaiting_opponent'`
 allows each player one waiting match; `match.create` checks first for the
 friendly error, and abandons the caller's own expired waiting match so the
-daily sweep's lag never blocks a new one. `match.code` is now only a label
+daily sweep's lag never blocks a new one.
+
+Beyond that, a player is in **one match at a time** (`holdsPlayer` in
+`src/match/active.ts`): one waiting for an opponent, one they are drawing in
+(submitted or not), or one running while their own run is unfinished. Once
+they have found the treasure, given up or timed out they are free, even while
+the opponent is still solving. `create`, `join`, `requestJoin` and
+`acceptRequest` (for the requester) refuse otherwise, each under a
+per-player advisory lock so two concurrent joins cannot both pass. The
+matches page shows the holding match in a highlighted card at the top and
+first in the list. `match.code` is now only a label
 (the editor names a draft after it, lists tell matches apart by it); nothing
 joins by it. See the [match lobby spec](2026-10-23-match-lobby-design.md).
 
@@ -398,8 +411,10 @@ The delay is hidden in two ways instead:
   is cosmetic — the runner's logical position never moves before the server
   answers — and is skipped under reduced motion.
 
-Held-key input is still queued as sequential `seq`-numbered moves, with one
-move waiting behind an unknown edge.
+Held-key input is still queued as sequential `seq`-numbered moves, but none
+waits behind an unknown edge: input while its answer is outstanding is
+dropped, so a move pressed blind never plays out after the player has seen the
+result.
 
 The obvious alternative — ship the maze to the browser, encrypted, and let the
 client resolve moves locally — is rejected outright. A browser that can

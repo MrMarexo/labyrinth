@@ -57,7 +57,12 @@ test.describe("drawing a labyrinth", () => {
     await expect(panel).toBeVisible();
     // The issue is rendered as copy, never as a raw key.
     await expect(panel).not.toContainText("maze.validate");
-    await expect(panel).toContainText("Place a start and a treasure");
+    // Everything still missing, not just the start and treasure: the
+    // default new labyrinth is 36 squares with two gates.
+    await expect(panel).toContainText("You have used 1 of 36 squares.");
+    await expect(panel).toContainText("Place 2 more gates.");
+    await expect(panel).toContainText("Place the start.");
+    await expect(panel).toContainText("Place the treasure.");
   });
 
   test("a drawing survives a page refresh", async ({ page }) => {

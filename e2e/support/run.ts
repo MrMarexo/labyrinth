@@ -20,8 +20,8 @@ const BUTTON: Record<Direction, string> = {
 
 /**
  * Walks a route one move at a time, waiting for the server to answer each
- * before sending the next, so the spec never depends on the queue's
- * one-waiting-slot policy. The keyboard on desktop, the d-pad on mobile —
+ * before sending the next, since the queue drops input pressed while an
+ * unknown edge's answer is outstanding. The keyboard on desktop, the d-pad on mobile —
  * both input paths get driven by the same specs.
  */
 export async function walk(

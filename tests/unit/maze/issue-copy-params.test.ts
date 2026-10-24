@@ -32,9 +32,9 @@ function lookup(catalogue: Catalogue, key: string): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
-/** Every {name} placeholder in a message. */
+/** Every {name} placeholder in a message, and every {name, plural, …}. */
 function placeholders(message: string): string[] {
-  return [...message.matchAll(/\{(\w+)\}/g)].map((m) => m[1]!).sort();
+  return [...message.matchAll(/\{(\w+)(?:\}|, )/g)].map((m) => m[1]!).sort();
 }
 
 // The params each key is emitted with, read from src/maze/validate.ts and
@@ -52,6 +52,7 @@ const expected: Record<string, string[]> = {
   "maze.validate.gateWithoutKey": ["gate"],
   "maze.validate.gateWithTwoKeys": ["gate"],
   "maze.validate.keyWithoutGate": ["gate"],
+  "maze.validate.missingGates": ["missing"],
 };
 
 // Every key the placeholder check runs over — not just MAZE_ISSUE_KEYS, so a

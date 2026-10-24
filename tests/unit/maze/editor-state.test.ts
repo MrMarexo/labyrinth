@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { emptyDraft } from "~/maze/draft";
 import {
+  brushCells,
   editorReducer,
   initialEditorState,
   cellsUsed,
@@ -78,6 +79,148 @@ describe("painting", () => {
   });
 });
 
+describe("brush", () => {
+  it("covers one square at size 1", () => {
+    expect(brushCells({ x: 3, y: 4 }, 1)).toEqual([{ x: 3, y: 4 }]);
+  });
+
+  it("covers the square and its right and lower neighbours at size 2", () => {
+    expect(brushCells({ x: 3, y: 4 }, 2)).toEqual([
+      { x: 3, y: 4 },
+      { x: 4, y: 4 },
+      { x: 3, y: 5 },
+      { x: 4, y: 5 },
+    ]);
+  });
+
+  it("shifts back inside the frame at its far edges", () => {
+    expect(brushCells({ x: 15, y: 15 }, 2)).toEqual([
+      { x: 14, y: 14 },
+      { x: 15, y: 14 },
+      { x: 14, y: 15 },
+      { x: 15, y: 15 },
+    ]);
+  });
+
+  it("paints a block as one undo step", () => {
+    const painted = editorReducer(start(), {
+      type: "paintCells",
+      cells: brushCells({ x: 0, y: 0 }, 2),
+    });
+    expect(cellsUsed(painted.draft)).toBe(4);
+    expect(painted.past).toHaveLength(1);
+    expect(editorReducer(painted, { type: "undo" }).draft.cells).toEqual([]);
+  });
+
+  it("paints only up to the budget", () => {
+    const next = editorReducer(start(), {
+      type: "paintCells",
+      cells: brushCells({ x: 0, y: 0 }, 2),
+      limit: 3,
+    });
+    expect(cellsUsed(next.draft)).toBe(3);
+  });
+
+  it("erases a block, with what was on it", () => {
+    const next = apply(
+      start(),
+      { type: "paintCells", cells: brushCells({ x: 0, y: 0 }, 2) },
+      { type: "paintCell", at: { x: 2, y: 0 } },
+      { type: "placeStart", at: { x: 1, y: 1 } },
+      { type: "eraseCells", cells: brushCells({ x: 0, y: 0 }, 2) },
+    );
+    expect(next.draft.cells).toEqual([{ x: 2, y: 0 }]);
+    expect(next.draft.start).toBeNull();
+  });
+
+  it("costs no undo step when it changes nothing", () => {
+    const next = editorReducer(start(), {
+      type: "eraseCells",
+      cells: brushCells({ x: 0, y: 0 }, 2),
+    });
+    expect(next.past).toHaveLength(0);
+  });
+});
+
+describe("clearing a square", () => {
+  // A 3x1 row: (0,0) (1,0) (2,0), and (1,1) below the middle.
+  function row(): EditorState {
+    return apply(
+      start(),
+      { type: "paintCell", at: { x: 0, y: 0 } },
+      { type: "paintCell", at: { x: 1, y: 0 } },
+      { type: "paintCell", at: { x: 2, y: 0 } },
+      { type: "paintCell", at: { x: 1, y: 1 } },
+    );
+  }
+
+  it("takes every wall and gate on the square's sides, and its key, start or treasure", () => {
+    const before = apply(
+      row(),
+      { type: "placeSegment", edge: { o: "V", x: 0, y: 0 }, kind: "wall" },
+      { type: "placeSegment", edge: { o: "H", x: 1, y: 0 }, kind: "wall" },
+      {
+        type: "placeSegment",
+        edge: { o: "V", x: 1, y: 0 },
+        kind: "gate",
+        gate: 1,
+        gateCount: GATES,
+      },
+      { type: "placeKey", at: { x: 0, y: 0 }, gate: 1, gateCount: GATES },
+      { type: "placeStart", at: { x: 1, y: 0 } },
+      { type: "placeTreasure", at: { x: 2, y: 0 } },
+    );
+    const next = editorReducer(before, {
+      type: "clearCell",
+      at: { x: 1, y: 0 },
+    });
+    expect(next.draft.segments).toEqual([]);
+    // The gate went, but its key is not on this square, so it stays.
+    expect(next.draft.keys).toEqual([{ gate: 1, x: 0, y: 0 }]);
+    expect(next.draft.start).toBeNull();
+    // Not on this square: stays.
+    expect(next.draft.treasure).toEqual({ x: 2, y: 0 });
+    // The squares themselves are never the eraser's.
+    expect(cellsUsed(next.draft)).toBe(4);
+  });
+
+  it("clearItems takes what sits on the square but leaves its walls", () => {
+    const before = apply(
+      row(),
+      { type: "placeSegment", edge: { o: "V", x: 0, y: 0 }, kind: "wall" },
+      { type: "placeStart", at: { x: 1, y: 0 } },
+      { type: "placeKey", at: { x: 2, y: 0 }, gate: 1, gateCount: GATES },
+    );
+    const started = editorReducer(before, {
+      type: "clearItems",
+      at: { x: 1, y: 0 },
+    });
+    expect(started.draft.start).toBeNull();
+    expect(started.draft.segments).toHaveLength(1);
+    const keyed = editorReducer(before, {
+      type: "clearItems",
+      at: { x: 2, y: 0 },
+    });
+    expect(keyed.draft.keys).toEqual([]);
+    expect(
+      editorReducer(before, { type: "clearItems", at: { x: 0, y: 0 } }),
+    ).toBe(before);
+  });
+
+  it("leaves walls on other squares alone", () => {
+    const before = apply(row(), {
+      type: "placeSegment",
+      edge: { o: "V", x: 0, y: 0 },
+      kind: "wall",
+    });
+    const next = editorReducer(before, {
+      type: "clearCell",
+      at: { x: 2, y: 0 },
+    });
+    expect(next).toBe(before);
+  });
+});
+
 describe("placing", () => {
   it("moves the start rather than adding a second", () => {
     const next = apply(
@@ -112,7 +255,7 @@ describe("placing", () => {
     expect(gatesPlaced(next.draft)).toBe(2);
   });
 
-  it("removing a gate removes its key too", () => {
+  it("removing a gate leaves its key where it is", () => {
     const next = apply(
       start(),
       {
@@ -125,7 +268,7 @@ describe("placing", () => {
       { type: "placeKey", at: { x: 3, y: 3 }, gate: 1, gateCount: GATES },
       { type: "removeSegment", edge: { o: "H", x: 0, y: 0 } },
     );
-    expect(next.draft.keys).toEqual([]);
+    expect(next.draft.keys).toEqual([{ gate: 1, x: 3, y: 3 }]);
   });
 
   it("replaces a wall with a gate rather than stacking", () => {
@@ -157,7 +300,7 @@ describe("placing", () => {
     expect(next.draft.segments).toEqual([]);
   });
 
-  it("toggling a gate off takes its key with it", () => {
+  it("toggling a gate off leaves its key", () => {
     const next = apply(
       start(),
       {
@@ -177,7 +320,7 @@ describe("placing", () => {
       },
     );
     expect(next.draft.segments).toEqual([]);
-    expect(next.draft.keys).toEqual([]);
+    expect(next.draft.keys).toEqual([{ gate: 1, x: 3, y: 3 }]);
     // A third distinct value (0, alongside 1 and 2 above) for the same
     // reason: no constant return satisfies all three.
     expect(gatesPlaced(next.draft)).toBe(0);
@@ -207,7 +350,7 @@ describe("placing", () => {
     expect(keysPlaced(next.draft)).toBe(2);
   });
 
-  it("removing a gate drops its key from the count, not just from the array", () => {
+  it("removing a gate keeps its key in the count", () => {
     const withKey = apply(
       start(),
       {
@@ -225,26 +368,7 @@ describe("placing", () => {
       type: "removeSegment",
       edge: { o: "H", x: 0, y: 0 },
     });
-    expect(keysPlaced(next.draft)).toBe(0);
-  });
-
-  it("removeKey removes an existing key", () => {
-    const withKey = apply(
-      start(),
-      {
-        type: "placeSegment",
-        edge: { o: "H", x: 0, y: 0 },
-        kind: "gate",
-        gate: 1,
-        gateCount: GATES,
-      },
-      { type: "placeKey", at: { x: 3, y: 3 }, gate: 1, gateCount: GATES },
-    );
-    const next = editorReducer(withKey, {
-      type: "removeKey",
-      at: { x: 3, y: 3 },
-    });
-    expect(next.draft.keys).toEqual([]);
+    expect(keysPlaced(next.draft)).toBe(1);
   });
 
   it("placeTreasure sets the treasure", () => {
@@ -402,7 +526,7 @@ describe("setWall", () => {
     expect(twice).toBe(once);
   });
 
-  it("replaces a gate and releases the gate's key", () => {
+  it("replaces a gate and keeps the gate's key", () => {
     const next = apply(
       start(),
       { type: "placeSegment", edge, kind: "gate", gate: 1, gateCount: GATES },
@@ -410,7 +534,7 @@ describe("setWall", () => {
       { type: "setWall", edge },
     );
     expect(next.draft.segments).toEqual([{ ...edge, kind: "wall" }]);
-    expect(next.draft.keys).toEqual([]);
+    expect(next.draft.keys).toEqual([{ gate: 1, x: 3, y: 3 }]);
     expect(gatesPlaced(next.draft)).toBe(0);
   });
 });
@@ -451,7 +575,7 @@ describe("loading a draft with segments outside the shape", () => {
     expect(state.past).toEqual([]);
   });
 
-  it("drops a gate on an outline edge and releases its key", () => {
+  it("drops a gate on an outline edge but keeps its key", () => {
     const state = initialEditorState({
       ...emptyDraft(),
       cells,
@@ -467,7 +591,10 @@ describe("loading a draft with segments outside the shape", () => {
     expect(state.draft.segments).toEqual([
       { o: "V", x: 0, y: 0, kind: "gate", gate: 1 },
     ]);
-    expect(state.draft.keys).toEqual([{ gate: 1, x: 0, y: 0 }]);
+    expect(state.draft.keys).toEqual([
+      { gate: 1, x: 0, y: 0 },
+      { gate: 2, x: 1, y: 0 },
+    ]);
   });
 
   it("hands back the very same draft when nothing needs dropping", () => {
@@ -562,7 +689,7 @@ describe("choosing the gate number", () => {
     expect(next.draft.keys).toEqual([{ gate: 2, x: 3, y: 3 }]);
   });
 
-  it("clicking gate N onto gate N removes it and releases key N", () => {
+  it("clicking gate N onto gate N removes it and keeps key N", () => {
     const next = apply(
       start(),
       { type: "placeSegment", edge: a, kind: "gate", gate: 2, gateCount: 2 },
@@ -570,10 +697,10 @@ describe("choosing the gate number", () => {
       { type: "placeSegment", edge: a, kind: "gate", gate: 2, gateCount: 2 },
     );
     expect(gates(next)).toEqual([]);
-    expect(next.draft.keys).toEqual([]);
+    expect(next.draft.keys).toEqual([{ gate: 2, x: 3, y: 3 }]);
   });
 
-  it("placing gate 1 over gate 2 removes gate 2 and releases key 2", () => {
+  it("placing gate 1 over gate 2 removes gate 2 and keeps key 2", () => {
     const next = apply(
       start(),
       { type: "placeSegment", edge: a, kind: "gate", gate: 2, gateCount: 2 },
@@ -582,10 +709,13 @@ describe("choosing the gate number", () => {
       { type: "placeSegment", edge: a, kind: "gate", gate: 1, gateCount: 2 },
     );
     expect(gates(next)).toEqual([{ edge: "H:0,0", gate: 1 }]);
-    expect(next.draft.keys).toEqual([{ gate: 1, x: 4, y: 4 }]);
+    expect(next.draft.keys).toEqual([
+      { gate: 2, x: 3, y: 3 },
+      { gate: 1, x: 4, y: 4 },
+    ]);
   });
 
-  it("moving gate 1 onto gate 2's edge leaves one gate there and releases key 2", () => {
+  it("moving gate 1 onto gate 2's edge leaves one gate there and keeps key 2", () => {
     const next = apply(
       start(),
       { type: "placeSegment", edge: a, kind: "gate", gate: 1, gateCount: 2 },
@@ -594,7 +724,27 @@ describe("choosing the gate number", () => {
       { type: "placeSegment", edge: b, kind: "gate", gate: 1, gateCount: 2 },
     );
     expect(gates(next)).toEqual([{ edge: "H:1,0", gate: 1 }]);
-    expect(next.draft.keys).toEqual([]);
+    expect(next.draft.keys).toEqual([{ gate: 2, x: 3, y: 3 }]);
+  });
+
+  it("erasing a square keeps the key of a gate on its side", () => {
+    const next = apply(
+      start(),
+      { type: "paintCell", at: { x: 0, y: 0 } },
+      { type: "paintCell", at: { x: 1, y: 0 } },
+      { type: "paintCell", at: { x: 2, y: 0 } },
+      {
+        type: "placeSegment",
+        edge: { o: "V", x: 0, y: 0 },
+        kind: "gate",
+        gate: 1,
+        gateCount: 2,
+      },
+      { type: "placeKey", at: { x: 2, y: 0 }, gate: 1, gateCount: 2 },
+      { type: "eraseCell", at: { x: 0, y: 0 } },
+    );
+    expect(next.draft.segments).toEqual([]);
+    expect(next.draft.keys).toEqual([{ gate: 1, x: 2, y: 0 }]);
   });
 
   it("erasing a square keeps a key whose gate is not placed yet", () => {

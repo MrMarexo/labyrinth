@@ -3,8 +3,15 @@
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 
+import { OptionPicker } from "~/components/option-picker";
 import { resolveErrorKey } from "~/lib/resolve-error-key";
-import { CELL_COUNT_PRESETS, MAX_GATES, MAZE_LIMIT } from "~/maze";
+import {
+  CELL_COUNT_PRESETS,
+  GATE_COUNT_OPTIONS,
+  MAZE_LIMIT,
+  type CellCount,
+  type GateCount,
+} from "~/maze";
 import { useRouter } from "~/i18n/navigation";
 import { api } from "~/trpc/react";
 
@@ -14,6 +21,8 @@ export function NewMazeForm() {
   const router = useRouter();
   const utils = api.useUtils();
   const [open, setOpen] = useState(false);
+  const [cellCount, setCellCount] = useState<CellCount>(CELL_COUNT_PRESETS[0]);
+  const [gateCount, setGateCount] = useState<GateCount>(2);
   const create = api.maze.createDraft.useMutation({
     onSuccess: ({ id }) => {
       void utils.maze.list.invalidate();
@@ -64,8 +73,8 @@ export function NewMazeForm() {
         const name = data.get("name");
         create.mutate({
           name: typeof name === "string" ? name : "",
-          cellCount: Number(data.get("cellCount")),
-          gateCount: Number(data.get("gateCount")),
+          cellCount,
+          gateCount,
         });
       }}
     >
@@ -79,32 +88,20 @@ export function NewMazeForm() {
         />
       </label>
 
-      <label className="block space-y-1">
-        <span className="text-sm">{t("squares")}</span>
-        <select
-          name="cellCount"
-          defaultValue={CELL_COUNT_PRESETS[0]}
-          className="border-border-strong bg-bg w-full rounded border px-3 py-2"
-        >
-          {CELL_COUNT_PRESETS.map((n) => (
-            <option key={n} value={n}>
-              {n}
-            </option>
-          ))}
-        </select>
-      </label>
+      <OptionPicker
+        label={t("size")}
+        options={CELL_COUNT_PRESETS}
+        value={cellCount}
+        onChange={setCellCount}
+        renderOption={(cells) => t("sizeOption", { cells })}
+      />
 
-      <label className="block space-y-1">
-        <span className="text-sm">{t("gates")}</span>
-        <input
-          name="gateCount"
-          type="number"
-          min={0}
-          max={MAX_GATES}
-          defaultValue={2}
-          className="border-border-strong bg-bg w-full rounded border px-3 py-2"
-        />
-      </label>
+      <OptionPicker
+        label={t("gates")}
+        options={GATE_COUNT_OPTIONS}
+        value={gateCount}
+        onChange={setGateCount}
+      />
 
       {createError && (
         <p role="alert" data-create-error className="text-danger text-sm">

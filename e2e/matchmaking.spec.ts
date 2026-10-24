@@ -1,7 +1,7 @@
 import { expect, request as apiRequestFactory } from "@playwright/test";
 
 import { PASSWORD, signUpViaApi } from "./support/auth";
-import { createMatch, test } from "./support/match";
+import { createMatch, joinMatch, test } from "./support/match";
 
 const SIZE = { cellCount: 36, gateCount: 0 };
 // A change reaches the other player over the realtime channel, not a reload.
@@ -47,6 +47,42 @@ test.describe("the lobby", () => {
     ).toHaveCount(0);
     await note.getByRole("link", { name: "Go to your waiting match" }).click();
     await expect(host).toHaveURL(new RegExp(`/en/matches/${matchId}$`));
+  });
+});
+
+test.describe("one match at a time", () => {
+  test("the match in progress sits on top, and nothing new can be started or joined", async ({
+    players,
+  }) => {
+    const host = await players({ name: "Host maze", ...SIZE });
+    const guest = await players({ name: "Guest maze", ...SIZE });
+    const other = await players({ name: "Other maze", ...SIZE });
+    const matchId = await createMatch(host, { cells: 36, gates: 0 });
+    await joinMatch(guest, matchId);
+    const elsewhere = await createMatch(other, { cells: 36, gates: 0 });
+
+    await guest.goto("/en/matches");
+    const current = guest.locator("[data-current-match]");
+    await expect(current).toHaveAttribute("data-current-match", matchId);
+    await expect(current).toContainText("Your current match");
+    await expect(current).toContainText("Both drawing");
+    // Still in the list too, first.
+    await expect(guest.locator("[data-match-row]").first()).toHaveAttribute(
+      "data-active",
+      "",
+    );
+
+    await expect(guest.locator("[data-already-active]")).toBeVisible();
+    await expect(
+      guest.getByRole("button", { name: "Create match" }),
+    ).toHaveCount(0);
+    await expect(guest.locator("[data-lobby-blocked]")).toBeVisible();
+    await expect(
+      guest.locator(`[data-lobby-match="${elsewhere}"] [data-request-state]`),
+    ).toBeDisabled();
+
+    await current.getByRole("link", { name: "Continue" }).click();
+    await expect(guest).toHaveURL(new RegExp(`/en/matches/${matchId}$`));
   });
 });
 
