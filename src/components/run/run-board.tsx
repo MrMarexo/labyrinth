@@ -4,8 +4,8 @@ import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 
 import { CELL_PX } from "~/components/editor/board";
-import { gateColour } from "~/components/editor/gate-colours";
 import {
+  GateSegment,
   KeyIcon,
   RunnerIcon,
   StartIcon,
@@ -194,7 +194,19 @@ export function RunBoard({ map, at, heldKeys, bump, lean }: RunBoardProps) {
     key: string,
     extra: { strokeWidth: number; hook?: boolean },
   ) => {
-    const held = segment.kind === "gate" && heldKeys.includes(segment.gate);
+    if (segment.kind === "gate") {
+      return (
+        <GateSegment
+          key={key}
+          data-run-segment={extra.hook ? edgeKey(segment) : undefined}
+          aria-hidden="true"
+          {...edgeLine(segment)}
+          gate={segment.gate}
+          strokeWidth={extra.strokeWidth}
+          strokeDasharray={heldKeys.includes(segment.gate) ? "6 4" : undefined}
+        />
+      );
+    }
     return (
       <line
         key={key}
@@ -203,13 +215,7 @@ export function RunBoard({ map, at, heldKeys, bump, lean }: RunBoardProps) {
         {...edgeLine(segment)}
         strokeWidth={extra.strokeWidth}
         strokeLinecap="round"
-        strokeDasharray={held ? "6 4" : undefined}
-        className={segment.kind === "wall" ? "stroke-wall" : undefined}
-        style={
-          segment.kind === "gate"
-            ? { stroke: gateColour(segment.gate) }
-            : undefined
-        }
+        className="stroke-wall"
       />
     );
   };

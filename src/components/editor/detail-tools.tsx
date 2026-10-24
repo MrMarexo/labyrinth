@@ -1,10 +1,13 @@
 "use client";
 
+import { Check } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useRef, type KeyboardEvent } from "react";
 
+import { iconButtonClass, Tooltip } from "~/components/tooltip";
 import type { Tool } from "~/maze";
 import { gateColour } from "./gate-colours";
+import { ToolIcon } from "./tool-icons";
 
 export type DetailToolsProps = {
   tool: Tool;
@@ -19,15 +22,17 @@ export type DetailToolsProps = {
   placed: ReadonlySet<number>;
 };
 
-/** The six tools this palette offers, in display and arrow-key order. */
-const DETAIL_TOOLS: readonly Tool[] = [
-  "wall",
-  "gate",
-  "key",
-  "start",
-  "treasure",
-  "erase",
+/**
+ * The six tools in display groups, one row each: the wall and its eraser,
+ * the two ends of the run, then the gate and its key, right above the colour
+ * picker they open. Arrow keys walk them in this order.
+ */
+const DETAIL_GROUPS: readonly (readonly Tool[])[] = [
+  ["wall", "erase"],
+  ["start", "treasure"],
+  ["gate", "key"],
 ];
+const DETAIL_TOOLS: readonly Tool[] = DETAIL_GROUPS.flat();
 
 export function DetailTools({
   tool,
@@ -99,29 +104,36 @@ export function DetailTools({
       <div
         role="radiogroup"
         aria-label={t("detailToolsLabel")}
-        className="flex flex-wrap gap-2"
+        className="flex flex-col gap-2"
       >
-        {DETAIL_TOOLS.map((option, index) => {
-          const active = tool === option;
-          return (
-            <button
-              key={option}
-              ref={(el) => {
-                if (el) buttonRefs.current.set(option, el);
-                else buttonRefs.current.delete(option);
-              }}
-              type="button"
-              role="radio"
-              aria-checked={active}
-              tabIndex={index === tabStopIndex ? 0 : -1}
-              onClick={() => onTool(option)}
-              onKeyDown={handleKeyDown}
-              className={buttonClass(active)}
-            >
-              {labelFor(option)}
-            </button>
-          );
-        })}
+        {DETAIL_GROUPS.map((group) => (
+          <div key={group[0]} className="flex gap-2">
+            {group.map((option) => {
+              const index = DETAIL_TOOLS.indexOf(option);
+              const active = tool === option;
+              return (
+                <button
+                  key={option}
+                  ref={(el) => {
+                    if (el) buttonRefs.current.set(option, el);
+                    else buttonRefs.current.delete(option);
+                  }}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  aria-label={labelFor(option)}
+                  tabIndex={index === tabStopIndex ? 0 : -1}
+                  onClick={() => onTool(option)}
+                  onKeyDown={handleKeyDown}
+                  className={iconButtonClass(active)}
+                >
+                  <ToolIcon tool={option} />
+                  <Tooltip label={labelFor(option)} />
+                </button>
+              );
+            })}
+          </div>
+        ))}
       </div>
 
       {(tool === "gate" || tool === "key") && gateBudget > 0 && (
@@ -144,12 +156,6 @@ export function DetailTools({
   );
 }
 
-function buttonClass(active: boolean): string {
-  return active
-    ? "bg-accent text-on-accent rounded px-3 py-2 text-sm"
-    : "border-border-strong rounded border px-3 py-2 text-sm";
-}
-
 type NumberPickerProps = {
   kind: "gate" | "key";
   count: number;
@@ -160,8 +166,9 @@ type NumberPickerProps = {
 
 /**
  * Which gate, or which gate's key, the active tool places: one radio per
- * number the maze allows, 1 to `count`. The same radiogroup pattern as the
- * palettes above.
+ * gate the maze allows, 1 to `count`, shown as its colour alone — gates are
+ * told apart by colour, never by number. The number stays in the accessible
+ * name. The same radiogroup pattern as the palettes above.
  */
 function NumberPicker({
   kind,
@@ -233,9 +240,9 @@ function NumberPicker({
             tabIndex={index === tabStopIndex ? 0 : -1}
             onClick={() => onChoose(n)}
             onKeyDown={handleKeyDown}
-            className={`${buttonClass(active)} inline-flex items-center gap-1.5`}
+            className={iconButtonClass(active)}
           >
-            <svg aria-hidden="true" viewBox="0 0 10 10" className="size-3">
+            <svg aria-hidden="true" viewBox="0 0 10 10" className="size-5">
               <circle
                 data-swatch
                 cx={5}
@@ -244,8 +251,13 @@ function NumberPicker({
                 style={{ fill: gateColour(n) }}
               />
             </svg>
-            <span>{n}</span>
-            {placed.has(n) && <span aria-hidden="true">✓</span>}
+            {placed.has(n) && (
+              <Check
+                aria-hidden="true"
+                strokeWidth={3}
+                className="absolute top-0.5 right-0.5 size-3"
+              />
+            )}
           </button>
         );
       })}

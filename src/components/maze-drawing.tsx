@@ -1,6 +1,10 @@
 import { CELL_PX } from "~/components/editor/board";
-import { gateColour } from "~/components/editor/gate-colours";
-import { KeyIcon, StartIcon, TreasureIcon } from "~/components/maze-icons";
+import {
+  GateSegment,
+  KeyIcon,
+  StartIcon,
+  TreasureIcon,
+} from "~/components/maze-icons";
 import { mazeViewBox } from "~/lib/maze-view-box";
 import { edgeKey, outlineEdges, type DraftMaze, type Edge } from "~/maze";
 
@@ -75,16 +79,23 @@ export function MazeDrawing({ maze }: { maze: DrawableMaze }) {
         />
       ))}
 
-      {maze.segments.map((s) => (
-        <line
-          key={`seg-${edgeKey(s)}`}
-          {...edgeLine(s)}
-          strokeWidth={4}
-          strokeLinecap="round"
-          className={s.kind === "wall" ? "stroke-wall" : undefined}
-          style={s.kind === "gate" ? { stroke: gateColour(s.gate) } : undefined}
-        />
-      ))}
+      {maze.segments.map((s) =>
+        s.kind === "gate" ? (
+          <GateSegment
+            key={`seg-${edgeKey(s)}`}
+            {...edgeLine(s)}
+            gate={s.gate}
+          />
+        ) : (
+          <line
+            key={`seg-${edgeKey(s)}`}
+            {...edgeLine(s)}
+            strokeWidth={4}
+            strokeLinecap="round"
+            className="stroke-wall"
+          />
+        ),
+      )}
     </>
   );
 }
