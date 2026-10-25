@@ -3,6 +3,7 @@
 import { useTranslations } from "next-intl";
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
   type FocusEvent,
@@ -89,8 +90,8 @@ function fitView(width: number, height: number, desktop: boolean): View {
 }
 export const CELL_PX = 40;
 const FRAME_BOUNDS: Bounds = { minX: 0, minY: 0, maxX: FRAME, maxY: FRAME };
-/** Cells beyond the window still rendered, so an arrow key has a target. */
-const OVERSCAN = 1;
+/** How far inside the window keyboard focus keeps its target, in cells. */
+const REVEAL_MARGIN = 1;
 /** Invisible hit strip for an edge. A wall is one pixel; this is what you click. */
 const EDGE_HIT = 14;
 
@@ -171,14 +172,9 @@ function midpoint(points: Map<number, { x: number; y: number }>) {
   return { x: x / points.size, y: y / points.size };
 }
 
-/** Whether `at` is within the window, or no more than OVERSCAN outside it. */
-function nearView(at: Point, cam: Camera, view: View): boolean {
-  return (
-    at.x >= Math.floor(cam.x) - OVERSCAN &&
-    at.x < Math.ceil(cam.x + view.w) + OVERSCAN &&
-    at.y >= Math.floor(cam.y) - OVERSCAN &&
-    at.y < Math.ceil(cam.y + view.h) + OVERSCAN
-  );
+/** The viewBox showing `view` squares of the frame from `cam`. */
+function viewBoxOf(cam: Camera, view: View): string {
+  return `${cam.x * CELL_PX} ${cam.y * CELL_PX} ${view.w * CELL_PX} ${view.h * CELL_PX}`;
 }
 
 type Stroke = {
@@ -231,7 +227,7 @@ export type BoardProps = {
 };
 
 /**
- * Renders every square near the window — `data-cell` for each, labelled
+ * Renders every square of the frame — `data-cell` for each, labelled
  * painted or void — so this is the author's own board. A run view needs a
  * sibling component fed only discovered cells and bumped segments; reusing
  * this one leaks void-vs-walled into the accessibility tree.
@@ -240,6 +236,10 @@ export type BoardProps = {
  * it is given allows, with VIEW squares along its shorter side. The
  * move tool, a two-finger drag, a middle or right drag and the wheel pan it;
  * keyboard focus brings its target into view.
+ *
+ * The whole frame is drawn once, and drawn again only when the maze changes.
+ * A pan moves the window over that drawing: it writes the SVG's viewBox
+ * straight to the element and renders nothing.
  */
 export function Board({
   draft,
@@ -260,12 +260,23 @@ export function Board({
 }: BoardProps) {
   const t = useTranslations("editor");
   const edgesActive = EDGE_TOOLS.has(tool);
-  const painted = new Set(draft.cells.map(cellKey));
+  // Everything here follows from the maze alone, so it is worked out again
+  // only when the maze changes, never for a hover, a focus or a pan.
+  const painted = useMemo(() => new Set(draft.cells.map(cellKey)), [draft]);
   // Only edges with a painted square on both sides take a wall; the rest of
   // the shape's border is drawn as the outline and is never a target.
-  const interiorEdges = ALL_EDGES.filter((e) => isInteriorEdge(e, painted));
-  const keyGateAt = new Map(draft.keys.map((k) => [cellKey(k), k.gate]));
-  const segmentAt = new Map(draft.segments.map((s) => [edgeKey(s), s]));
+  const interiorEdges = useMemo(
+    () => ALL_EDGES.filter((e) => isInteriorEdge(e, painted)),
+    [painted],
+  );
+  const keyGateAt = useMemo(
+    () => new Map(draft.keys.map((k) => [cellKey(k), k.gate])),
+    [draft],
+  );
+  const segmentAt = useMemo(
+    () => new Map(draft.segments.map((s) => [edgeKey(s), s])),
+    [draft],
+  );
 
   // Roving tabindex: cells and edges are each their own focus group, so Tab
   // visits the grid once per group instead of once per square. The live stop
@@ -340,12 +351,10 @@ export function Board({
   const viewRef = useRef(view);
   viewRef.current = view;
 
-  const [cam, setCam] = useState<Camera>(() =>
-    framePainted(draft.cells, SQUARE_VIEW, FRAME_BOUNDS),
-  );
-  // Read by the wheel listener, which is attached once.
-  const camRef = useRef(cam);
-  camRef.current = cam;
+  // The camera is not state: a pan must not render. It lives here, and
+  // `moveCamera` writes it to the SVG directly.
+  const camRef = useRef<Camera | null>(null);
+  camRef.current ??= framePainted(draft.cells, SQUARE_VIEW, FRAME_BOUNDS);
   const panRef = useRef<Pan | null>(null);
   const [panning, setPanning] = useState(false);
   /** Touch pointers down on the board, by client position. */
@@ -355,20 +364,28 @@ export function Board({
    * landing first turns it into a pan instead of a placement.
    */
   const tapRef = useRef<{ pointerId: number; target: Target } | null>(null);
-  /** A target to focus once it renders: `c:` or `e:` plus its key. */
-  const pendingFocusRef = useRef<string | null>(null);
 
+  /** The camera now. Set on the first render, so never null after it. */
+  function camera(): Camera {
+    return camRef.current!;
+  }
+
+  /** Moves the window, straight on the element; says whether it moved. */
   function moveCamera(next: Camera) {
     const clamped = clampCamera(next, viewRef.current, FRAME_BOUNDS);
-    const current = camRef.current;
+    const current = camera();
     if (clamped.x === current.x && clamped.y === current.y) return false;
     camRef.current = clamped;
-    setCam(clamped);
+    const svg = svgRef.current;
+    if (svg) {
+      svg.setAttribute("viewBox", viewBoxOf(clamped, viewRef.current));
+      svg.dataset.camera = `${clamped.x},${clamped.y}`;
+    }
     return true;
   }
 
   function reveal(at: Point) {
-    moveCamera(follow(camRef.current, at, viewRef.current, OVERSCAN));
+    moveCamera(follow(camera(), at, viewRef.current, REVEAL_MARGIN));
   }
 
   /**
@@ -410,7 +427,7 @@ export function Board({
     // stroke's next sample would join across everything in between. The
     // wheel is swallowed instead, since a page scroll would do the same.
     if (strokeRef.current) return true;
-    const current = camRef.current;
+    const current = camera();
     return moveCamera({ x: current.x + dx, y: current.y + dy });
   });
 
@@ -422,22 +439,13 @@ export function Board({
   useEffect(() => {
     if (!measured) return;
     if (framed.current === frame) {
-      moveCamera(camRef.current);
+      moveCamera(camera());
       return;
     }
     framed.current = frame;
     moveCamera(framePainted(draft.cells, view, FRAME_BOUNDS));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [frame, measured, view.w, view.h]);
-
-  // A focus target that was off the board when an arrow key asked for it.
-  useEffect(() => {
-    const pending = pendingFocusRef.current;
-    if (!pending) return;
-    pendingFocusRef.current = null;
-    const refs = pending.startsWith("c:") ? cellRefs : edgeRefs;
-    refs.current.get(pending.slice(2))?.focus({ preventScroll: true });
-  });
 
   /** Shows the ring for keyboard focus only; says whether it did. */
   function showRingIfKeyboard(
@@ -461,14 +469,8 @@ export function Board({
   function moveCellFocus(dx: number, dy: number, from: Point) {
     const next = { x: from.x + dx, y: from.y + dy };
     if (next.x < 0 || next.x >= FRAME || next.y < 0 || next.y >= FRAME) return;
-    const el = cellRefs.current.get(cellKey(next));
-    if (el) {
-      el.focus({ preventScroll: true });
-      return;
-    }
-    // Not rendered: make it the stop, which renders it, then focus it.
-    pendingFocusRef.current = `c:${cellKey(next)}`;
-    setFocusedCell(next);
+    // Not scrolled into view by the browser: `onFocus` moves the camera.
+    cellRefs.current.get(cellKey(next))?.focus({ preventScroll: true });
   }
 
   function handleCellKeyDown(event: KeyboardEvent<SVGRectElement>, at: Point) {
@@ -506,14 +508,9 @@ export function Board({
   function moveEdgeFocus(delta: number) {
     const next = focusedEdgeIndex + delta;
     if (next < 0 || next >= interiorEdges.length) return;
-    const key = edgeKey(interiorEdges[next]!);
-    const el = edgeRefs.current.get(key);
-    if (el) {
-      el.focus({ preventScroll: true });
-      return;
-    }
-    pendingFocusRef.current = `e:${key}`;
-    setFocusedEdge(key);
+    edgeRefs.current
+      .get(edgeKey(interiorEdges[next]!))
+      ?.focus({ preventScroll: true });
   }
 
   function handleEdgeKeyDown(event: KeyboardEvent<SVGRectElement>, edge: Edge) {
@@ -603,7 +600,7 @@ export function Board({
     pan.points.set(pointerId, at);
     const mid = midpoint(pan.points);
     const scale = cellsPerPixel(svgRef.current, CELL_PX);
-    const current = camRef.current;
+    const current = camera();
     moveCamera({
       x: current.x - (mid.x - pan.last.x) * scale,
       y: current.y - (mid.y - pan.last.y) * scale,
@@ -867,100 +864,71 @@ export function Board({
     }
   }
 
-  function cellLabel(at: Point): string {
-    const key = cellKey(at);
-    const status = painted.has(key) ? t("cellPainted") : t("cellVoid");
-    const label = t("cellLabel", { x: at.x, y: at.y, status });
+  // Read by the cached layers below, whose handlers must call the latest
+  // code without the layers being built again for it.
+  const live = useRef({ handleCellKeyDown, handleEdgeKeyDown, reveal });
+  live.current = { handleCellKeyDown, handleEdgeKeyDown, reveal };
 
-    if (draft.start && cellKey(draft.start) === key) {
-      return `${label}, ${t("cellStart")}`;
+  // The layers are built again only when what they show changes: the maze,
+  // the tab stop, or (for the edge targets) the tool. A hover, a focus ring
+  // or a pan leaves them as they are.
+  const cellLayer = useMemo(() => {
+    function cellLabel(at: Point): string {
+      const key = cellKey(at);
+      const status = painted.has(key) ? t("cellPainted") : t("cellVoid");
+      const label = t("cellLabel", { x: at.x, y: at.y, status });
+
+      if (draft.start && cellKey(draft.start) === key) {
+        return `${label}, ${t("cellStart")}`;
+      }
+      if (draft.treasure && cellKey(draft.treasure) === key) {
+        return `${label}, ${t("cellTreasure")}`;
+      }
+      const gate = keyGateAt.get(key);
+      if (gate !== undefined) return `${label}, ${t("cellKey", { gate })}`;
+      return label;
     }
-    if (draft.treasure && cellKey(draft.treasure) === key) {
-      return `${label}, ${t("cellTreasure")}`;
-    }
-    const gate = keyGateAt.get(key);
-    if (gate !== undefined) return `${label}, ${t("cellKey", { gate })}`;
-    return label;
-  }
 
-  function edgeLabel(edge: Edge): string {
-    const segment = segmentAt.get(edgeKey(edge));
-    const status = !segment
-      ? t("edgeEmpty")
-      : segment.kind === "wall"
-        ? t("edgeWall")
-        : t("edgeGate", { gate: segment.gate });
-    return t("edgeLabel", { o: edge.o, x: edge.x, y: edge.y, status });
-  }
+    return ALL_CELLS.map((at) => {
+      const key = cellKey(at);
+      const focused = focusedCell.x === at.x && focusedCell.y === at.y;
+      return (
+        <rect
+          key={key}
+          ref={(el) => {
+            if (el) cellRefs.current.set(key, el);
+            else cellRefs.current.delete(key);
+          }}
+          data-cell={`${at.x},${at.y}`}
+          role="button"
+          tabIndex={focused ? 0 : -1}
+          aria-label={cellLabel(at)}
+          x={at.x * CELL_PX}
+          y={at.y * CELL_PX}
+          width={CELL_PX}
+          height={CELL_PX}
+          className={
+            painted.has(key)
+              ? "fill-cell-painted stroke-grid-line outline-none"
+              : "fill-cell-void stroke-grid-line outline-none"
+          }
+          strokeWidth={1}
+          onKeyDown={(event) => live.current.handleCellKeyDown(event, at)}
+          onFocus={(event) => {
+            setFocusedCell(at);
+            if (showRingIfKeyboard(event, { kind: "cell", at })) {
+              live.current.reveal(at);
+            }
+          }}
+          onBlur={() => setRing(null)}
+        />
+      );
+    });
+  }, [draft, painted, keyGateAt, focusedCell, t]);
 
-  return (
-    // The space the board fills. On a phone the full width, and as tall as
-    // that or the screen, whichever is less: a square upright, a wide strip
-    // on its side. On a desktop everything beside the panel and below the
-    // title, capped so a very wide or very tall monitor does not get a
-    // giant board.
-    <div
-      ref={boxRef}
-      className="h-[min(calc(100vw-2rem),calc(100dvh-2rem))] w-full min-w-0 lg:h-[min(calc(100dvh-11rem),60rem)] lg:max-w-[100rem] lg:flex-1"
-    >
-      <svg
-        ref={svgRef}
-        data-board
-        role="group"
-        aria-label={t("boardLabel")}
-        data-camera={`${cam.x},${cam.y}`}
-        data-view={`${view.w},${view.h}`}
-        viewBox={`${cam.x * CELL_PX} ${cam.y * CELL_PX} ${view.w * CELL_PX} ${view.h * CELL_PX}`}
-        // touch-none: a swipe draws instead of scrolling the page. The board
-        // already fits the width, so losing pinch-zoom on it costs little.
-        className={cn(
-          "border-border-strong block h-full w-full touch-none rounded border select-none",
-          panning ? "cursor-grabbing" : tool === "move" && "cursor-grab",
-        )}
-        onContextMenu={(event) => event.preventDefault()}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerEnd}
-        onPointerCancel={handlePointerEnd}
-        onLostPointerCapture={handlePointerEnd}
-        onPointerLeave={() => setHover(null)}
-      >
-        {ALL_CELLS.map((at) => {
-          const key = cellKey(at);
-          const focused = focusedCell.x === at.x && focusedCell.y === at.y;
-          // The tab stop always renders, wherever the window has gone.
-          if (!focused && !nearView(at, cam, view)) return null;
-          return (
-            <rect
-              key={key}
-              ref={(el) => {
-                if (el) cellRefs.current.set(key, el);
-                else cellRefs.current.delete(key);
-              }}
-              data-cell={`${at.x},${at.y}`}
-              role="button"
-              tabIndex={focused ? 0 : -1}
-              aria-label={cellLabel(at)}
-              x={at.x * CELL_PX}
-              y={at.y * CELL_PX}
-              width={CELL_PX}
-              height={CELL_PX}
-              className={
-                painted.has(key)
-                  ? "fill-cell-painted stroke-grid-line outline-none"
-                  : "fill-cell-void stroke-grid-line outline-none"
-              }
-              strokeWidth={1}
-              onKeyDown={(event) => handleCellKeyDown(event, at)}
-              onFocus={(event) => {
-                setFocusedCell(at);
-                if (showRingIfKeyboard(event, { kind: "cell", at })) reveal(at);
-              }}
-              onBlur={() => setRing(null)}
-            />
-          );
-        })}
-
+  const shapeLayer = useMemo(
+    () => (
+      <>
         {draft.start && (
           <StartIcon
             data-start
@@ -1034,41 +1002,93 @@ export function Board({
             />
           );
         })}
+      </>
+    ),
+    [draft],
+  );
 
-        {edgesActive &&
-          interiorEdges.map((edge, index) => {
-            const horizontal = edge.o === "H";
-            const key = edgeKey(edge);
-            const focused = index === focusedEdgeIndex;
-            if (!focused && !nearView(edge, cam, view)) return null;
-            return (
-              <rect
-                key={`hit-${key}`}
-                ref={(el) => {
-                  if (el) edgeRefs.current.set(key, el);
-                  else edgeRefs.current.delete(key);
-                }}
-                data-edge={key}
-                role="button"
-                tabIndex={focused ? 0 : -1}
-                aria-label={edgeLabel(edge)}
-                x={edge.x * CELL_PX + (horizontal ? 0 : CELL_PX - EDGE_HIT / 2)}
-                y={edge.y * CELL_PX + (horizontal ? CELL_PX - EDGE_HIT / 2 : 0)}
-                width={horizontal ? CELL_PX : EDGE_HIT}
-                height={horizontal ? EDGE_HIT : CELL_PX}
-                fill="transparent"
-                className="outline-none"
-                onKeyDown={(event) => handleEdgeKeyDown(event, edge)}
-                onFocus={(event) => {
-                  setFocusedEdge(key);
-                  if (showRingIfKeyboard(event, { kind: "edge", edge })) {
-                    reveal(edge);
-                  }
-                }}
-                onBlur={() => setRing(null)}
-              />
-            );
-          })}
+  const edgeLayer = useMemo(() => {
+    if (!edgesActive) return null;
+
+    function edgeLabel(edge: Edge): string {
+      const segment = segmentAt.get(edgeKey(edge));
+      const status = !segment
+        ? t("edgeEmpty")
+        : segment.kind === "wall"
+          ? t("edgeWall")
+          : t("edgeGate", { gate: segment.gate });
+      return t("edgeLabel", { o: edge.o, x: edge.x, y: edge.y, status });
+    }
+
+    return interiorEdges.map((edge, index) => {
+      const horizontal = edge.o === "H";
+      const key = edgeKey(edge);
+      const focused = index === focusedEdgeIndex;
+      return (
+        <rect
+          key={`hit-${key}`}
+          ref={(el) => {
+            if (el) edgeRefs.current.set(key, el);
+            else edgeRefs.current.delete(key);
+          }}
+          data-edge={key}
+          role="button"
+          tabIndex={focused ? 0 : -1}
+          aria-label={edgeLabel(edge)}
+          x={edge.x * CELL_PX + (horizontal ? 0 : CELL_PX - EDGE_HIT / 2)}
+          y={edge.y * CELL_PX + (horizontal ? CELL_PX - EDGE_HIT / 2 : 0)}
+          width={horizontal ? CELL_PX : EDGE_HIT}
+          height={horizontal ? EDGE_HIT : CELL_PX}
+          fill="transparent"
+          className="outline-none"
+          onKeyDown={(event) => live.current.handleEdgeKeyDown(event, edge)}
+          onFocus={(event) => {
+            setFocusedEdge(key);
+            if (showRingIfKeyboard(event, { kind: "edge", edge })) {
+              live.current.reveal(edge);
+            }
+          }}
+          onBlur={() => setRing(null)}
+        />
+      );
+    });
+  }, [edgesActive, interiorEdges, segmentAt, focusedEdgeIndex, t]);
+
+  return (
+    // The space the board fills. On a phone the full width, and as tall as
+    // that or the screen, whichever is less: a square upright, a wide strip
+    // on its side. On a desktop everything beside the panel and below the
+    // title, capped so a very wide or very tall monitor does not get a
+    // giant board.
+    <div
+      ref={boxRef}
+      className="h-[min(calc(100vw-2rem),calc(100dvh-2rem))] w-full min-w-0 lg:h-[min(calc(100dvh-11rem),60rem)] lg:max-w-[100rem] lg:flex-1"
+    >
+      <svg
+        ref={svgRef}
+        data-board
+        role="group"
+        aria-label={t("boardLabel")}
+        data-camera={`${camera().x},${camera().y}`}
+        data-view={`${view.w},${view.h}`}
+        viewBox={viewBoxOf(camera(), view)}
+        // touch-none: a swipe draws instead of scrolling the page. The board
+        // already fits the width, so losing pinch-zoom on it costs little.
+        className={cn(
+          "border-border-strong block h-full w-full touch-none rounded border select-none",
+          panning ? "cursor-grabbing" : tool === "move" && "cursor-grab",
+        )}
+        onContextMenu={(event) => event.preventDefault()}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerEnd}
+        onPointerCancel={handlePointerEnd}
+        onLostPointerCapture={handlePointerEnd}
+        onPointerLeave={() => setHover(null)}
+      >
+        {cellLayer}
+        {shapeLayer}
+        {edgeLayer}
 
         {hover && !locked && renderHover(hover)}
 

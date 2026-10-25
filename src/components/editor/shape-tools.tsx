@@ -10,20 +10,21 @@ import { BrushIcon, PALETTE_GROUP, PALETTE_ROWS, ToolIcon } from "./tool-icons";
 export type ShapeToolsProps = {
   tool: Tool;
   onTool: (tool: Tool) => void;
+  /** Turns the move tool on, or off again back to the tool before it. */
+  onToggleMove: () => void;
   used: number;
   budget: number;
   brush: BrushSize;
   onBrush: (brush: BrushSize) => void;
 };
 
-/** The pan tool, on a row of its own above the brush. */
-const MOVE_TOOL: readonly Tool[] = ["move"];
 /** The two shape tools, in display and arrow-key order. */
 const SHAPE_TOOLS: readonly Tool[] = ["paint", "erase-cell"];
 
 export function ShapeTools({
   tool,
   onTool,
+  onToggleMove,
   used,
   budget,
   brush,
@@ -51,19 +52,20 @@ export function ShapeTools({
   return (
     <div className="space-y-3">
       <div className={PALETTE_ROWS}>
-        {/* `tool` is shared with the detail palette, so each group can hold
-            a value none of its buttons represents; RadioButtons keeps a tab
-            stop anyway. */}
-        <RadioButtons
-          aria-label={t("move")}
-          options={MOVE_TOOL}
-          value={tool}
-          onChange={onTool}
-          optionLabel={toolLabel}
-          renderOption={renderTool}
-          buttonClass={iconButtonClass}
-          className="flex gap-2"
-        />
+        {/* A toggle, not a radio: pressed again, it hands back the tool
+            that was active before it. */}
+        <div className="flex gap-2">
+          <button
+            type="button"
+            aria-pressed={tool === "move"}
+            aria-label={t("move")}
+            onClick={onToggleMove}
+            className={iconButtonClass(tool === "move")}
+          >
+            <ToolIcon tool="move" />
+            <Tooltip label={t("move")} />
+          </button>
+        </div>
         <RadioButtons
           aria-label={t("brushLabel")}
           options={BRUSH_SIZES}
@@ -79,6 +81,9 @@ export function ShapeTools({
           buttonClass={iconButtonClass}
           className={PALETTE_GROUP}
         />
+        {/* `tool` is shared with the detail palette, so a group can hold a
+            value none of its buttons represents; RadioButtons keeps a tab
+            stop anyway. */}
         <RadioButtons
           aria-label={t("shapeToolsLabel")}
           options={SHAPE_TOOLS}

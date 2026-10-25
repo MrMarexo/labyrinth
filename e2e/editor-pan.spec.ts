@@ -58,15 +58,17 @@ test.describe("panning the editor board", () => {
   }) => {
     await signUpAndOpenNewMaze(page, { centred: true });
     const board = page.locator("svg[data-board]");
-    // Far outside the window, so not even rendered.
-    await expect(cell(page, 0, 0)).toHaveCount(0);
+    // Drawn, like every square, but far outside the window.
+    const corner00 = (await cell(page, 0, 0).boundingBox())!;
+    const shown = (await board.boundingBox())!;
+    expect(corner00.y + corner00.height).toBeLessThan(shown.y);
     const before = await camera(board);
     const edge = corner(await view(board));
     // Squares well inside the opening window.
     const x = Math.ceil(Math.max(before.x, 0)) + 2;
     const y = Math.ceil(Math.max(before.y, 0)) + 2;
 
-    await page.getByRole("radio", { name: "Move" }).click();
+    await page.getByRole("button", { name: "Move" }).click();
     await drag(page, cell(page, x, y), cell(page, x + 4, y + 4));
     // Four squares up and left, or as far as the frame's edge allows.
     await expect
@@ -90,6 +92,28 @@ test.describe("panning the editor board", () => {
     await fresh.click();
     await expect(page.locator("[data-budget]")).toHaveText("1 / 36 squares");
     await expect(fresh).toHaveAttribute("aria-label", /, painted$/);
+  });
+
+  test("the move button is a toggle: pressed again, it gives back the tool from before", async ({
+    page,
+  }) => {
+    await signUpAndOpenNewMaze(page);
+    const move = page.getByRole("button", { name: "Move" });
+    await page.getByRole("radio", { name: "Wall" }).click();
+
+    await move.click();
+    await expect(move).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("radio", { name: "Wall" })).toHaveAttribute(
+      "aria-checked",
+      "false",
+    );
+
+    await move.click();
+    await expect(move).toHaveAttribute("aria-pressed", "false");
+    await expect(page.getByRole("radio", { name: "Wall" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
   });
 
   test("the wheel does not move the board under a stroke", async ({
@@ -118,7 +142,7 @@ test.describe("panning the editor board", () => {
 
     const edge = corner(await view(board));
 
-    await page.getByRole("radio", { name: "Move" }).click();
+    await page.getByRole("button", { name: "Move" }).click();
     await drag(page, cell(page, 2, 2), cell(page, 10, 10));
     const at = await camera(board);
     expect(at.x).toBeCloseTo(edge.x, 1);

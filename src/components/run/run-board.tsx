@@ -1,7 +1,13 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useEffect, useRef, useState, type PointerEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type PointerEvent,
+  type RefObject,
+} from "react";
 
 import { CELL_PX } from "~/components/editor/board";
 import {
@@ -146,44 +152,71 @@ function fitBox({ minX, minY, maxX, maxY }: Bounds): Box {
   };
 }
 
+function boxString(box: Box): string {
+  return `${box.x} ${box.y} ${box.w} ${box.h}`;
+}
+
 /**
- * Eases the viewBox toward `target` over ZOOM_MS, or jumps when reduced or
- * `instant` (a pan, which must track the pointer).
+ * Keeps the SVG's viewBox on `target`, eased over ZOOM_MS, or at once when
+ * reduced. Written straight to the element, so no frame of the easing and no
+ * pan renders anything. Returns the box to render with, and `jump`, which
+ * moves the viewBox at once (a pan, which must track the pointer).
  */
-function useEasedBox(target: Box, reduced: boolean, instant: boolean): Box {
-  const [box, setBox] = useState(target);
+function useViewBox(
+  svgRef: RefObject<SVGSVGElement | null>,
+  target: Box,
+  reduced: boolean,
+) {
   const shown = useRef(target);
-  const key = `${target.x},${target.y},${target.w},${target.h}`;
+  const frame = useRef(0);
+  const key = boxString(target);
+
+  function write(box: Box) {
+    shown.current = box;
+    svgRef.current?.setAttribute("viewBox", boxString(box));
+  }
 
   useEffect(() => {
+    cancelAnimationFrame(frame.current);
     const from = shown.current;
-    if (reduced || instant) {
-      shown.current = target;
-      setBox(target);
+    if (reduced) {
+      write(target);
       return;
     }
     const start = performance.now();
-    let frame = 0;
     const tick = (now: number) => {
       const t = Math.min(1, (now - start) / ZOOM_MS);
       const e = 1 - (1 - t) ** 3;
-      const next = {
+      write({
         x: from.x + (target.x - from.x) * e,
         y: from.y + (target.y - from.y) * e,
         w: from.w + (target.w - from.w) * e,
         h: from.h + (target.h - from.h) * e,
-      };
-      shown.current = next;
-      setBox(next);
-      if (t < 1) frame = requestAnimationFrame(tick);
+      });
+      if (t < 1) frame.current = requestAnimationFrame(tick);
     };
-    frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
+    frame.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame.current);
     // `key` stands for `target`, whose identity changes every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, reduced, instant]);
+  }, [key, reduced]);
 
-  return box;
+  return {
+    box: shown.current,
+    jump(box: Box) {
+      cancelAnimationFrame(frame.current);
+      write(box);
+    },
+  };
+}
+
+function cameraBox(cam: Camera): Box {
+  return {
+    x: cam.x * CELL_PX,
+    y: cam.y * CELL_PX,
+    w: MAX_SPAN * CELL_PX,
+    h: MAX_SPAN * CELL_PX,
+  };
 }
 
 /** True for PULSE_MS after each new bump, so the class never lingers. */
@@ -216,50 +249,76 @@ export function RunBoard({ map, at, heldKeys, bump, lean }: RunBoardProps) {
   const bounds = discoveredBounds(map, at);
   const capped =
     Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) > MAX_SPAN;
+  // `cam` is the camera as last committed; a pan in progress moves the
+  // board without it and commits once it settles, so it renders nothing.
   const [cam, setCam] = useState<Camera | null>(null);
   const shown = clampCamera(cam ?? centreOn(at, MAX_SPAN), MAX_SPAN, bounds);
-  // Where the camera is now, for pans: several pointer or wheel events can
-  // arrive before the next render, and each must start where the last left
-  // off, not from `shown` as that render saw it.
-  const shownRef = useRef(shown);
-  shownRef.current = shown;
+  // Where the camera is now. A pan starts each step from here, since several
+  // pointer or wheel events can arrive between renders; a render only resets
+  // it when no pan is waiting to be committed.
+  const liveRef = useRef(shown);
+  const uncommitted = useRef(false);
+  if (!uncommitted.current) liveRef.current = shown;
+  const commitTimer = useRef(0);
+  useEffect(() => () => window.clearTimeout(commitTimer.current), []);
+
+  function commit() {
+    window.clearTimeout(commitTimer.current);
+    uncommitted.current = false;
+    setCam(liveRef.current);
+  }
+
   const atKey = cellKey(at);
   useEffect(() => {
+    window.clearTimeout(commitTimer.current);
+    uncommitted.current = false;
     if (!capped) {
       setCam(null);
       return;
     }
-    setCam((prev) => {
-      const from = clampCamera(
-        prev ?? centreOn(at, MAX_SPAN),
-        MAX_SPAN,
-        bounds,
-      );
-      return follow(from, at, MAX_SPAN, FOLLOW_MARGIN);
-    });
+    // From wherever the viewer left it, panned or not.
+    const from = clampCamera(liveRef.current, MAX_SPAN, bounds);
+    setCam(follow(from, at, MAX_SPAN, FOLLOW_MARGIN));
     // `atKey` stands for `at`; `bounds` only ever grows with a move.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [atKey, capped]);
+
+  const view = useViewBox(
+    svgRef,
+    capped ? cameraBox(shown) : fitBox(bounds),
+    reduced,
+  );
 
   const panRef = useRef<{ pointerId: number; x: number; y: number } | null>(
     null,
   );
   const [panning, setPanning] = useState(false);
 
+  /** Moves the camera by a delta in cells, on the element only. */
   function panBy(dx: number, dy: number): boolean {
     if (!capped) return false;
-    const from = shownRef.current;
+    const from = liveRef.current;
     const next = clampCamera(
       { x: from.x + dx, y: from.y + dy },
       MAX_SPAN,
       bounds,
     );
     if (next.x === from.x && next.y === from.y) return false;
-    shownRef.current = next;
-    setCam(next);
+    liveRef.current = next;
+    uncommitted.current = true;
+    view.jump(cameraBox(next));
+    if (svgRef.current) svgRef.current.dataset.camera = `${next.x},${next.y}`;
     return true;
   }
-  useWheelPan(svgRef, MAX_SPAN, panBy);
+  useWheelPan(svgRef, MAX_SPAN, (dx, dy) => {
+    const moved = panBy(dx, dy);
+    // The wheel has no release: commit once it has been still a moment.
+    if (moved) {
+      window.clearTimeout(commitTimer.current);
+      commitTimer.current = window.setTimeout(commit, 150);
+    }
+    return moved;
+  });
 
   function handlePointerDown(event: PointerEvent<SVGSVGElement>) {
     if (!capped || panRef.current) return;
@@ -286,20 +345,9 @@ export function RunBoard({ map, at, heldKeys, bump, lean }: RunBoardProps) {
     if (panRef.current?.pointerId !== event.pointerId) return;
     panRef.current = null;
     setPanning(false);
+    if (uncommitted.current) commit();
   }
 
-  const box = useEasedBox(
-    capped
-      ? {
-          x: shown.x * CELL_PX,
-          y: shown.y * CELL_PX,
-          w: MAX_SPAN * CELL_PX,
-          h: MAX_SPAN * CELL_PX,
-        }
-      : fitBox(bounds),
-    reduced,
-    panning,
-  );
   const pulsing = usePulse(bump?.id ?? null);
 
   const drawSegment = (
@@ -345,11 +393,13 @@ export function RunBoard({ map, at, heldKeys, bump, lean }: RunBoardProps) {
       data-camera={capped ? `${shown.x},${shown.y}` : undefined}
       role="img"
       aria-label={t("boardLabel")}
-      viewBox={`${box.x} ${box.y} ${box.w} ${box.h}`}
+      viewBox={boxString(view.box)}
       preserveAspectRatio="xMidYMid meet"
       // A camera pans with a drag, so then a swipe on it must not scroll.
       className={cn(
-        "border-border-strong aspect-square h-auto w-full max-w-[700px] rounded border",
+        // The void is the element's own background, not a rect in the
+        // drawing: it then covers whatever the viewBox shows, mid-pan too.
+        "border-border-strong bg-cell-void aspect-square h-auto w-full max-w-[700px] rounded border",
         capped && "touch-none select-none",
         capped && (panning ? "cursor-grabbing" : "cursor-grab"),
       )}
@@ -359,14 +409,6 @@ export function RunBoard({ map, at, heldKeys, bump, lean }: RunBoardProps) {
       onPointerCancel={handlePointerEnd}
       onLostPointerCapture={handlePointerEnd}
     >
-      <rect
-        aria-hidden="true"
-        x={box.x}
-        y={box.y}
-        width={box.w}
-        height={box.h}
-        className="fill-cell-void"
-      />
       {map.cells.map((c) => (
         <g key={cellKey(c)} aria-hidden="true">
           <rect

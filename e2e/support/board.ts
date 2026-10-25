@@ -67,7 +67,7 @@ export function corner({ w, h }: { w: number; h: number }) {
 export async function panToCorner(page: Page): Promise<void> {
   const board = page.locator("svg[data-board]");
   const target = corner(await view(board));
-  await page.getByRole("radio", { name: "Move" }).click();
+  await page.getByRole("button", { name: "Move" }).click();
   // The frame is larger than the window, so it may take a few drags, each
   // from near the window's top-left to near its bottom-right.
   for (let i = 0; i < 6; i += 1) {

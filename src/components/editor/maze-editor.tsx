@@ -385,6 +385,20 @@ export function MazeEditor({
       ? "saving"
       : "saved";
 
+  // The tool the move toggle hands back when it is turned off again.
+  const beforeMoveRef = useRef<Tool>("paint");
+
+  function toggleMove() {
+    if (tool !== "move") {
+      beforeMoveRef.current = tool;
+      setTool("move");
+      return;
+    }
+    // Straight back, not through `selectTool`: the gate or key number the
+    // author had chosen stays chosen.
+    setTool(beforeMoveRef.current);
+  }
+
   function selectTool(next: Tool) {
     setTool(next);
     if (next === "gate" || next === "key") {
@@ -533,6 +547,7 @@ export function MazeEditor({
         <ShapeTools
           tool={tool}
           onTool={selectTool}
+          onToggleMove={toggleMove}
           used={cellsUsed(state.draft)}
           budget={cellCount}
           brush={brush}
