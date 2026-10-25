@@ -2,10 +2,33 @@
 
 import { useEffect, useRef, type RefObject } from "react";
 
+// What the editor board and the run board share for panning.
+
+/**
+ * Captures a pointer for a gesture on `el`, so its moves and release keep
+ * coming when it leaves the board.
+ */
+export function capturePointer(el: Element | null, pointerId: number) {
+  try {
+    el?.setPointerCapture(pointerId);
+  } catch {
+    // Without capture a gesture still works while the pointer stays on
+    // the board, and lostpointercapture/pointerup end it either way.
+  }
+}
+
+/** Board cells per client pixel, for an SVG drawn `cellPx` per cell. */
+export function cellsPerPixel(svg: SVGSVGElement | null, cellPx: number) {
+  // The screen matrix, not the element's box: the box includes the border.
+  const scale = svg?.getScreenCTM()?.a;
+  return scale ? 1 / (scale * cellPx) : 0;
+}
+
 /**
  * Pans a board with the wheel, `span` cells across its width. `pan` moves the
- * camera by a delta in cells and says whether it moved; only then is the
- * page kept still, so it scrolls on once the board can go no further.
+ * camera by a delta in cells and says whether to keep the page still —
+ * normally whether the camera moved, so the page scrolls on once the board
+ * can go no further.
  * Attached by hand: React's wheel listener is passive and cannot do that.
  */
 export function useWheelPan(

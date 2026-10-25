@@ -159,11 +159,12 @@ The frame is larger than that: the board is a **camera** onto a 48 × 48
 frame, and pans rather than shrinks (§10.2). Coordinates are absolute
 within the frame, so every stored coordinate is in `0..47`.
 
-The cap is also what prevents degenerate shapes. There is deliberately **no
-minimum** — a corridor may be one square wide anywhere it likes — but a maze
-that is one square tall and sixty-four wide cannot exist, because 64 exceeds
-the width cap. The budget and the cap together do that work, so no separate
-rule is needed.
+There is deliberately **no minimum** — a corridor may be one square wide
+anywhere it likes — and no rule against long, thin shapes. The 48 × 48 cap
+leaves room for them: with a 256-square budget a maze may be a corridor 48
+squares long, or a strip 5 tall and 48 wide. That is accepted. A maze one
+square tall and sixty-four wide still cannot exist, because 64 exceeds the
+width cap.
 
 ## 4. Validation
 
@@ -649,8 +650,8 @@ more than the whole frame zooms in until it shows exactly the frame; on a
 desktop it keeps its zoom, and the frame sits centred with empty margin.
 
 **Panning.** The board is a window onto the 48 × 48 frame (§3.3). It
-opens centred on what is painted, or at the frame's top-left corner when
-nothing is. The **move** tool, first in the shape palette, pans with a drag
+opens centred on what is painted, or on the middle of the frame when nothing
+is, so a new maze can grow in every direction. The **move** tool, first in the shape palette, pans with a drag
 and draws nothing. Whatever the tool, a two-finger drag on touch, a middle or
 right drag with a mouse, and the wheel pan too; the wheel lets the page scroll
 once the board can go no further that way. A second finger landing mid-stroke
@@ -999,7 +1000,7 @@ or a share link. The lobby itself shipped ([match lobby spec](2026-10-23-match-l
 | Realtime transport | Managed vendor (Pusher), behind a `RealtimePublisher` interface. |
 | Replay in v1? | Yes, and it is the primary use — the author is usually offline during the run. |
 | Maze footprint | A cell budget, any connected shape, not a rectangle. Void squares cost nothing. |
-| Shape size limits | Bounding box at most 48 × 48; the board shows part of it and pans. No minimum — corridors may be one square wide. The cap is what makes a long thin maze impossible. |
+| Shape size limits | Bounding box at most 48 × 48; the board shows part of it and pans. No minimum — corridors may be one square wide — and long, thin shapes are allowed. |
 | Difficulty feedback to the author | None. No difficulty score, no gate-placement advice, no "too easy" warning. The only judgement made about a maze is whether the treasure is reachable. |
 | Decorative gates | Legal, including a gate whose key is unreachable. Misdirection is a design tool, not an error. |
 | Enclosure | The labyrinth is always closed; a runner can never leave it. Guaranteed by construction, stated as a rule. |

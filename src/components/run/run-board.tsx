@@ -12,7 +12,11 @@ import {
   TreasureIcon,
 } from "~/components/maze-icons";
 import { useReducedMotion } from "~/components/use-reduced-motion";
-import { useWheelPan } from "~/components/use-wheel-pan";
+import {
+  capturePointer,
+  cellsPerPixel,
+  useWheelPan,
+} from "~/components/board-pan";
 import {
   centreOn,
   clampCamera,
@@ -130,26 +134,15 @@ function discoveredBounds(map: DiscoveredMap, at: Point): Bounds {
 }
 
 /** `bounds`, squared off. */
-function fitBox(bounds: Bounds): Box {
-  let { minX, minY } = bounds;
-  let maxX = bounds.maxX - 1;
-  let maxY = bounds.maxY - 1;
+function fitBox({ minX, minY, maxX, maxY }: Bounds): Box {
   // Square, so the board's on-screen size never changes as it grows: on a
   // phone the d-pad below it must not move under the thumb.
-  const spanX = maxX - minX + 1;
-  const spanY = maxY - minY + 1;
-  if (spanX < spanY) {
-    minX -= Math.floor((spanY - spanX) / 2);
-    maxX += Math.ceil((spanY - spanX) / 2);
-  } else if (spanY < spanX) {
-    minY -= Math.floor((spanX - spanY) / 2);
-    maxY += Math.ceil((spanX - spanY) / 2);
-  }
+  const span = Math.max(maxX - minX, maxY - minY);
   return {
-    x: minX * CELL_PX,
-    y: minY * CELL_PX,
-    w: (maxX - minX + 1) * CELL_PX,
-    h: (maxY - minY + 1) * CELL_PX,
+    x: (minX - Math.floor((span - (maxX - minX)) / 2)) * CELL_PX,
+    y: (minY - Math.floor((span - (maxY - minY)) / 2)) * CELL_PX,
+    w: span * CELL_PX,
+    h: span * CELL_PX,
   };
 }
 
@@ -225,6 +218,11 @@ export function RunBoard({ map, at, heldKeys, bump, lean }: RunBoardProps) {
     Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) > MAX_SPAN;
   const [cam, setCam] = useState<Camera | null>(null);
   const shown = clampCamera(cam ?? centreOn(at, MAX_SPAN), MAX_SPAN, bounds);
+  // Where the camera is now, for pans: several pointer or wheel events can
+  // arrive before the next render, and each must start where the last left
+  // off, not from `shown` as that render saw it.
+  const shownRef = useRef(shown);
+  shownRef.current = shown;
   const atKey = cellKey(at);
   useEffect(() => {
     if (!capped) {
@@ -250,12 +248,14 @@ export function RunBoard({ map, at, heldKeys, bump, lean }: RunBoardProps) {
 
   function panBy(dx: number, dy: number): boolean {
     if (!capped) return false;
+    const from = shownRef.current;
     const next = clampCamera(
-      { x: shown.x + dx, y: shown.y + dy },
+      { x: from.x + dx, y: from.y + dy },
       MAX_SPAN,
       bounds,
     );
-    if (next.x === shown.x && next.y === shown.y) return false;
+    if (next.x === from.x && next.y === from.y) return false;
+    shownRef.current = next;
     setCam(next);
     return true;
   }
@@ -269,20 +269,14 @@ export function RunBoard({ map, at, heldKeys, bump, lean }: RunBoardProps) {
       y: event.clientY,
     };
     setPanning(true);
-    try {
-      svgRef.current?.setPointerCapture(event.pointerId);
-    } catch {
-      // Without capture the pan still works while the pointer is on the board.
-    }
+    capturePointer(svgRef.current, event.pointerId);
   }
 
   function handlePointerMove(event: PointerEvent<SVGSVGElement>) {
     const pan = panRef.current;
     if (pan?.pointerId !== event.pointerId) return;
-    // The screen matrix, not the element's box: the box includes the border.
-    const ctm = svgRef.current?.getScreenCTM()?.a;
-    if (!ctm) return;
-    const scale = 1 / (ctm * CELL_PX);
+    const scale = cellsPerPixel(svgRef.current, CELL_PX);
+    if (!scale) return;
     panBy(-(event.clientX - pan.x) * scale, -(event.clientY - pan.y) * scale);
     pan.x = event.clientX;
     pan.y = event.clientY;

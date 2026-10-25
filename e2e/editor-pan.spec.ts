@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 import { MAX_BOUNDING_BOX as FRAME } from "~/maze";
 
-import { camera, cell, corner, drag, view } from "./support/board";
+import { camera, cell, centre, corner, drag, view } from "./support/board";
 import { signUpAndOpenNewMaze } from "./support/maze";
 
 test.describe("panning the editor board", () => {
@@ -90,6 +90,26 @@ test.describe("panning the editor board", () => {
     await fresh.click();
     await expect(page.locator("[data-budget]")).toHaveText("1 / 36 squares");
     await expect(fresh).toHaveAttribute("aria-label", /, painted$/);
+  });
+
+  test("the wheel does not move the board under a stroke", async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name === "mobile", "no wheel on a phone");
+    await signUpAndOpenNewMaze(page);
+    const board = page.locator("svg[data-board]");
+    const before = await camera(board);
+    const start = await centre(cell(page, 2, 2));
+
+    await page.mouse.move(start.x, start.y);
+    await page.mouse.down();
+    await page.mouse.wheel(0, 400);
+    await page.mouse.move(start.x + 2, start.y + 2);
+    await page.mouse.up();
+
+    // Moving the board would have painted a streak to where it went.
+    expect(await camera(board)).toEqual(before);
+    await expect(page.locator("[data-budget]")).toHaveText("1 / 36 squares");
   });
 
   test("the camera stops at the edge of the frame", async ({ page }) => {

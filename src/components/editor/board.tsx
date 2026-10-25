@@ -24,7 +24,11 @@ import {
   type Point,
   type Tool,
 } from "~/maze";
-import { useWheelPan } from "~/components/use-wheel-pan";
+import {
+  capturePointer,
+  cellsPerPixel,
+  useWheelPan,
+} from "~/components/board-pan";
 import { cn } from "~/lib/cn";
 import {
   GateSegment,
@@ -363,13 +367,6 @@ export function Board({
     return true;
   }
 
-  /** Board cells per client pixel. */
-  function cellsPerPixel() {
-    // The screen matrix, not the element's box: the box includes the border.
-    const scale = svgRef.current?.getScreenCTM()?.a;
-    return scale ? 1 / (scale * CELL_PX) : 0;
-  }
-
   function reveal(at: Point) {
     moveCamera(follow(camRef.current, at, viewRef.current, OVERSCAN));
   }
@@ -409,6 +406,10 @@ export function Board({
   }, []);
 
   useWheelPan(svgRef, view.w, (dx, dy) => {
+    // Not under a stroke: the board would move beneath the pointer, and the
+    // stroke's next sample would join across everything in between. The
+    // wheel is swallowed instead, since a page scroll would do the same.
+    if (strokeRef.current) return true;
     const current = camRef.current;
     return moveCamera({ x: current.x + dx, y: current.y + dy });
   });
@@ -583,15 +584,6 @@ export function Board({
     }
   }
 
-  function capture(pointerId: number) {
-    try {
-      svgRef.current?.setPointerCapture(pointerId);
-    } catch {
-      // Without capture a gesture still works while the pointer stays on
-      // the board, and lostpointercapture/pointerup end it either way.
-    }
-  }
-
   /** Starts a pan, or adds a pointer to the one in progress. */
   function beginPan(pointerId: number, at: { x: number; y: number }) {
     const pan: Pan = panRef.current ?? { points: new Map(), last: at };
@@ -602,7 +594,7 @@ export function Board({
     setPanning(true);
     setHover(null);
     document.documentElement.classList.add("select-none");
-    capture(pointerId);
+    capturePointer(svgRef.current, pointerId);
   }
 
   function movePan(pointerId: number, at: { x: number; y: number }) {
@@ -610,7 +602,7 @@ export function Board({
     if (!pan?.points.has(pointerId)) return false;
     pan.points.set(pointerId, at);
     const mid = midpoint(pan.points);
-    const scale = cellsPerPixel();
+    const scale = cellsPerPixel(svgRef.current, CELL_PX);
     const current = camRef.current;
     moveCamera({
       x: current.x - (mid.x - pan.last.x) * scale,
@@ -683,7 +675,7 @@ export function Board({
     // A swipe that strays off the board would otherwise select page text.
     // Not preventDefault on the press: that would stop the rect taking focus.
     document.documentElement.classList.add("select-none");
-    capture(event.pointerId);
+    capturePointer(svgRef.current, event.pointerId);
     onStrokeBegin();
     strokeAlong(p, p);
   }
