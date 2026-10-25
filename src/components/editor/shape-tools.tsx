@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { RadioButtons } from "~/components/radio-buttons";
 import { iconButtonClass, Tooltip } from "~/components/tooltip";
 import { BRUSH_SIZES, type BrushSize, type Tool } from "~/maze";
-import { BrushIcon, ToolIcon } from "./tool-icons";
+import { BrushIcon, PALETTE_GROUP, PALETTE_ROWS, ToolIcon } from "./tool-icons";
 
 export type ShapeToolsProps = {
   tool: Tool;
@@ -16,7 +16,9 @@ export type ShapeToolsProps = {
   onBrush: (brush: BrushSize) => void;
 };
 
-/** The two tools this palette offers, in display and arrow-key order. */
+/** The pan tool, on a row of its own above the brush. */
+const MOVE_TOOL: readonly Tool[] = ["move"];
+/** The two shape tools, in display and arrow-key order. */
 const SHAPE_TOOLS: readonly Tool[] = ["paint", "erase-cell"];
 
 export function ShapeTools({
@@ -30,29 +32,35 @@ export function ShapeTools({
   const t = useTranslations("editor");
 
   function toolLabel(option: Tool): string {
+    if (option === "move") return t("move");
     return option === "paint" ? t("paint") : t("eraseCell");
   }
   function brushLabel(size: BrushSize): string {
     return t("brushSize", { size });
   }
 
+  const renderTool = (option: Tool) => (
+    <>
+      <ToolIcon tool={option} />
+      <Tooltip label={toolLabel(option)} />
+    </>
+  );
+
+  // On a desktop one column, like the detail palette: move, then the brush
+  // size, then what the brush does. On a phone the three groups share a row.
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap gap-4">
-        {/* `tool` is shared with the detail palette, so it can hold a value
-            neither button represents; RadioButtons keeps a tab stop anyway. */}
+      <div className={PALETTE_ROWS}>
+        {/* `tool` is shared with the detail palette, so each group can hold
+            a value none of its buttons represents; RadioButtons keeps a tab
+            stop anyway. */}
         <RadioButtons
-          aria-label={t("shapeToolsLabel")}
-          options={SHAPE_TOOLS}
+          aria-label={t("move")}
+          options={MOVE_TOOL}
           value={tool}
           onChange={onTool}
           optionLabel={toolLabel}
-          renderOption={(option) => (
-            <>
-              <ToolIcon tool={option} />
-              <Tooltip label={toolLabel(option)} />
-            </>
-          )}
+          renderOption={renderTool}
           buttonClass={iconButtonClass}
           className="flex gap-2"
         />
@@ -69,7 +77,17 @@ export function ShapeTools({
             </>
           )}
           buttonClass={iconButtonClass}
-          className="flex gap-2"
+          className={PALETTE_GROUP}
+        />
+        <RadioButtons
+          aria-label={t("shapeToolsLabel")}
+          options={SHAPE_TOOLS}
+          value={tool}
+          onChange={onTool}
+          optionLabel={toolLabel}
+          renderOption={renderTool}
+          buttonClass={iconButtonClass}
+          className={PALETTE_GROUP}
         />
       </div>
 

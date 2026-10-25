@@ -9,6 +9,8 @@ import {
 } from "./geometry";
 
 export type Tool =
+  /** Pans the board; draws nothing. */
+  | "move"
   | "paint"
   | "erase-cell"
   | "wall"
@@ -86,6 +88,8 @@ export type EditorAction =
   | { type: "redo" }
   | { type: "beginStroke" }
   | { type: "endStroke" }
+  /** Abandons the open stroke: the draft goes back to how it began. */
+  | { type: "cancelStroke" }
   /**
    * Starts over from `draft` as if it had just been opened: no history, and
    * the same reference-preserving cleanup as `initialEditorState`.
@@ -154,6 +158,12 @@ export function editorReducer(
       future: [],
       strokeBase: null,
     };
+  }
+
+  if (action.type === "cancelStroke") {
+    const base = state.strokeBase;
+    if (base === null) return state;
+    return { ...state, draft: base, strokeBase: null };
   }
 
   // History can't move under a stroke that is still being drawn.

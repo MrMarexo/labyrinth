@@ -112,9 +112,9 @@ export function validateStructure(
   const width = Math.max(...xs) - Math.min(...xs) + 1;
   const height = Math.max(...ys) - Math.min(...ys) + 1;
   // Unreachable through `validateMaze`: the schema caps every coordinate at
-  // 0..MAX_BOUNDING_BOX-1, so no parsed maze can exceed a 16x16 box. That is
-  // by design — the editor board is a fixed 16x16 frame and coordinates are
-  // absolute within it (spec §3.3), not a window onto a larger canvas. The
+  // 0..MAX_BOUNDING_BOX-1, so no parsed maze can exceed the cap. That is by
+  // design — coordinates are absolute within the editor's fixed frame
+  // (spec §3.3), which the board pans over rather than grows past. The
   // rule stays as defence for a caller that builds a `Maze` without going
   // through `parseMaze`.
   if (width > MAX_BOUNDING_BOX || height > MAX_BOUNDING_BOX) {

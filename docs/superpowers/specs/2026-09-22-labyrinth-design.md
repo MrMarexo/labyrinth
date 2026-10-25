@@ -143,23 +143,21 @@ reuse a maze they have already drawn.
 
 ### 3.3 Limits
 
-- `cellCount` presets: 36, 64, 100, 144, 196, 256. Set per match. 256 fills
-  the whole 16 × 16 frame, so at that size the shape is fixed and only the
-  walls, gates and keys are the author's.
+- `cellCount` presets: 36, 64, 100, 144, 196, 256. Set per match.
 - `gateCount`: 0–5. Set per match. The format still accepts gate ids up to 8
   (the original cap, which keeps the solver's state space small, §4.2), so
   mazes saved before the cap was lowered still parse.
-- Bounding box of the drawn shape: at most 16 × 16.
+- Bounding box of the drawn shape: at most 48 × 48.
 
-The 16 × 16 cap is set by the desktop board, not by storage. Wall edges need a
-~14 px hit strip to be comfortably clickable, which wants cells around 44 px;
-16 cells is then ~700 px of board, which sits beside the side panel on a
-1280 px laptop without cramping. At 20 cells the squares drop to ~35 px and the
-edges get fiddly.
+The board shows at least 16 squares each way, a number set by the board: wall edges
+need a ~14 px hit strip to be comfortably clickable, which wants cells around
+44 px; 16 cells is then ~700 px of board, which sits beside the side panel on
+a 1280 px laptop without cramping. At 20 cells the squares drop to ~35 px and
+the edges get fiddly.
 
-Coordinates are absolute within that fixed 16 × 16 frame: the board *is* the
-frame, not a viewport onto a larger canvas, so the editor needs no panning,
-zooming or scrolling and every stored coordinate is in `0..15`.
+The frame is larger than that: the board is a **camera** onto a 48 × 48
+frame, and pans rather than shrinks (§10.2). Coordinates are absolute
+within the frame, so every stored coordinate is in `0..47`.
 
 The cap is also what prevents degenerate shapes. There is deliberately **no
 minimum** — a corridor may be one square wide anywhere it likes — but a maze
@@ -181,7 +179,7 @@ feedback and again on the server on submit. Only the server's verdict counts.
 - `start` and `treasure` are both in `cells` and are different cells.
 - The start cell holds no key and no treasure.
 - Each cell holds at most one of { key, treasure }.
-- The shape's bounding box is at most 16 × 16 (§3.3).
+- The shape's bounding box is at most 48 × 48 (§3.3).
 - Every segment's two adjacent cells are both in `cells`.
 - No two segments share an `(o, x, y)`.
 - Gate ids are exactly `1..gateCount`, each on exactly one segment.
@@ -640,6 +638,27 @@ touched; a tap with a stroke tool is a one-edit stroke. The board sets
 `touch-action: none` so a swipe on a phone draws instead of scrolling — the
 board already fits the width, so losing pinch-zoom on it costs little.
 
+**Board size.** The board fills the space it has: on a phone a square the
+width of the screen; on a desktop everything beside the side panel and below
+the title, up to 100rem wide and 60rem tall, so a very wide or very tall
+monitor does not get a giant board. Squares stay square. The shorter side
+shows 12 of them on a phone, big enough to hit with a thumb, and 24 on a desktop, where the board is large
+enough for smaller squares and more of the maze is worth seeing at once; the
+longer side shows as many more as fit. On a phone a board long enough to show
+more than the whole frame zooms in until it shows exactly the frame; on a
+desktop it keeps its zoom, and the frame sits centred with empty margin.
+
+**Panning.** The board is a window onto the 48 × 48 frame (§3.3). It
+opens centred on what is painted, or at the frame's top-left corner when
+nothing is. The **move** tool, first in the shape palette, pans with a drag
+and draws nothing. Whatever the tool, a two-finger drag on touch, a middle or
+right drag with a mouse, and the wheel pan too; the wheel lets the page scroll
+once the board can go no further that way. A second finger landing mid-stroke
+cancels the stroke — it is undone, not recorded — and on touch a tap tool
+(gate, key, start, treasure) acts on release, so the first finger of a pan
+places nothing. The camera stops at the frame's edges. Keyboard focus moving
+to a square or edge outside the window brings it into view.
+
 **The outline is automatic.** Every edge with exactly one painted side —
 including the frame border and the rim of any unpainted hole — is drawn as a
 wall, because it is one (§2.3), and is recomputed from the painted cells on
@@ -718,7 +737,11 @@ parts in that order around the board.
 
 The board shows at least 7 × 7 cells, centred on the runner, and grows to fit
 every discovered cell, segment and passage with a cell of padding, easing the
-change over about 200 ms. An edge between two discovered cells that is neither
+change over about 200 ms — up to 16 × 16, the editor's window. Past that it
+stops zooming out and becomes a camera: it moves only as the runner comes
+within two cells of an edge, and a drag (or the wheel) pans it over what has
+been discovered, never beyond. The runner's next move brings it back, centred
+on the runner if they had been panned out of view. An edge between two discovered cells that is neither
 a known segment nor a passage is drawn as a faint dashed line: untested, could
 go either way. A key on a discovered cell has been collected (stepping on a
 cell picks it up) and a drawn treasure has been reached, so both are drawn at
@@ -729,7 +752,8 @@ component: the editor board renders every square of the frame and labels each
 painted or void, which in a run view would leak the shape into the
 accessibility tree. The run board is a sibling that shares the cell size and
 gate colours and is fed only what the runner has discovered. Its viewport grows
-as the runner explores, because the frame's size is itself a secret.
+as the runner explores, because the frame's size is itself a secret; for the
+same reason the camera's bounds are the discovered area, never the frame.
 
 A runner who finds the treasure sees their own score and a waiting state; the
 opponent's score stays hidden until the match ends (§9). The finishing move
@@ -815,8 +839,8 @@ leaves half the error surface silently untranslated.
 ### 10.7 Responsiveness
 
 Desktop: board plus side panel. Mobile: board with a bottom sheet for the
-palette. The board scales to the viewport with zoom and pan. See the known risk
-in §10.2.
+palette. The board scales to the viewport, and pans over a frame larger than
+it (§10.2). See the known risk in §10.2.
 
 ## 11. Error handling
 
@@ -975,7 +999,7 @@ or a share link. The lobby itself shipped ([match lobby spec](2026-10-23-match-l
 | Realtime transport | Managed vendor (Pusher), behind a `RealtimePublisher` interface. |
 | Replay in v1? | Yes, and it is the primary use — the author is usually offline during the run. |
 | Maze footprint | A cell budget, any connected shape, not a rectangle. Void squares cost nothing. |
-| Shape size limits | Bounding box at most 16 × 16, sized by what fits comfortably on a desktop board. No minimum — corridors may be one square wide. The cap is what makes a long thin maze impossible. |
+| Shape size limits | Bounding box at most 48 × 48; the board shows part of it and pans. No minimum — corridors may be one square wide. The cap is what makes a long thin maze impossible. |
 | Difficulty feedback to the author | None. No difficulty score, no gate-placement advice, no "too easy" warning. The only judgement made about a maze is whether the treasure is reachable. |
 | Decorative gates | Legal, including a gate whose key is unreachable. Misdirection is a design tool, not an error. |
 | Enclosure | The labyrinth is always closed; a runner can never leave it. Guaranteed by construction, stated as a rule. |

@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type PointerEvent } from "react";
 
 import { CELL_PX } from "~/components/editor/board";
 import {
@@ -12,6 +12,15 @@ import {
   TreasureIcon,
 } from "~/components/maze-icons";
 import { useReducedMotion } from "~/components/use-reduced-motion";
+import { useWheelPan } from "~/components/use-wheel-pan";
+import {
+  centreOn,
+  clampCamera,
+  follow,
+  type Bounds,
+  type Camera,
+} from "~/lib/camera";
+import { cn } from "~/lib/cn";
 import {
   cellKey,
   edgeBetween,
@@ -37,6 +46,13 @@ export type RunBoardProps = {
 
 /** The board never shows less than this many cells across (spec §10.3). */
 const MIN_SPAN = 7;
+/**
+ * Nor more: past this the board stops zooming out and becomes a camera that
+ * follows the runner.
+ */
+const MAX_SPAN = 16;
+/** How near an edge of the camera, in cells, the runner may come. */
+const FOLLOW_MARGIN = 2;
 /** How far the runner leans toward an unanswered move, in cells. */
 const LEAN = 0.35;
 const LEAN_MS = 90;
@@ -91,9 +107,9 @@ type Box = { x: number; y: number; w: number; h: number };
 
 /**
  * At least MIN_SPAN cells each way, centred on the runner, grown to fit
- * everything discovered with a cell of padding, then squared off.
+ * everything discovered with a cell of padding. `max` is exclusive.
  */
-function boardBox(map: DiscoveredMap, at: Point): Box {
+function discoveredBounds(map: DiscoveredMap, at: Point): Bounds {
   const half = Math.floor(MIN_SPAN / 2);
   let minX = at.x - half;
   let maxX = at.x + half;
@@ -110,6 +126,14 @@ function boardBox(map: DiscoveredMap, at: Point): Box {
     include(e.x, e.y);
     include(e.o === "H" ? e.x : e.x + 1, e.o === "H" ? e.y + 1 : e.y);
   }
+  return { minX, minY, maxX: maxX + 1, maxY: maxY + 1 };
+}
+
+/** `bounds`, squared off. */
+function fitBox(bounds: Bounds): Box {
+  let { minX, minY } = bounds;
+  let maxX = bounds.maxX - 1;
+  let maxY = bounds.maxY - 1;
   // Square, so the board's on-screen size never changes as it grows: on a
   // phone the d-pad below it must not move under the thumb.
   const spanX = maxX - minX + 1;
@@ -129,15 +153,18 @@ function boardBox(map: DiscoveredMap, at: Point): Box {
   };
 }
 
-/** Eases the viewBox toward `target` over ZOOM_MS, or jumps when reduced. */
-function useEasedBox(target: Box, reduced: boolean): Box {
+/**
+ * Eases the viewBox toward `target` over ZOOM_MS, or jumps when reduced or
+ * `instant` (a pan, which must track the pointer).
+ */
+function useEasedBox(target: Box, reduced: boolean, instant: boolean): Box {
   const [box, setBox] = useState(target);
   const shown = useRef(target);
   const key = `${target.x},${target.y},${target.w},${target.h}`;
 
   useEffect(() => {
     const from = shown.current;
-    if (reduced) {
+    if (reduced || instant) {
       shown.current = target;
       setBox(target);
       return;
@@ -161,7 +188,7 @@ function useEasedBox(target: Box, reduced: boolean): Box {
     return () => cancelAnimationFrame(frame);
     // `key` stands for `target`, whose identity changes every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, reduced]);
+  }, [key, reduced, instant]);
 
   return box;
 }
@@ -187,7 +214,98 @@ function usePulse(id: number | null): boolean {
 export function RunBoard({ map, at, heldKeys, bump, lean }: RunBoardProps) {
   const t = useTranslations("run");
   const reduced = useReducedMotion();
-  const box = useEasedBox(boardBox(map, at), reduced);
+  const svgRef = useRef<SVGSVGElement>(null);
+
+  // Once what is discovered outgrows MAX_SPAN, the board is a camera over it.
+  // A pan is the viewer's own; the runner's next move brings the camera back
+  // (`follow` centres a runner who is out of view). The camera never shows
+  // more than the discovered bounds, so it gives nothing away either.
+  const bounds = discoveredBounds(map, at);
+  const capped =
+    Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) > MAX_SPAN;
+  const [cam, setCam] = useState<Camera | null>(null);
+  const shown = clampCamera(cam ?? centreOn(at, MAX_SPAN), MAX_SPAN, bounds);
+  const atKey = cellKey(at);
+  useEffect(() => {
+    if (!capped) {
+      setCam(null);
+      return;
+    }
+    setCam((prev) => {
+      const from = clampCamera(
+        prev ?? centreOn(at, MAX_SPAN),
+        MAX_SPAN,
+        bounds,
+      );
+      return follow(from, at, MAX_SPAN, FOLLOW_MARGIN);
+    });
+    // `atKey` stands for `at`; `bounds` only ever grows with a move.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [atKey, capped]);
+
+  const panRef = useRef<{ pointerId: number; x: number; y: number } | null>(
+    null,
+  );
+  const [panning, setPanning] = useState(false);
+
+  function panBy(dx: number, dy: number): boolean {
+    if (!capped) return false;
+    const next = clampCamera(
+      { x: shown.x + dx, y: shown.y + dy },
+      MAX_SPAN,
+      bounds,
+    );
+    if (next.x === shown.x && next.y === shown.y) return false;
+    setCam(next);
+    return true;
+  }
+  useWheelPan(svgRef, MAX_SPAN, panBy);
+
+  function handlePointerDown(event: PointerEvent<SVGSVGElement>) {
+    if (!capped || panRef.current) return;
+    panRef.current = {
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+    };
+    setPanning(true);
+    try {
+      svgRef.current?.setPointerCapture(event.pointerId);
+    } catch {
+      // Without capture the pan still works while the pointer is on the board.
+    }
+  }
+
+  function handlePointerMove(event: PointerEvent<SVGSVGElement>) {
+    const pan = panRef.current;
+    if (pan?.pointerId !== event.pointerId) return;
+    // The screen matrix, not the element's box: the box includes the border.
+    const ctm = svgRef.current?.getScreenCTM()?.a;
+    if (!ctm) return;
+    const scale = 1 / (ctm * CELL_PX);
+    panBy(-(event.clientX - pan.x) * scale, -(event.clientY - pan.y) * scale);
+    pan.x = event.clientX;
+    pan.y = event.clientY;
+  }
+
+  function handlePointerEnd(event: PointerEvent<SVGSVGElement>) {
+    if (panRef.current?.pointerId !== event.pointerId) return;
+    panRef.current = null;
+    setPanning(false);
+  }
+
+  const box = useEasedBox(
+    capped
+      ? {
+          x: shown.x * CELL_PX,
+          y: shown.y * CELL_PX,
+          w: MAX_SPAN * CELL_PX,
+          h: MAX_SPAN * CELL_PX,
+        }
+      : fitBox(bounds),
+    reduced,
+    panning,
+  );
   const pulsing = usePulse(bump?.id ?? null);
 
   const drawSegment = (
@@ -228,12 +346,24 @@ export function RunBoard({ map, at, heldKeys, bump, lean }: RunBoardProps) {
 
   return (
     <svg
+      ref={svgRef}
       data-run-board
+      data-camera={capped ? `${shown.x},${shown.y}` : undefined}
       role="img"
       aria-label={t("boardLabel")}
       viewBox={`${box.x} ${box.y} ${box.w} ${box.h}`}
       preserveAspectRatio="xMidYMid meet"
-      className="border-border-strong aspect-square h-auto w-full max-w-[700px] rounded border"
+      // A camera pans with a drag, so then a swipe on it must not scroll.
+      className={cn(
+        "border-border-strong aspect-square h-auto w-full max-w-[700px] rounded border",
+        capped && "touch-none select-none",
+        capped && (panning ? "cursor-grabbing" : "cursor-grab"),
+      )}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerEnd}
+      onPointerCancel={handlePointerEnd}
+      onLostPointerCapture={handlePointerEnd}
     >
       <rect
         aria-hidden="true"

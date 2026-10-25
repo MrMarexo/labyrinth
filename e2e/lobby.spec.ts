@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 
-import { cell, drag } from "./support/board";
+import { cell, drag, panToCorner } from "./support/board";
 import { createMatch, joinMatch, test } from "./support/match";
 
 test.describe("the lobby's maze picker", () => {
@@ -180,14 +180,15 @@ test.describe("the lobby's maze picker", () => {
     // The match's settings, not the new-labyrinth form's defaults.
     await expect(host.locator("[data-budget]")).toHaveText("0 / 36 squares");
     await expect(host.locator("[data-gates]")).toHaveText("0 / 0 gates");
+    await panToCorner(host);
 
     const use = host.locator("[data-use-in-match]");
     await expect(use).toBeDisabled();
 
     // 36 squares, a start and a treasure: a valid 0-gate maze.
-    await drag(host, cell(host, 0, 0), cell(host, 15, 0));
-    await drag(host, cell(host, 0, 1), cell(host, 15, 1));
-    await drag(host, cell(host, 0, 2), cell(host, 3, 2));
+    await drag(host, cell(host, 0, 0), cell(host, 11, 0));
+    await drag(host, cell(host, 0, 1), cell(host, 11, 1));
+    await drag(host, cell(host, 0, 2), cell(host, 11, 2));
     await expect(host.locator("[data-budget]")).toHaveText("36 / 36 squares");
     await host.getByRole("radio", { name: "Start", exact: true }).click();
     await cell(host, 0, 0).click();
@@ -223,6 +224,7 @@ test.describe("leaving the editor for the lobby", () => {
     await host.getByRole("button", { name: "Draw a new one" }).click();
     await expect(host).toHaveURL(/\/en\/labyrinths\/[^/?]+\?match=/);
     const left = new URL(host.url()).pathname;
+    await panToCorner(host);
     await host.locator('[data-cell="0,0"]').click();
     await expect(host.locator("[data-save-state]")).toHaveAttribute(
       "data-save-state",

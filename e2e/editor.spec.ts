@@ -331,7 +331,7 @@ test.describe("a stale copy of the editor", () => {
 
       // The batch link streams, so a refusal still arrives as a 200; the
       // banner is the signal.
-      await second.locator('[data-cell="5,5"]').click();
+      await second.locator('[data-cell="20,20"]').click();
       const banner = second.locator("[data-save-error]");
       await expect(banner).toContainText(
         "This labyrinth was changed somewhere else. Reload to see the latest version.",

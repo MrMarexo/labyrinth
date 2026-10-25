@@ -234,9 +234,9 @@ test.describe("save status", () => {
     await expect(status).toHaveText("Saved");
 
     // 36 squares, a start and a treasure: a valid 0-gate maze.
-    await drag(page, cell(page, 1, 0), cell(page, 15, 0));
-    await drag(page, cell(page, 0, 1), cell(page, 15, 1));
-    await drag(page, cell(page, 0, 2), cell(page, 3, 2));
+    await drag(page, cell(page, 1, 0), cell(page, 11, 0));
+    await drag(page, cell(page, 0, 1), cell(page, 11, 1));
+    await drag(page, cell(page, 0, 2), cell(page, 11, 2));
     await expect(page.locator("[data-budget]")).toHaveText("36 / 36 squares");
     await page.getByRole("radio", { name: "Start", exact: true }).click();
     await cell(page, 0, 0).click();

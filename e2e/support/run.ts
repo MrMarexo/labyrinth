@@ -53,19 +53,27 @@ export async function walk(
 
 type Players = Parameters<Parameters<typeof test>[2]>[0]["players"];
 
-/** Two players in a running 36/1 match, each holding a gated seed. */
+type Seed = Omit<Parameters<Players>[0], "name">;
+
+/**
+ * Two players in a running match, each holding the same seed: by default
+ * the gated 36/1 one.
+ */
 export async function startRunningMatch(
   players: Players,
   createMatch: (
     page: Page,
     o: { cells: number; gates: number },
   ) => Promise<string>,
+  size: Seed = { cellCount: 36, gateCount: 1, layout: "gated" },
 ) {
-  const size = { cellCount: 36, gateCount: 1, layout: "gated" as const };
   const host = await players({ name: "Host maze", ...size });
   const guest = await players({ name: "Guest maze", ...size });
 
-  const matchId = await createMatch(host, { cells: 36, gates: 1 });
+  const matchId = await createMatch(host, {
+    cells: size.cellCount,
+    gates: size.gateCount,
+  });
   await joinMatch(guest, matchId);
 
   for (const page of [host, guest]) {

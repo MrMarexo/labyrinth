@@ -9,7 +9,7 @@ import {
   type Maze,
 } from "./format";
 
-/** Every cell of the 16x16 frame, painted or not. */
+/** Every cell of the frame, painted or not. */
 const MAX_CELLS = MAX_BOUNDING_BOX * MAX_BOUNDING_BOX;
 /** Every interior edge of the frame: FRAME*(FRAME-1) each for H and V. */
 const MAX_SEGMENTS = 2 * MAX_BOUNDING_BOX * (MAX_BOUNDING_BOX - 1);

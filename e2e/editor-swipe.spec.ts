@@ -187,10 +187,10 @@ test.describe("drawing with a swipe", () => {
 
   test("painting stops at the square budget", async ({ page }) => {
     await signUpAndOpenNewMaze(page);
-    // 36 squares: fill two rows of 16 and four more, then swipe on.
-    await drag(page, cell(page, 0, 0), cell(page, 15, 0));
-    await drag(page, cell(page, 0, 1), cell(page, 15, 1));
-    await drag(page, cell(page, 0, 2), cell(page, 9, 2));
+    // 36 squares: fill three rows of 12, then swipe on.
+    await drag(page, cell(page, 0, 0), cell(page, 11, 0));
+    await drag(page, cell(page, 0, 1), cell(page, 11, 1));
+    await drag(page, cell(page, 0, 2), cell(page, 11, 2));
     await expect(page.locator("[data-budget]")).toHaveText("36 / 36 squares");
     await cell(page, 0, 5).click();
     await expect(page.locator("[data-budget]")).toHaveText("36 / 36 squares");

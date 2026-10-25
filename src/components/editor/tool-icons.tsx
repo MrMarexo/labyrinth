@@ -1,6 +1,7 @@
 import {
   DoorStairwell,
   Eraser,
+  Hand,
   Key,
   Trophy,
   type LucideProps,
@@ -8,6 +9,19 @@ import {
 import type { ReactNode } from "react";
 
 import type { BrushSize, Tool } from "~/maze";
+
+/**
+ * A palette's groups: side by side and wrapping on a phone, where height is
+ * scarce, and stacked into one column beside the board on a desktop.
+ */
+export const PALETTE_ROWS =
+  "flex flex-wrap items-center gap-x-3 gap-y-2 lg:flex-col lg:items-start lg:gap-2";
+/**
+ * Every group after a palette's first: set off by a rule on a phone, where
+ * the groups sit in a row, and by nothing in the desktop column.
+ */
+export const PALETTE_GROUP =
+  "border-border-strong flex gap-2 border-l pl-3 lg:border-l-0 lg:pl-0";
 
 /**
  * Palette icons, one per tool. Key, start and treasure are the glyphs the
@@ -21,6 +35,8 @@ export function ToolIcon({ tool }: { tool: Tool }) {
     strokeWidth: 2,
   };
   switch (tool) {
+    case "move":
+      return <Hand {...lucide} />;
     case "paint":
       return <PaintIcon />;
     case "erase-cell":

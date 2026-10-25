@@ -200,6 +200,7 @@
     "edgeWall": "stena",
     "edgeGate": "brána {gate}",
     "shapeToolsLabel": "Nástroj tvaru",
+    "move": "Posun",
     "paint": "Kresliť",
     "eraseCell": "Zmazať políčko",
     "brushLabel": "Veľkosť štetca",

@@ -3,7 +3,7 @@ import { z } from "zod";
 import { toTranslatableIssues, type TranslatableIssue } from "~/lib/issues";
 
 /** Spec §3.3. The cap is set by what fits a desktop board, not by storage. */
-export const MAX_BOUNDING_BOX = 16;
+export const MAX_BOUNDING_BOX = 48;
 
 /**
  * Spec §3.3. The format's cap on gate ids, which keeps the solver's state

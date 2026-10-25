@@ -135,6 +135,8 @@ export function MazeEditor({
   // flush may still be in flight, and a read before it lands would adopt
   // the pre-flush version and make the next save a false conflict.
   const [othersLeft, setOthersLeft] = useState(false);
+  // Counts drafts loaded from the server, so the board frames each afresh.
+  const [loads, setLoads] = useState(0);
   useEffect(() => {
     let live = true;
     void discardsSettled().then(() => {
@@ -171,6 +173,7 @@ export function MazeEditor({
     versionRef.current = latest.version;
     setSavedDraft(latest.data);
     dispatch({ type: "load", draft: latest.data });
+    setLoads((n) => n + 1);
   }, [fresh.data]);
 
   function send(draft: DraftMaze) {
@@ -502,10 +505,15 @@ export function MazeEditor({
     dispatch({ type: "endStroke" });
   }
 
+  function onStrokeCancel() {
+    dispatch({ type: "cancelStroke" });
+  }
+
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
+    <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-center lg:gap-8">
       <Board
         draft={state.draft}
+        frame={loads}
         tool={tool}
         paintsLeft={Math.max(0, cellCount - cellsUsed(state.draft))}
         brush={brush}
@@ -514,13 +522,14 @@ export function MazeEditor({
         onCell={onCell}
         onEdge={onEdge}
         onStrokeBegin={onStrokeBegin}
+        onStrokeCancel={onStrokeCancel}
         onStrokeCell={onStrokeCell}
         onStrokeEdge={onStrokeEdge}
         onStrokeTap={onStrokeTap}
         onStrokeEnd={onStrokeEnd}
       />
 
-      <aside className="space-y-6">
+      <aside className="space-y-4 lg:w-80 lg:shrink-0 lg:space-y-6">
         <ShapeTools
           tool={tool}
           onTool={selectTool}

@@ -200,6 +200,7 @@
     "edgeWall": "wall",
     "edgeGate": "gate {gate}",
     "shapeToolsLabel": "Shape tool",
+    "move": "Move",
     "paint": "Paint",
     "eraseCell": "Erase square",
     "brushLabel": "Brush size",

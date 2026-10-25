@@ -336,6 +336,40 @@ test.describe("how the run feels", () => {
     expect(dpadAfter!.x).toBeCloseTo(dpadBefore!.x, 0);
   });
 
+  test("past sixteen squares the board follows the runner, pans with a drag, and the next move brings it back", async ({
+    players,
+  }, testInfo) => {
+    const { host } = await startRunningMatch(players, createMatch, {
+      cellCount: 256,
+      gateCount: 0,
+      layout: "open",
+    });
+    const board = host.locator("[data-run-board]");
+    const cameraX = async () =>
+      Number((await board.getAttribute("data-camera"))?.split(",")[0]);
+    await expect(board).not.toHaveAttribute("data-camera", /./);
+
+    // Along the top row of the open 16×16. With the outline found east of
+    // the last square and a cell of padding, x runs from -1 to 18: more than
+    // the sixteen squares the board shows, so it sits at the east end.
+    await walk(host, Array<"E">(15).fill("E"), testInfo);
+    await expect(board).toHaveAttribute("data-camera", /^2,/);
+
+    // Dragging east looks west, as far as the discovered squares go.
+    const box = (await board.boundingBox())!;
+    const y = box.y + box.height / 2;
+    await host.mouse.move(box.x + box.width * 0.3, y);
+    await host.mouse.down();
+    await host.mouse.move(box.x + box.width * 0.7, y, { steps: 8 });
+    await host.mouse.up();
+    await expect.poll(cameraX).toBe(-1);
+
+    // The runner, on 14, is now too near the east edge: just enough to keep
+    // two squares between them.
+    await walk(host, ["W"], testInfo);
+    await expect.poll(cameraX).toBe(1);
+  });
+
   test("the board shows at least seven squares each way from the start", async ({
     players,
   }) => {

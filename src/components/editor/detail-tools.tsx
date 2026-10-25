@@ -7,7 +7,7 @@ import { useRef, type KeyboardEvent } from "react";
 import { iconButtonClass, Tooltip } from "~/components/tooltip";
 import type { Tool } from "~/maze";
 import { gateColour } from "./gate-colours";
-import { ToolIcon } from "./tool-icons";
+import { PALETTE_GROUP, PALETTE_ROWS, ToolIcon } from "./tool-icons";
 
 export type DetailToolsProps = {
   tool: Tool;
@@ -23,7 +23,8 @@ export type DetailToolsProps = {
 };
 
 /**
- * The six tools in display groups, one row each: the wall and its eraser,
+ * The six tools in display groups, one row each on a desktop and side by
+ * side on a phone: the wall and its eraser,
  * the two ends of the run, then the gate and its key, right above the colour
  * picker they open. Arrow keys walk them in this order.
  */
@@ -104,10 +105,13 @@ export function DetailTools({
       <div
         role="radiogroup"
         aria-label={t("detailToolsLabel")}
-        className="flex flex-col gap-2"
+        className={PALETTE_ROWS}
       >
-        {DETAIL_GROUPS.map((group) => (
-          <div key={group[0]} className="flex gap-2">
+        {DETAIL_GROUPS.map((group, i) => (
+          <div
+            key={group[0]}
+            className={i === 0 ? "flex gap-2" : PALETTE_GROUP}
+          >
             {group.map((option) => {
               const index = DETAIL_TOOLS.indexOf(option);
               const active = tool === option;
@@ -146,12 +150,10 @@ export function DetailTools({
         />
       )}
 
-      <p data-gates className="text-sm">
-        {t("gates", { gates, gateBudget })}
-      </p>
-      <p data-keys className="text-sm">
-        {t("keys", { keys })}
-      </p>
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm lg:flex-col lg:gap-y-3">
+        <p data-gates>{t("gates", { gates, gateBudget })}</p>
+        <p data-keys>{t("keys", { keys })}</p>
+      </div>
     </div>
   );
 }

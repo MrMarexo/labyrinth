@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseMaze } from "~/maze/format";
+import { MAX_BOUNDING_BOX, parseMaze } from "~/maze/format";
 
 /** The smallest maze that satisfies the schema: two cells side by side. */
 const minimal = {
@@ -71,7 +71,7 @@ describe("parseMaze", () => {
       ...minimal,
       cells: [
         { x: 0, y: 0 },
-        { x: 16, y: 0 },
+        { x: MAX_BOUNDING_BOX, y: 0 },
       ],
     });
     expect(result.ok).toBe(false);

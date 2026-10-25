@@ -11,6 +11,7 @@ import {
   lowestUnplaced,
   type EditorState,
 } from "~/maze/editor-state";
+import { MAX_BOUNDING_BOX } from "~/maze/format";
 import { edgeKey } from "~/maze/geometry";
 
 /** A budget wide enough that no test below runs into it by accident. */
@@ -94,11 +95,12 @@ describe("brush", () => {
   });
 
   it("shifts back inside the frame at its far edges", () => {
-    expect(brushCells({ x: 15, y: 15 }, 2)).toEqual([
-      { x: 14, y: 14 },
-      { x: 15, y: 14 },
-      { x: 14, y: 15 },
-      { x: 15, y: 15 },
+    const last = MAX_BOUNDING_BOX - 1;
+    expect(brushCells({ x: last, y: last }, 2)).toEqual([
+      { x: last - 1, y: last - 1 },
+      { x: last, y: last - 1 },
+      { x: last - 1, y: last },
+      { x: last, y: last },
     ]);
   });
 
@@ -512,6 +514,24 @@ describe("strokes", () => {
   it("ending a stroke that never began changes nothing", () => {
     const state = start();
     expect(editorReducer(state, { type: "endStroke" })).toBe(state);
+  });
+
+  it("cancelling a stroke puts the draft back and records nothing", () => {
+    const before = apply(start(), { type: "paintCell", at: { x: 9, y: 9 } });
+    const after = apply(
+      before,
+      { type: "beginStroke" },
+      { type: "paintCell", at: { x: 0, y: 0 } },
+      { type: "cancelStroke" },
+    );
+    expect(after.draft).toBe(before.draft);
+    expect(after.past).toEqual(before.past);
+    expect(after.strokeBase).toBeNull();
+  });
+
+  it("cancelling a stroke that never began changes nothing", () => {
+    const state = start();
+    expect(editorReducer(state, { type: "cancelStroke" })).toBe(state);
   });
 });
 

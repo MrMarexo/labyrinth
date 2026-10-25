@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { draftMazeSchema, draftToMaze, emptyDraft } from "~/maze/draft";
+import { MAX_BOUNDING_BOX } from "~/maze/format";
 
 describe("emptyDraft", () => {
   it("is a valid draft with nothing placed", () => {
@@ -29,31 +30,34 @@ describe("draftMazeSchema", () => {
     // A draft is permissive about completeness, never about the frame.
     const result = draftMazeSchema.safeParse({
       ...emptyDraft(),
-      cells: [{ x: 16, y: 0 }],
+      cells: [{ x: MAX_BOUNDING_BOX, y: 0 }],
     });
     expect(result.success).toBe(false);
   });
 });
 
+const CELLS = MAX_BOUNDING_BOX * MAX_BOUNDING_BOX;
+const EDGES = 2 * MAX_BOUNDING_BOX * (MAX_BOUNDING_BOX - 1);
+
 describe("draftMazeSchema bounds", () => {
-  // 16x16 frame: at most 256 cells, 2*16*15 = 480 interior edges, MAX_GATES
+  // An N×N frame: at most N² cells, 2·N·(N−1) interior edges, MAX_GATES
   // (8) keys. Coordinates repeat on purpose — only the array length is under
   // test here, not cell uniqueness (validateStructure's job).
   it("accepts as many cells as the frame can hold", () => {
-    const cells = Array.from({ length: 256 }, () => ({ x: 0, y: 0 }));
+    const cells = Array.from({ length: CELLS }, () => ({ x: 0, y: 0 }));
     const result = draftMazeSchema.safeParse({ ...emptyDraft(), cells });
     expect(result.success).toBe(true);
   });
 
   it("rejects one more cell than the frame can hold", () => {
-    const cells = Array.from({ length: 257 }, () => ({ x: 0, y: 0 }));
+    const cells = Array.from({ length: CELLS + 1 }, () => ({ x: 0, y: 0 }));
     const result = draftMazeSchema.safeParse({ ...emptyDraft(), cells });
     expect(result.success).toBe(false);
   });
 
   it("accepts as many segments as the frame has interior edges", () => {
     const segments = Array.from(
-      { length: 480 },
+      { length: EDGES },
       () => ({ o: "H", x: 0, y: 0, kind: "wall" }) as const,
     );
     const result = draftMazeSchema.safeParse({ ...emptyDraft(), segments });
@@ -62,7 +66,7 @@ describe("draftMazeSchema bounds", () => {
 
   it("rejects one more segment than the frame has interior edges", () => {
     const segments = Array.from(
-      { length: 481 },
+      { length: EDGES + 1 },
       () => ({ o: "H", x: 0, y: 0, kind: "wall" }) as const,
     );
     const result = draftMazeSchema.safeParse({ ...emptyDraft(), segments });

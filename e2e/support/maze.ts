@@ -1,6 +1,7 @@
 import { expect, type Page } from "@playwright/test";
 
 import { PASSWORD, uniqueEmail } from "./auth";
+import { panToCorner } from "./board";
 
 export async function signUp(page: Page): Promise<void> {
   await page.goto("/en/sign-up");
@@ -11,10 +12,13 @@ export async function signUp(page: Page): Promise<void> {
   await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
 }
 
-/** `gates` is the new maze's gate count; the form's default (2) if omitted. */
+/**
+ * `gates` is the new maze's gate count; the form's default (2) if omitted.
+ * Unless `centred`, the board is panned to the frame's top-left corner.
+ */
 export async function signUpAndOpenNewMaze(
   page: Page,
-  options: { gates?: number } = {},
+  options: { gates?: number; centred?: boolean } = {},
 ): Promise<void> {
   await signUp(page);
   await page.goto("/en/labyrinths");
@@ -28,4 +32,5 @@ export async function signUpAndOpenNewMaze(
   }
   await page.getByRole("button", { name: "Create" }).click();
   await expect(page.locator("svg[data-board]")).toBeVisible();
+  if (!options.centred) await panToCorner(page);
 }

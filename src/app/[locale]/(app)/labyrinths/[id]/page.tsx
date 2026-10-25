@@ -52,7 +52,8 @@ export default async function EditorPage({
       : null;
 
   return (
-    <main className="mx-auto max-w-5xl space-y-6 p-8">
+    // Wide, unlike the other pages: the board grows to fill the screen.
+    <main className="mx-auto max-w-[120rem] space-y-6 px-4 py-6 lg:px-8">
       <h1 className="text-2xl font-bold">{row.name}</h1>
       <MazeEditor
         id={row.id}

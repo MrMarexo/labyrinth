@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { Maze } from "~/maze/format";
+import { MAX_BOUNDING_BOX, type Maze } from "~/maze/format";
 import { validateStructure } from "~/maze/validate";
 
 /** A 2x2 block of four cells, no segments. */
@@ -131,9 +131,10 @@ describe("validateStructure", () => {
   it("rejects a bounding box wider than the cap", () => {
     const maze = square();
     maze.cells = [{ x: 0, y: 0 }];
-    for (let x = 1; x < 17; x += 1) maze.cells.push({ x, y: 0 });
-    maze.treasure = { x: 16, y: 0 };
-    expect(keys(maze, { cellCount: 17, gateCount: 0 })).toContain(
+    const past = MAX_BOUNDING_BOX + 1;
+    for (let x = 1; x < past; x += 1) maze.cells.push({ x, y: 0 });
+    maze.treasure = { x: MAX_BOUNDING_BOX, y: 0 };
+    expect(keys(maze, { cellCount: past, gateCount: 0 })).toContain(
       "maze.validate.boundingBoxTooLarge",
     );
   });
