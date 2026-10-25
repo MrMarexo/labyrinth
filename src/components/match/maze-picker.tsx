@@ -4,11 +4,12 @@ import { useTranslations } from "next-intl";
 import { useRef, useState, type KeyboardEvent } from "react";
 
 import { discardsSettled } from "~/components/editor/pending-discards";
+import { useReplaceConcept } from "~/components/editor/replace-concept";
+import { Link } from "~/components/link";
 
 import { MazeTile, mazeTileClass } from "~/components/maze-tile";
 import { useRouter } from "~/i18n/navigation";
-import { resolveErrorKey } from "~/lib/resolve-error-key";
-import { MAZE_LIMIT, draftToMaze } from "~/maze";
+import { draftToMaze } from "~/maze";
 import { api } from "~/trpc/react";
 
 export type MazePickerProps = {
@@ -21,7 +22,8 @@ export type MazePickerProps = {
 export function MazePicker({ match, selected, onSelect }: MazePickerProps) {
   const t = useTranslations("lobby");
   const buttonRefs = useRef(new Map<string, HTMLButtonElement>());
-  const { data, isPending } = api.match.eligibleMazes.useQuery({
+  const tl = useTranslations("labyrinths");
+  const { data: eligible, isPending } = api.match.eligibleMazes.useQuery({
     matchId: match.id,
   });
 
@@ -30,7 +32,27 @@ export function MazePicker({ match, selected, onSelect }: MazePickerProps) {
   // their library arrives.
   if (isPending) return null;
 
-  const drawNew = <DrawNew match={match} />;
+  // A half-drawn concept is offered to finish in the editor, never to use.
+  const unfinished = eligible?.find((m) => m.concept && !m.valid) ?? null;
+  const data = eligible?.filter((m) => m.valid);
+  const drawNew = (
+    <div className="flex flex-wrap items-start gap-3">
+      {unfinished && (
+        <Link
+          href={{
+            pathname: `/labyrinths/${unfinished.id}`,
+            query: { match: match.id },
+          }}
+          prefetch={false}
+          data-continue-concept
+          className="border-border-strong rounded border px-3 py-2 text-sm"
+        >
+          {t("continueConcept", { name: unfinished.name })}
+        </Link>
+      )}
+      <DrawNew match={match} />
+    </div>
+  );
   if (!data || data.length === 0) {
     return (
       <div className="space-y-2">
@@ -104,7 +126,13 @@ export function MazePicker({ match, selected, onSelect }: MazePickerProps) {
                   </span>
                 }
                 maze={draftToMaze(m.data)}
-              />
+              >
+                {m.concept && (
+                  <span data-concept-badge className="text-muted text-xs">
+                    {tl("conceptBadge")}
+                  </span>
+                )}
+              </MazeTile>
             </button>
           );
         })}
@@ -115,9 +143,10 @@ export function MazePicker({ match, selected, onSelect }: MazePickerProps) {
 }
 
 /**
- * Opens an empty labyrinth at exactly this match's settings in the editor,
- * which offers to use it here once it is drawn. The server reuses one of the
- * player's own empty drafts at these settings rather than making another.
+ * Opens an empty concept at exactly this match's settings in the editor,
+ * which offers to use it here once it is drawn. The server hands back the
+ * player's concept if it is empty and at these settings; any other concept
+ * is replaced only once the player agrees in a popup.
  */
 function DrawNew({ match }: { match: MazePickerProps["match"] }) {
   const t = useTranslations("lobby");
@@ -125,9 +154,9 @@ function DrawNew({ match }: { match: MazePickerProps["match"] }) {
   const router = useRouter();
   const utils = api.useUtils();
   // True while an editor that just closed may still be discarding the very
-  // draft the server would hand back.
+  // concept the server would hand back.
   const [waiting, setWaiting] = useState(false);
-  const create = api.maze.draftForMatch.useMutation({
+  const create = api.maze.conceptForMatch.useMutation({
     onSuccess: ({ id }) => {
       void utils.maze.list.invalidate();
       router.push({
@@ -136,23 +165,8 @@ function DrawNew({ match }: { match: MazePickerProps["match"] }) {
       });
     },
   });
-  const error = create.isError
-    ? resolveErrorKey(te, create.error, "errors.unknown")
-    : null;
+  const { error, dialog } = useReplaceConcept(create);
   const busy = waiting || create.isPending || create.isSuccess;
-  // At the limit the server would refuse a new draft, unless one of the
-  // player's own empty drafts at this size can be reused instead.
-  const { data: mazes } = api.maze.list.useQuery();
-  const atLimit =
-    !!mazes &&
-    mazes.length >= MAZE_LIMIT &&
-    !mazes.some(
-      (m) =>
-        m.state === "draft" &&
-        m.cellCount === match.cellCount &&
-        m.gateCount === match.gateCount &&
-        m.preview?.cells.length === 0,
-    );
 
   return (
     <div className="space-y-1">
@@ -160,7 +174,7 @@ function DrawNew({ match }: { match: MazePickerProps["match"] }) {
         type="button"
         data-draw-new
         // Still pending while the editor loads, so it cannot fire twice.
-        disabled={busy || atLimit}
+        disabled={busy}
         onClick={async () => {
           setWaiting(true);
           await discardsSettled();
@@ -174,16 +188,12 @@ function DrawNew({ match }: { match: MazePickerProps["match"] }) {
       >
         {busy ? t("creatingNew") : t("drawNew")}
       </button>
-      {atLimit && (
-        <p className="text-muted text-sm">
-          {t("atLimit", { limit: MAZE_LIMIT })}
-        </p>
-      )}
       {error && (
         <p role="alert" data-draw-new-error className="text-danger text-sm">
           {te(error.key as never, error.params as never)}
         </p>
       )}
+      {dialog}
     </div>
   );
 }

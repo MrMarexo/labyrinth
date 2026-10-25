@@ -1,10 +1,14 @@
+import { sql } from "drizzle-orm";
 import {
+  boolean,
   index,
   integer,
   jsonb,
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 
 import { user } from "./auth";
@@ -47,6 +51,20 @@ export const maze = pgTable(
      * replay window closes; then the nightly purge removes the row.
      */
     deletedAt: timestamp("deleted_at"),
+    /**
+     * The author's one labyrinth in progress. Autosaved while it is drawn,
+     * but not in their library: it does not count toward the limit, and it
+     * becomes a saved labyrinth only through `maze.saveConcept` or by being
+     * used in a match.
+     */
+    concept: boolean("concept").notNull().default(false),
+    /**
+     * For a concept opened from a saved labyrinth: that labyrinth, which its
+     * save writes back into while it is still unused. Null for a new one.
+     */
+    sourceId: text("source_id").references((): AnyPgColumn => maze.id, {
+      onDelete: "set null",
+    }),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at")
       .notNull()
@@ -55,5 +73,8 @@ export const maze = pgTable(
   },
   (table) => [
     index("maze_author_updated_idx").on(table.authorId, table.updatedAt),
+    uniqueIndex("maze_one_concept_per_author")
+      .on(table.authorId)
+      .where(sql`${table.concept}`),
   ],
 );

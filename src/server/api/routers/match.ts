@@ -11,6 +11,7 @@ import {
   lte,
   ne,
   notInArray,
+  or,
 } from "drizzle-orm";
 import { z } from "zod";
 
@@ -32,6 +33,7 @@ import {
   validateMaze,
 } from "~/maze";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { lockAuthor, promoteConcept } from "~/server/maze/concept";
 import {
   match,
   matchPlayer,
@@ -140,10 +142,12 @@ async function waitingMatches(
 }
 
 /**
- * Every maze of this author that the opponent has already faced in some
+ * The `contentHash` of every maze the opponent has already faced in some
  * other match. Rule 4 of §6: reuse is what makes the library worth having,
  * but not against someone who has already walked the maze — which requires
- * that match to have actually reached `running`.
+ * that match to have actually reached `running`. Compared by content, not
+ * id, so an unchanged copy ("Edit of …") is the same maze it was copied
+ * from.
  *
  * That has to be read off the opponent's own `matchPlayer.submittedAt`, not
  * off `match.status`: in Phase 3 nobody can move or finish a run, so every
@@ -180,9 +184,11 @@ async function mazesFacedBy(
     .filter((id) => id !== exceptMatchId);
   if (ids.length === 0) return [];
 
+  // A used maze always has its hash: it validated on its way in.
   const faced = await db
-    .select({ mazeId: matchPlayer.mazeId })
+    .select({ contentHash: maze.contentHash })
     .from(matchPlayer)
+    .innerJoin(maze, eq(maze.id, matchPlayer.mazeId))
     .where(
       and(
         inArray(matchPlayer.matchId, ids),
@@ -190,7 +196,9 @@ async function mazesFacedBy(
       ),
     );
 
-  return faced.map((f) => f.mazeId).filter((id): id is string => id !== null);
+  return faced
+    .map((f) => f.contentHash)
+    .filter((hash): hash is string => hash !== null);
 }
 
 /** The match must still be waiting for an opponent and inside its deadline. */
@@ -501,13 +509,20 @@ export const matchRouter = createTRPCRouter({
         eq(maze.cellCount, row.cellCount),
         eq(maze.gateCount, row.gateCount),
         // `contentHash` is only ever set by `saveDraft` once the maze
-        // validates at these exact settings — a half-drawn draft has none,
-        // so this is exactly the predicate that keeps `submitMaze` from
-        // rejecting a choice the picker just offered as valid.
-        isNotNull(maze.contentHash),
+        // validates at these exact settings — a half-drawn one has none, so
+        // this is exactly the predicate that keeps `submitMaze` from
+        // rejecting a choice the picker just offered as valid. The concept
+        // comes along either way: the picker offers a half-drawn one to
+        // finish, never to use.
+        or(isNotNull(maze.contentHash), eq(maze.concept, true)),
         isNull(maze.deletedAt),
       ];
-      if (faced.length > 0) conditions.push(notInArray(maze.id, faced));
+      if (faced.length > 0) {
+        // A half-drawn concept has no hash, and is not a faced maze.
+        conditions.push(
+          or(isNull(maze.contentHash), notInArray(maze.contentHash, faced)),
+        );
+      }
 
       // `data` is for the picker's previews. Author-facing: the first
       // condition limits this to the caller's own mazes, never the
@@ -517,13 +532,16 @@ export const matchRouter = createTRPCRouter({
           id: maze.id,
           name: maze.name,
           updatedAt: maze.updatedAt,
+          concept: maze.concept,
+          contentHash: maze.contentHash,
           data: maze.data,
         })
         .from(maze)
         .where(and(...conditions))
-        .orderBy(desc(maze.updatedAt));
-      return rows.map((row) => ({
+        .orderBy(desc(maze.concept), desc(maze.updatedAt));
+      return rows.map(({ contentHash, ...row }) => ({
         ...row,
+        valid: contentHash !== null,
         data: draftMazeSchema.parse(row.data),
       }));
     }),
@@ -796,6 +814,9 @@ export const matchRouter = createTRPCRouter({
           });
         }
 
+        // Before the maze row, in the same order `maze.saveConcept` takes
+        // them, so a submit and a save of one concept cannot deadlock.
+        await lockAuthor(tx, ctx.session.user.id);
         const [mazeRow] = await tx
           .select()
           .from(maze)
@@ -828,14 +849,6 @@ export const matchRouter = createTRPCRouter({
           });
         }
 
-        const faced = await mazesFacedBy(tx, them?.userId ?? null, row.id);
-        if (faced.includes(mazeRow.id)) {
-          throw new TRPCError({
-            code: "CONFLICT",
-            message: "errors.mazeAlreadyFaced",
-          });
-        }
-
         // The server's verdict is the only one that counts (§4). A maze
         // already marked submitted was validated on its way in, but
         // re-running it costs one BFS and removes the assumption.
@@ -850,6 +863,32 @@ export const matchRouter = createTRPCRouter({
           });
         }
 
+        // After validating, by the hash just computed: the stored one may
+        // be stale or missing on a concept.
+        const faced = await mazesFacedBy(tx, them?.userId ?? null, row.id);
+        if (faced.includes(validation.contentHash)) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "errors.mazeAlreadyFaced",
+          });
+        }
+
+        // A concept is saved on its way in, back into the labyrinth it was
+        // opened from if there is one, so the used labyrinth is in the
+        // author's library like any other.
+        let mazeId = mazeRow.id;
+        if (mazeRow.concept) {
+          mazeId = await promoteConcept(
+            tx,
+            {
+              ...mazeRow,
+              contentHash: validation.contentHash,
+              optimalMoves: validation.optimalMoves,
+            },
+            { checkLimit: false },
+          );
+        }
+
         await tx
           .update(maze)
           .set({
@@ -857,11 +896,11 @@ export const matchRouter = createTRPCRouter({
             contentHash: validation.contentHash,
             optimalMoves: validation.optimalMoves,
           })
-          .where(eq(maze.id, mazeRow.id));
+          .where(eq(maze.id, mazeId));
 
         await tx
           .update(matchPlayer)
-          .set({ mazeId: mazeRow.id, submittedAt: now })
+          .set({ mazeId, submittedAt: now })
           .where(
             and(
               eq(matchPlayer.matchId, row.id),
@@ -871,7 +910,7 @@ export const matchRouter = createTRPCRouter({
 
         const seated = players.map((p) =>
           p.userId === ctx.session.user.id
-            ? { ...p, mazeId: mazeRow.id, submittedAt: now }
+            ? { ...p, mazeId, submittedAt: now }
             : p,
         );
         const bothIn =

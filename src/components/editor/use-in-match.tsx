@@ -32,6 +32,8 @@ export function UseInMatch({
       await Promise.all([
         utils.match.get.invalidate({ id: match.id }),
         utils.match.list.invalidate(),
+        // A concept used here is saved into the library on the way in.
+        utils.maze.list.invalidate(),
       ]);
       router.push(`/matches/${match.id}`);
     },

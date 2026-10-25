@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 
 import { MAZE_LIMIT, emptyDraft } from "~/maze";
@@ -28,24 +28,137 @@ async function signedIn() {
 
 const settings = { name: "First", cellCount: 36 as const, gateCount: 2 };
 
-describe("maze.createDraft", () => {
-  it("creates an empty draft owned by the caller", async () => {
+const solvable = {
+  cellCount: SOLVABLE_MAZE_CELL_COUNT,
+  gateCount: SOLVABLE_MAZE_GATE_COUNT,
+} as const;
+
+type Caller = ReturnType<typeof createCaller>;
+
+/** A saved labyrinth, put straight in the table: library filler. */
+async function savedRow(
+  authorId: string,
+  values: Partial<typeof maze.$inferInsert> = {},
+) {
+  const [row] = await db
+    .insert(maze)
+    .values({
+      authorId,
+      name: "Saved",
+      cellCount: settings.cellCount,
+      gateCount: settings.gateCount,
+      data: emptyDraft(),
+      ...values,
+    })
+    .returning({ id: maze.id });
+  return row!;
+}
+
+/** A ready labyrinth saved the way a player saves one. */
+async function savedReady(caller: Caller, name = "Ready") {
+  const concept = await caller.maze.createConcept({
+    name,
+    ...solvable,
+    replace: true,
+  });
+  const { version } = await caller.maze.saveDraft({
+    id: concept.id,
+    data: solvableDraft(),
+    expectedVersion: 0,
+  });
+  return caller.maze.saveConcept({ id: concept.id, expectedVersion: version });
+}
+
+/** Paints one square, so the concept is no longer empty. */
+async function paint(caller: Caller, id: string) {
+  await caller.maze.saveDraft({
+    id,
+    data: { ...emptyDraft(), cells: [{ x: 0, y: 0 }] },
+    expectedVersion: 0,
+  });
+}
+
+async function rowOf(id: string) {
+  const [row] = await db.select().from(maze).where(eq(maze.id, id));
+  return row;
+}
+
+describe("maze.createConcept", () => {
+  it("creates an empty concept owned by the caller", async () => {
     const ctx = await signedIn();
     const caller = createCaller(ctx);
 
-    const created = await caller.maze.createDraft(settings);
+    const created = await caller.maze.createConcept(settings);
 
     const [row] = await db.select().from(maze).where(eq(maze.id, created.id));
     expect(row?.authorId).toBe(ctx.session!.user.id);
+    expect(row?.concept).toBe(true);
     expect(row?.status).toBe("draft");
     expect(row?.contentHash).toBeNull();
     expect(row?.data).toEqual(emptyDraft());
   });
 
+  it("refuses to replace an existing concept unless asked to", async () => {
+    const caller = createCaller(await signedIn());
+    const first = await caller.maze.createConcept(settings);
+    await paint(caller, first.id);
+
+    const refused = caller.maze.createConcept({ ...settings, name: "Second" });
+    await expect(rejection(refused)).resolves.toEqual({
+      code: "CONFLICT",
+      message: "errors.conceptExists",
+    });
+    // Names the concept, for the popup.
+    await expect(refused.catch((e: Error) => e.cause)).resolves.toMatchObject({
+      issue: { key: "errors.conceptExists", params: { name: "First" } },
+    });
+    expect(await rowOf(first.id)).toBeDefined();
+
+    const second = await caller.maze.createConcept({
+      ...settings,
+      name: "Second",
+      replace: true,
+    });
+    expect(await rowOf(first.id)).toBeUndefined();
+    expect((await rowOf(second.id))?.concept).toBe(true);
+  });
+
+  it("replaces an empty concept without asking", async () => {
+    const caller = createCaller(await signedIn());
+    const first = await caller.maze.createConcept(settings);
+
+    const second = await caller.maze.createConcept({
+      ...settings,
+      name: "Second",
+    });
+    expect(await rowOf(first.id)).toBeUndefined();
+    expect((await rowOf(second.id))?.concept).toBe(true);
+  });
+
+  it("keeps one concept when two replacements race", async () => {
+    const ctx = await signedIn();
+    const caller = createCaller(ctx);
+    await caller.maze.createConcept(settings);
+
+    const results = await Promise.allSettled([
+      caller.maze.createConcept({ ...settings, replace: true }),
+      caller.maze.createConcept({ ...settings, replace: true }),
+    ]);
+
+    expect(results.every((r) => r.status === "fulfilled")).toBe(true);
+    const concepts = await db
+      .select()
+      .from(maze)
+      .where(
+        and(eq(maze.authorId, ctx.session!.user.id), eq(maze.concept, true)),
+      );
+    expect(concepts).toHaveLength(1);
+  });
+
   it("rejects a cell count that is not a preset", async () => {
     const caller = createCaller(await signedIn());
     await expect(
-      rejection(caller.maze.createDraft({ ...settings, cellCount: 37 })),
+      rejection(caller.maze.createConcept({ ...settings, cellCount: 37 })),
     ).resolves.toMatchObject({ code: "BAD_REQUEST" });
   });
 
@@ -53,16 +166,16 @@ describe("maze.createDraft", () => {
     const caller = createCaller(
       await createTRPCContext({ headers: new Headers() }),
     );
-    await expect(rejection(caller.maze.createDraft(settings))).resolves.toEqual(
-      { code: "UNAUTHORIZED", message: "errors.notSignedIn" },
-    );
+    await expect(
+      rejection(caller.maze.createConcept(settings)),
+    ).resolves.toEqual({ code: "UNAUTHORIZED", message: "errors.notSignedIn" });
   });
 });
 
 describe("maze.saveDraft", () => {
   it("stores the draft and leaves derived columns null while invalid", async () => {
     const caller = createCaller(await signedIn());
-    const created = await caller.maze.createDraft(settings);
+    const created = await caller.maze.createConcept(settings);
 
     const result = await caller.maze.saveDraft({
       id: created.id,
@@ -80,7 +193,7 @@ describe("maze.saveDraft", () => {
 
   it("computes and persists derived metrics for a valid maze", async () => {
     const caller = createCaller(await signedIn());
-    const created = await caller.maze.createDraft({
+    const created = await caller.maze.createConcept({
       ...settings,
       cellCount: SOLVABLE_MAZE_CELL_COUNT,
       gateCount: SOLVABLE_MAZE_GATE_COUNT,
@@ -101,7 +214,7 @@ describe("maze.saveDraft", () => {
 
   it("refuses someone else's maze, indistinguishably from a missing one", async () => {
     const owner = createCaller(await signedIn());
-    const created = await owner.maze.createDraft(settings);
+    const created = await owner.maze.createConcept(settings);
     const stranger = createCaller(await signedIn());
 
     const notMine = await rejection(
@@ -129,7 +242,7 @@ describe("maze.saveDraft", () => {
   });
   it("starts at version 0 and counts up one per save", async () => {
     const caller = createCaller(await signedIn());
-    const created = await caller.maze.createDraft(settings);
+    const created = await caller.maze.createConcept(settings);
     expect((await caller.maze.get({ id: created.id })).version).toBe(0);
 
     const first = await caller.maze.saveDraft({
@@ -149,7 +262,7 @@ describe("maze.saveDraft", () => {
 
   it("refuses a save from a stale version and leaves the stored draft alone", async () => {
     const caller = createCaller(await signedIn());
-    const created = await caller.maze.createDraft(settings);
+    const created = await caller.maze.createConcept(settings);
     const kept = { ...emptyDraft(), cells: [{ x: 0, y: 0 }] };
     await caller.maze.saveDraft({
       id: created.id,
@@ -176,9 +289,26 @@ describe("maze.saveDraft", () => {
     expect(row?.version).toBe(1);
   });
 
+  it("refuses a saved labyrinth: only a concept is autosaved", async () => {
+    const ctx = await signedIn();
+    const caller = createCaller(ctx);
+    const saved = await savedRow(ctx.session!.user.id);
+
+    await expect(
+      rejection(
+        caller.maze.saveDraft({
+          id: saved.id,
+          data: { ...emptyDraft(), cells: [{ x: 0, y: 0 }] },
+          expectedVersion: 0,
+        }),
+      ),
+    ).resolves.toEqual({ code: "FORBIDDEN", message: "errors.mazeIsSaved" });
+    expect((await rowOf(saved.id))?.data).toEqual(emptyDraft());
+  });
+
   it("still refuses a submitted maze as submitted, whatever the version", async () => {
     const caller = createCaller(await signedIn());
-    const created = await caller.maze.createDraft(settings);
+    const created = await caller.maze.createConcept(settings);
     await db
       .update(maze)
       .set({ status: "submitted" })
@@ -204,23 +334,27 @@ describe("maze.saveDraft", () => {
 });
 
 describe("maze.list", () => {
-  it("returns only the caller's mazes, newest first", async () => {
+  it("returns only the caller's mazes, the concept first, then newest first", async () => {
     const ctx = await signedIn();
     const caller = createCaller(ctx);
-    const first = await caller.maze.createDraft({ ...settings, name: "One" });
-    const second = await caller.maze.createDraft({ ...settings, name: "Two" });
+    const concept = await caller.maze.createConcept({
+      ...settings,
+      name: "Concept",
+    });
+    const first = await savedRow(ctx.session!.user.id, { name: "One" });
+    const second = await savedRow(ctx.session!.user.id, { name: "Two" });
 
     const stranger = createCaller(await signedIn());
-    await stranger.maze.createDraft({ ...settings, name: "Theirs" });
+    await stranger.maze.createConcept({ ...settings, name: "Theirs" });
 
     const mine = await caller.maze.list();
-    expect(mine.map((m) => m.id)).toEqual([second.id, first.id]);
+    expect(mine.map((m) => m.id)).toEqual([concept.id, second.id, first.id]);
     expect(mine.every((m) => m.name !== "Theirs")).toBe(true);
   });
 
   it("returns each of the caller's own drawings as a parsed preview, never the raw data column", async () => {
     const caller = createCaller(await signedIn());
-    await caller.maze.createDraft(settings);
+    await caller.maze.createConcept(settings);
     const [summary] = await caller.maze.list();
     expect(summary).toBeDefined();
     expect(summary).not.toHaveProperty("data");
@@ -231,7 +365,7 @@ describe("maze.list", () => {
 describe("maze.get", () => {
   it("returns the caller's own maze", async () => {
     const caller = createCaller(await signedIn());
-    const created = await caller.maze.createDraft(settings);
+    const created = await caller.maze.createConcept(settings);
     const fetched = await caller.maze.get({ id: created.id });
     expect(fetched.id).toBe(created.id);
     expect(fetched.data).toEqual(emptyDraft());
@@ -239,15 +373,17 @@ describe("maze.get", () => {
 
   it("projects only what the editor and the read-only view need — status, but no authorId or derived metrics", async () => {
     const caller = createCaller(await signedIn());
-    const created = await caller.maze.createDraft(settings);
+    const created = await caller.maze.createConcept(settings);
     const fetched = await caller.maze.get({ id: created.id });
     expect(Object.keys(fetched).sort()).toEqual(
       [
         "cellCount",
+        "concept",
         "data",
         "gateCount",
         "id",
         "name",
+        "sourceId",
         "status",
         "version",
       ].sort(),
@@ -269,7 +405,7 @@ describe("maze.get", () => {
 
   it("refuses someone else's maze, indistinguishably from a missing one", async () => {
     const owner = createCaller(await signedIn());
-    const created = await owner.maze.createDraft(settings);
+    const created = await owner.maze.createConcept(settings);
     const stranger = createCaller(await signedIn());
 
     const notMine = await rejection(stranger.maze.get({ id: created.id }));
@@ -290,7 +426,7 @@ describe("maze.get", () => {
 describe("maze.remove", () => {
   it("lets the owner remove their own draft", async () => {
     const caller = createCaller(await signedIn());
-    const created = await caller.maze.createDraft(settings);
+    const created = await caller.maze.createConcept(settings);
 
     await caller.maze.remove({ id: created.id });
 
@@ -307,7 +443,7 @@ describe("maze.remove", () => {
 
   it("refuses someone else's maze, indistinguishably from a missing one, and leaves it intact", async () => {
     const owner = createCaller(await signedIn());
-    const created = await owner.maze.createDraft(settings);
+    const created = await owner.maze.createConcept(settings);
     const stranger = createCaller(await signedIn());
 
     const notMine = await rejection(stranger.maze.remove({ id: created.id }));
@@ -341,7 +477,7 @@ describe("maze.remove", () => {
 
   it("hides a used labyrinth from its author but keeps the row", async () => {
     const caller = createCaller(await signedIn());
-    const created = await caller.maze.createDraft(settings);
+    const created = await caller.maze.createConcept(settings);
     await db
       .update(maze)
       .set({ status: "submitted" })
@@ -367,19 +503,14 @@ describe("maze.remove", () => {
   });
 
   it("frees a slot when a used labyrinth is deleted", async () => {
-    const caller = createCaller(await signedIn());
-    for (let i = 0; i < MAZE_LIMIT; i++) {
-      await caller.maze.createDraft(settings);
+    const ctx = await signedIn();
+    const caller = createCaller(ctx);
+    for (let i = 0; i < MAZE_LIMIT - 1; i++) {
+      await savedRow(ctx.session!.user.id);
     }
-    const [one] = await caller.maze.list();
-    await db
-      .update(maze)
-      .set({ status: "submitted" })
-      .where(eq(maze.id, one!.id));
-    await caller.maze.remove({ id: one!.id });
-    await expect(caller.maze.createDraft(settings)).resolves.toHaveProperty(
-      "id",
-    );
+    const used = await savedRow(ctx.session!.user.id, { status: "submitted" });
+    await caller.maze.remove({ id: used.id });
+    await expect(savedReady(caller)).resolves.toHaveProperty("id");
   });
 });
 
@@ -395,14 +526,15 @@ async function drawingMatch() {
   return { host, hostId: hostCtx.session!.user.id, matchId: created.id };
 }
 
-describe("maze.draftForMatch", () => {
-  it("creates an empty draft at the match's settings when there is none to reuse", async () => {
+describe("maze.conceptForMatch", () => {
+  it("creates an empty concept at the match's settings when there is none", async () => {
     const { host, hostId, matchId } = await drawingMatch();
 
-    const { id } = await host.maze.draftForMatch({ matchId, name: "New" });
+    const { id } = await host.maze.conceptForMatch({ matchId, name: "New" });
 
     const [row] = await db.select().from(maze).where(eq(maze.id, id));
     expect(row?.authorId).toBe(hostId);
+    expect(row?.concept).toBe(true);
     expect(row?.status).toBe("draft");
     expect(row?.name).toBe("New");
     expect(row?.cellCount).toBe(settings.cellCount);
@@ -410,41 +542,59 @@ describe("maze.draftForMatch", () => {
     expect(row?.data).toEqual(emptyDraft());
   });
 
-  it("reuses the caller's own empty draft at the same settings instead of piling up another", async () => {
+  it("reuses the caller's own empty concept at the same settings", async () => {
     const { host, matchId } = await drawingMatch();
 
-    const first = await host.maze.draftForMatch({ matchId, name: "New" });
-    const second = await host.maze.draftForMatch({ matchId, name: "New" });
+    const first = await host.maze.conceptForMatch({ matchId, name: "New" });
+    const second = await host.maze.conceptForMatch({ matchId, name: "New" });
 
     expect(second.id).toBe(first.id);
     const mine = await host.maze.list();
     expect(mine.map((m) => m.id)).toEqual([first.id]);
   });
 
-  it("does not reuse a draft that has squares, one at other settings, or someone else's", async () => {
+  it("asks before replacing a concept that has squares", async () => {
     const { host, matchId } = await drawingMatch();
-    const painted = await host.maze.createDraft(settings);
-    await host.maze.saveDraft({
-      id: painted.id,
-      data: { ...emptyDraft(), cells: [{ x: 0, y: 0 }] },
-      expectedVersion: 0,
+    const kept = await host.maze.createConcept(settings);
+    await paint(host, kept.id);
+
+    await expect(
+      rejection(host.maze.conceptForMatch({ matchId, name: "New" })),
+    ).resolves.toEqual({ code: "CONFLICT", message: "errors.conceptExists" });
+    expect(await rowOf(kept.id)).toBeDefined();
+
+    const { id } = await host.maze.conceptForMatch({
+      matchId,
+      name: "New",
+      replace: true,
     });
-    const otherSize = await host.maze.createDraft({
-      ...settings,
-      cellCount: 64,
-    });
-    const otherGates = await host.maze.createDraft({
-      ...settings,
-      gateCount: settings.gateCount + 1,
-    });
+    expect(id).not.toBe(kept.id);
+    expect(await rowOf(kept.id)).toBeUndefined();
+  });
+
+  it("replaces an empty concept at other settings without asking", async () => {
+    for (const values of [
+      { ...settings, cellCount: 64 as const },
+      { ...settings, gateCount: settings.gateCount + 1 },
+    ]) {
+      const { host, matchId } = await drawingMatch();
+      const kept = await host.maze.createConcept(values);
+
+      const { id } = await host.maze.conceptForMatch({ matchId, name: "New" });
+      expect(id).not.toBe(kept.id);
+      expect(await rowOf(kept.id)).toBeUndefined();
+    }
+  });
+
+  it("never touches someone else's concept", async () => {
+    const { host, matchId } = await drawingMatch();
     const stranger = createCaller(await signedIn());
-    const theirs = await stranger.maze.createDraft(settings);
+    const theirs = await stranger.maze.createConcept(settings);
 
-    const { id } = await host.maze.draftForMatch({ matchId, name: "New" });
+    const { id } = await host.maze.conceptForMatch({ matchId, name: "New" });
 
-    expect([painted.id, otherSize.id, otherGates.id, theirs.id]).not.toContain(
-      id,
-    );
+    expect(id).not.toBe(theirs.id);
+    expect(await rowOf(theirs.id)).toBeDefined();
   });
 
   it("refuses a caller who is not in the match, indistinguishably from a missing one", async () => {
@@ -453,10 +603,10 @@ describe("maze.draftForMatch", () => {
     const stranger = createCaller(strangerCtx);
 
     const notMine = await rejection(
-      stranger.maze.draftForMatch({ matchId, name: "New" }),
+      stranger.maze.conceptForMatch({ matchId, name: "New" }),
     );
     const missing = await rejection(
-      stranger.maze.draftForMatch({
+      stranger.maze.conceptForMatch({
         matchId: crypto.randomUUID(),
         name: "New",
       }),
@@ -484,7 +634,9 @@ describe("maze.draftForMatch", () => {
     });
 
     await expect(
-      rejection(host.maze.draftForMatch({ matchId: created.id, name: "New" })),
+      rejection(
+        host.maze.conceptForMatch({ matchId: created.id, name: "New" }),
+      ),
     ).resolves.toEqual({
       code: "CONFLICT",
       message: "errors.matchNotDrawing",
@@ -498,9 +650,9 @@ describe("maze.draftForMatch", () => {
 });
 
 describe("maze.discardIfEmpty", () => {
-  it("deletes the caller's own empty draft", async () => {
+  it("deletes the caller's own empty concept", async () => {
     const caller = createCaller(await signedIn());
-    const created = await caller.maze.createDraft(settings);
+    const created = await caller.maze.createConcept(settings);
 
     await caller.maze.discardIfEmpty({ id: created.id });
 
@@ -510,7 +662,7 @@ describe("maze.discardIfEmpty", () => {
 
   it("keeps a draft that has squares", async () => {
     const caller = createCaller(await signedIn());
-    const created = await caller.maze.createDraft(settings);
+    const created = await caller.maze.createConcept(settings);
     await caller.maze.saveDraft({
       id: created.id,
       data: { ...emptyDraft(), cells: [{ x: 0, y: 0 }] },
@@ -523,9 +675,19 @@ describe("maze.discardIfEmpty", () => {
     expect(row).toBeDefined();
   });
 
+  it("keeps a saved labyrinth, even an empty one", async () => {
+    const ctx = await signedIn();
+    const caller = createCaller(ctx);
+    const saved = await savedRow(ctx.session!.user.id);
+
+    await caller.maze.discardIfEmpty({ id: saved.id });
+
+    expect(await rowOf(saved.id)).toBeDefined();
+  });
+
   it("keeps a submitted maze, even an empty one", async () => {
     const caller = createCaller(await signedIn());
-    const created = await caller.maze.createDraft(settings);
+    const created = await caller.maze.createConcept(settings);
     // An empty maze can never really be submitted; set directly so the
     // status is the only thing that keeps it.
     await db
@@ -541,7 +703,7 @@ describe("maze.discardIfEmpty", () => {
 
   it("keeps someone else's empty draft, and is a quiet no-op for them and for a missing id", async () => {
     const owner = createCaller(await signedIn());
-    const created = await owner.maze.createDraft(settings);
+    const created = await owner.maze.createConcept(settings);
     const stranger = createCaller(await signedIn());
 
     await stranger.maze.discardIfEmpty({ id: created.id });
@@ -570,87 +732,286 @@ describe("the labyrinth limit", () => {
     message: "errors.mazeLimitReached",
   };
 
-  async function fill(caller: ReturnType<typeof createCaller>, count: number) {
+  async function fill(userId: string, count: number) {
     for (let i = 0; i < count; i++) {
-      await caller.maze.createDraft({ ...settings, name: `Maze ${i}` });
+      await savedRow(userId, { name: `Maze ${i}` });
     }
   }
 
-  it("refuses one more than the limit", async () => {
-    const caller = createCaller(await signedIn());
-    await fill(caller, MAZE_LIMIT);
-    await expect(rejection(caller.maze.createDraft(settings))).resolves.toEqual(
-      limitReached,
-    );
+  it("refuses to save one more than the limit, and keeps the concept", async () => {
+    const ctx = await signedIn();
+    const caller = createCaller(ctx);
+    await fill(ctx.session!.user.id, MAZE_LIMIT);
+
+    const concept = await caller.maze.createConcept({ name: "C", ...solvable });
+    const { version } = await caller.maze.saveDraft({
+      id: concept.id,
+      data: solvableDraft(),
+      expectedVersion: 0,
+    });
+    await expect(
+      rejection(
+        caller.maze.saveConcept({ id: concept.id, expectedVersion: version }),
+      ),
+    ).resolves.toEqual(limitReached);
+    expect((await rowOf(concept.id))?.concept).toBe(true);
   });
 
-  it("counts used labyrinths toward the limit", async () => {
+  it("counts used labyrinths but not the concept", async () => {
+    const ctx = await signedIn();
+    const caller = createCaller(ctx);
+    await fill(ctx.session!.user.id, MAZE_LIMIT - 2);
+    await savedRow(ctx.session!.user.id, { status: "submitted" });
+    await caller.maze.createConcept(settings);
+
+    await expect(savedReady(caller)).resolves.toHaveProperty("id");
+    await expect(rejection(savedReady(caller))).resolves.toEqual(limitReached);
+  });
+
+  it("lets a concept be drawn at the limit", async () => {
+    const { host, hostId, matchId } = await drawingMatch();
+    await fill(hostId, MAZE_LIMIT);
+    await expect(
+      host.maze.conceptForMatch({ matchId, name: "New" }),
+    ).resolves.toHaveProperty("id");
+    await expect(
+      host.maze.createConcept({ ...settings, replace: true }),
+    ).resolves.toHaveProperty("id");
+  });
+});
+
+describe("maze.saveConcept", () => {
+  it("turns a valid new concept into a ready labyrinth", async () => {
     const caller = createCaller(await signedIn());
-    await fill(caller, MAZE_LIMIT);
-    const [one] = await caller.maze.list();
+    const { id } = await savedReady(caller, "Mine");
+
+    const row = await rowOf(id);
+    expect(row?.concept).toBe(false);
+    expect(row?.name).toBe("Mine");
+    expect(row?.contentHash).not.toBeNull();
+    const listed = (await caller.maze.list()).find((m) => m.id === id);
+    expect(listed?.state).toBe("ready");
+  });
+
+  it("refuses a concept that does not validate", async () => {
+    const caller = createCaller(await signedIn());
+    const concept = await caller.maze.createConcept(settings);
+    const { version } = await caller.maze.saveDraft({
+      id: concept.id,
+      data: { ...emptyDraft(), cells: [{ x: 0, y: 0 }] },
+      expectedVersion: 0,
+    });
+
+    await expect(
+      rejection(
+        caller.maze.saveConcept({ id: concept.id, expectedVersion: version }),
+      ),
+    ).resolves.toEqual({ code: "BAD_REQUEST", message: "errors.mazeInvalid" });
+    expect((await rowOf(concept.id))?.concept).toBe(true);
+  });
+
+  it("refuses a stale version, so what is saved is what the editor showed", async () => {
+    const caller = createCaller(await signedIn());
+    const concept = await caller.maze.createConcept({ name: "C", ...solvable });
+    await caller.maze.saveDraft({
+      id: concept.id,
+      data: solvableDraft(),
+      expectedVersion: 0,
+    });
+
+    await expect(
+      rejection(
+        caller.maze.saveConcept({ id: concept.id, expectedVersion: 0 }),
+      ),
+    ).resolves.toEqual({
+      code: "CONFLICT",
+      message: "errors.draftChangedElsewhere",
+    });
+  });
+
+  it("refuses a saved labyrinth and someone else's concept alike", async () => {
+    const owner = createCaller(await signedIn());
+    const saved = await savedReady(owner);
+    const theirs = await owner.maze.createConcept(settings);
+    const stranger = createCaller(await signedIn());
+
+    for (const [caller, id] of [
+      [owner, saved.id],
+      [stranger, theirs.id],
+    ] as const) {
+      await expect(
+        rejection(caller.maze.saveConcept({ id, expectedVersion: 0 })),
+      ).resolves.toEqual({ code: "FORBIDDEN", message: "errors.notYourMaze" });
+    }
+  });
+});
+
+describe("maze.editAsConcept", () => {
+  it("opens a ready labyrinth as a concept that saves back into it", async () => {
+    const caller = createCaller(await signedIn());
+    const saved = await savedReady(caller, "Original");
+    const before = await rowOf(saved.id);
+
+    const concept = await caller.maze.editAsConcept({
+      id: saved.id,
+      copyName: "Edit of Original",
+    });
+    const opened = await caller.maze.get({ id: concept.id });
+    expect(opened).toMatchObject({
+      concept: true,
+      sourceId: saved.id,
+      name: "Original",
+      data: before?.data,
+    });
+
+    // Changed, but not saved yet: the library still has the original.
+    const moved = { ...solvableDraft(), treasure: { x: 0, y: 5 } };
+    const { version } = await caller.maze.saveDraft({
+      id: concept.id,
+      data: moved,
+      expectedVersion: opened.version,
+    });
+    expect((await rowOf(saved.id))?.data).toEqual(before?.data);
+
+    const result = await caller.maze.saveConcept({
+      id: concept.id,
+      expectedVersion: version,
+    });
+    expect(result.id).toBe(saved.id);
+    expect((await rowOf(saved.id))?.data).toEqual(moved);
+    expect(await rowOf(concept.id)).toBeUndefined();
+    expect((await caller.maze.list()).map((m) => m.id)).toEqual([saved.id]);
+  });
+
+  it("copies a used labyrinth into a concept under the copy's name", async () => {
+    const ctx = await signedIn();
+    const caller = createCaller(ctx);
+    const used = await savedRow(ctx.session!.user.id, {
+      name: "Old",
+      status: "submitted",
+      data: solvableDraft(),
+      // Set as on any used labyrinth: it validated on its way in.
+      contentHash: "hash",
+      optimalMoves: SOLVABLE_MAZE_OPTIMAL_MOVES,
+      ...solvable,
+    });
+
+    const concept = await caller.maze.editAsConcept({
+      id: used.id,
+      copyName: "Edit of Old",
+    });
+    const opened = await caller.maze.get({ id: concept.id });
+    expect(opened).toMatchObject({
+      concept: true,
+      sourceId: used.id,
+      name: "Edit of Old",
+      status: "draft",
+    });
+
+    const saved = await caller.maze.saveConcept({
+      id: concept.id,
+      expectedVersion: opened.version,
+    });
+    expect(saved.id).toBe(concept.id);
+    expect((await rowOf(used.id))?.status).toBe("submitted");
+    expect((await caller.maze.list()).map((m) => m.state).sort()).toEqual([
+      "ready",
+      "used",
+    ]);
+  });
+
+  it("returns the concept already editing that labyrinth without asking", async () => {
+    const ctx = await signedIn();
+    const caller = createCaller(ctx);
+    const ready = await savedReady(caller);
+    const used = await savedRow(ctx.session!.user.id, {
+      status: "submitted",
+      contentHash: "hash",
+    });
+
+    for (const { id } of [ready, used]) {
+      const first = await caller.maze.editAsConcept({
+        id,
+        copyName: "x",
+        replace: true,
+      });
+      await paint(caller, first.id);
+      const again = await caller.maze.editAsConcept({ id, copyName: "x" });
+      expect(again.id).toBe(first.id);
+    }
+  });
+
+  it("asks before replacing a different concept", async () => {
+    const caller = createCaller(await signedIn());
+    const saved = await savedReady(caller);
+    const other = await caller.maze.createConcept(settings);
+    await paint(caller, other.id);
+
+    await expect(
+      rejection(caller.maze.editAsConcept({ id: saved.id, copyName: "x" })),
+    ).resolves.toEqual({ code: "CONFLICT", message: "errors.conceptExists" });
+    expect(await rowOf(other.id)).toBeDefined();
+
+    await caller.maze.editAsConcept({
+      id: saved.id,
+      copyName: "x",
+      replace: true,
+    });
+    expect(await rowOf(other.id)).toBeUndefined();
+  });
+
+  it("refuses a concept, a deleted labyrinth and someone else's", async () => {
+    const owner = createCaller(await signedIn());
+    const ctx = await signedIn();
+    const caller = createCaller(ctx);
+    const theirs = await savedReady(owner);
+    const deleted = await savedRow(ctx.session!.user.id, {
+      status: "submitted",
+      deletedAt: new Date(),
+    });
+    const concept = await caller.maze.createConcept(settings);
+
+    for (const id of [theirs.id, deleted.id, concept.id]) {
+      await expect(
+        rejection(caller.maze.editAsConcept({ id, copyName: "x" })),
+      ).resolves.toEqual({ code: "FORBIDDEN", message: "errors.notYourMaze" });
+    }
+  });
+
+  it("saves as a new labyrinth when the original was used in the meantime", async () => {
+    const caller = createCaller(await signedIn());
+    const saved = await savedReady(caller, "Original");
+    const concept = await caller.maze.editAsConcept({
+      id: saved.id,
+      copyName: "x",
+    });
+    const opened = await caller.maze.get({ id: concept.id });
     await db
       .update(maze)
       .set({ status: "submitted" })
-      .where(eq(maze.id, one!.id));
-    await expect(rejection(caller.maze.createDraft(settings))).resolves.toEqual(
-      limitReached,
-    );
-  });
+      .where(eq(maze.id, saved.id));
 
-  it("lets only one of two concurrent creations take the last slot", async () => {
-    const caller = createCaller(await signedIn());
-    await fill(caller, MAZE_LIMIT - 1);
-    const results = await Promise.allSettled([
-      caller.maze.createDraft(settings),
-      caller.maze.createDraft(settings),
-    ]);
-    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
-    expect(await caller.maze.list()).toHaveLength(MAZE_LIMIT);
-  });
-
-  it("lets draftForMatch reuse an empty draft at the limit", async () => {
-    const { host, matchId } = await drawingMatch();
-    await fill(host, MAZE_LIMIT);
-    const reused = await host.maze.draftForMatch({ matchId, name: "New" });
-    expect((await host.maze.list()).map((m) => m.id)).toContain(reused.id);
-    expect(await host.maze.list()).toHaveLength(MAZE_LIMIT);
-  });
-
-  it("refuses draftForMatch at the limit when nothing is reusable", async () => {
-    const { host, matchId } = await drawingMatch();
-    await host.maze.createDraft({ ...settings, cellCount: 64 });
-    const [other] = await host.maze.list();
-    for (let i = 1; i < MAZE_LIMIT; i++) {
-      await host.maze.createDraft({ ...settings, cellCount: 64 });
-    }
-    expect(other).toBeDefined();
-    await expect(
-      rejection(host.maze.draftForMatch({ matchId, name: "New" })),
-    ).resolves.toEqual(limitReached);
+    const result = await caller.maze.saveConcept({
+      id: concept.id,
+      expectedVersion: opened.version,
+    });
+    expect(result.id).toBe(concept.id);
+    expect((await rowOf(concept.id))?.concept).toBe(false);
   });
 });
 
 describe("maze.list states", () => {
-  it("labels each labyrinth draft, ready or used", async () => {
-    const caller = createCaller(await signedIn());
-    const draft = await caller.maze.createDraft({ ...settings, name: "D" });
-    const ready = await caller.maze.createDraft({
-      name: "R",
-      cellCount: SOLVABLE_MAZE_CELL_COUNT,
-      gateCount: SOLVABLE_MAZE_GATE_COUNT,
-    });
-    await caller.maze.saveDraft({
-      id: ready.id,
-      data: solvableDraft(),
-      expectedVersion: 0,
-    });
-    const used = await caller.maze.createDraft({ ...settings, name: "U" });
-    await db
-      .update(maze)
-      .set({ status: "submitted" })
-      .where(eq(maze.id, used.id));
+  it("labels each labyrinth concept, draft, ready or used", async () => {
+    const ctx = await signedIn();
+    const caller = createCaller(ctx);
+    const userId = ctx.session!.user.id;
+    const draft = await savedRow(userId, { name: "D" });
+    const ready = await savedReady(caller, "R");
+    const used = await savedRow(userId, { name: "U", status: "submitted" });
+    const concept = await caller.maze.createConcept({ ...settings, name: "C" });
 
     const byId = new Map((await caller.maze.list()).map((m) => [m.id, m]));
+    expect(byId.get(concept.id)?.state).toBe("concept");
     expect(byId.get(draft.id)?.state).toBe("draft");
     expect(byId.get(ready.id)?.state).toBe("ready");
     expect(byId.get(used.id)?.state).toBe("used");

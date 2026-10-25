@@ -76,7 +76,9 @@
     "fieldRequired": "Toto pole je povinné.",
     "emailInvalid": "Zadajte platnú e-mailovú adresu.",
     "matchNotCancellable": "Zrušiť sa dá len zápas, ktorý ešte čaká na súpera.",
-    "draftChangedElsewhere": "Toto bludisko sa medzitým zmenilo inde. Načítajte ho znova, aby ste videli najnovšiu verziu."
+    "draftChangedElsewhere": "Toto bludisko sa medzitým zmenilo inde. Načítajte ho znova, aby ste videli najnovšiu verziu.",
+    "conceptExists": "Už máte rozpracovaný koncept. Ak budete pokračovať, zmaže sa.",
+    "mazeIsSaved": "Toto bludisko je uložené. Ak ho chcete zmeniť, otvorte ho vo svojich bludiskách a zvoľte Upraviť."
   },
   "play": {
     "title": "Vaše hry",
@@ -99,13 +101,13 @@
     "confirmDeleteShort": "Potvrdiť",
     "deleteCancel": "Zrušiť",
     "deleting": "Maže sa…",
-    "readOnly": "Toto bludisko už bolo použité v zápase, preto ho nemožno upraviť. Môžete ho znova použiť v iných zápasoch rovnakej veľkosti.",
+    "readOnly": "Toto bludisko už bolo použité v zápase, preto ho nemožno meniť. Úpravou vznikne kópia, ktorú meniť môžete.",
     "backToList": "Späť na vaše bludiská",
     "count": "{count} / {limit} bludísk",
-    "atLimit": "Máte {limit} bludísk, viac ich mať nemôžete. Ak chcete nakresliť ďalšie, jedno zmažte.",
+    "atLimit": "Máte {limit} bludísk, viac ich mať nemôžete. Kresliť môžete aj naďalej, ale pred uložením ďalšieho jedno zmažte.",
     "filterState": "Zobraziť",
     "filterAll": "Všetky",
-    "filterDrafts": "Koncepty",
+    "filterDrafts": "Nedokončené",
     "filterReady": "Pripravené",
     "filterUsed": "Použité",
     "filterAny": "Ľubovoľný",
@@ -115,7 +117,13 @@
     "sortSize": "Veľkosť",
     "noMatches": "Týmto filtrom nezodpovedá žiadne bludisko.",
     "usedBadge": "Použité",
-    "deleteUsedHint": "Odohrané zápasy si svoje výsledky ponechajú."
+    "deleteUsedHint": "Odohrané zápasy si svoje výsledky ponechajú.",
+    "conceptBadge": "Koncept",
+    "conceptHint": "Medzi vaše bludiská sa dostane, až keď ho uložíte.",
+    "edit": "Upraviť",
+    "editCopy": "Upraviť kópiu",
+    "editing": "Otvára sa…",
+    "editOfName": "Úprava {name}"
   },
   "matches": {
     "title": "Zápasy",
@@ -222,15 +230,20 @@
     "keyOption": "Kľúč {gate}",
     "keyOptionPlaced": "Kľúč {gate}, umiestnený",
     "saving": "Ukladá sa…",
-    "saved": "Uložené",
-    "savedAndReady": "Toto bludisko je uložené a pripravené na použitie v hre.",
+    "saved": "Koncept uložený",
+    "savedAndReady": "Toto bludisko je hotové.",
     "notYetValid": "Ešte nie je hotové:",
     "undo": "Späť",
     "redo": "Dopredu",
     "saveFailed": "Vaše zmeny sa nepodarilo uložiť.",
     "retry": "Skúsiť znova",
     "useInMatch": "Použiť v tomto zápase",
-    "reload": "Načítať znova"
+    "reload": "Načítať znova",
+    "conceptNote": "Koncept: ukladá sa priebežne, ale medzi vaše bludiská sa dostane, až keď ho uložíte.",
+    "conceptOf": "Koncept: zmeny bludiska {name}. Uložené bludisko zostane, aké bolo, kým koncept neuložíte.",
+    "saveLabyrinth": "Uložiť bludisko",
+    "savingLabyrinth": "Ukladá sa…",
+    "saveAtLimit": "Máte {limit} bludísk, viac ich mať nemôžete. Ak chcete uložiť toto, jedno zmažte."
   },
   "lobby": {
     "title": "Zápas",
@@ -252,7 +265,6 @@
     "opponentForfeited": "Vášmu súperovi vypršal čas.",
     "newMazeName": "Bludisko pre zápas {code}",
     "creatingNew": "Vytvára sa…",
-    "atLimit": "Máte {limit} bludísk, viac ich mať nemôžete. Ak chcete nakresliť nové, jedno zmažte na stránke Bludiská.",
     "waitingOpen": "Čaká sa na súpera — váš zápas je v lobby.",
     "waitingLocked": "Čaká sa na súpera. Váš zápas je zamknutý: pošlite odkaz a potom prijmite žiadosť.",
     "heading": "Lobby",
@@ -280,7 +292,8 @@
     "declineName": "Zamietnuť {name}",
     "joinTitle": "Pripojiť sa k zápasu",
     "closed": "Tento zápas už nie je otvorený.",
-    "backToLobby": "Späť do lobby"
+    "backToLobby": "Späť do lobby",
+    "continueConcept": "Dokončiť koncept: {name}"
   },
   "run": {
     "watching": "{count, plural, one {Sleduje # človek} few {Sledujú # ľudia} other {Sleduje # ľudí}}",
@@ -361,5 +374,12 @@
     "jumpToLive": "Späť naživo",
     "step": "Ťah {step} z {length}",
     "back": "Späť na zápas"
+  },
+  "concept": {
+    "replaceTitle": "Zmazať váš koncept?",
+    "replaceBody": "Máte rozpracovaný koncept {name}. Ak budete pokračovať, zmaže sa.",
+    "replaceBodyUnnamed": "Máte rozpracovaný koncept. Ak budete pokračovať, zmaže sa.",
+    "replaceConfirm": "Zmazať a pokračovať",
+    "replaceCancel": "Ponechať"
   }
 }

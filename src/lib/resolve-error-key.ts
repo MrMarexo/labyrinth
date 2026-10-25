@@ -4,7 +4,7 @@ import type { TranslatableIssue } from "~/lib/issues";
 
 type Translator = ReturnType<typeof useTranslations>;
 
-type ResolvableError = {
+export type ResolvableError = {
   message: string;
   data?: { issues?: TranslatableIssue[] } | null;
 };

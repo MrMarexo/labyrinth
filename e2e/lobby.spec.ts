@@ -277,10 +277,11 @@ test.describe("the editor's match check", () => {
     const matchId = await createMatch(host, { cells: 36, gates: 0 });
     await joinMatch(guest, matchId);
 
-    /** Opens the player's only labyrinth with `?match=` pointing here. */
+    /** Edits the player's only labyrinth with `?match=` pointing here. */
     async function openWithMatch(page: Page, name: string) {
       await page.goto("/en/labyrinths");
       await page.getByRole("link", { name }).click();
+      await page.getByRole("button", { name: "Edit", exact: true }).click();
       await expect(page.locator("svg[data-board]")).toBeVisible();
       await page.goto(`${page.url()}?match=${matchId}`);
       await expect(page.locator("svg[data-board]")).toBeVisible();

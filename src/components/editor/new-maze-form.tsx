@@ -4,11 +4,12 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { OptionPicker } from "~/components/option-picker";
-import { resolveErrorKey } from "~/lib/resolve-error-key";
+import { useReplaceConcept } from "~/components/editor/replace-concept";
 import {
   CELL_COUNT_PRESETS,
   GATE_COUNT_OPTIONS,
   MAZE_LIMIT,
+  savedCount,
   type CellCount,
   type GateCount,
 } from "~/maze";
@@ -23,7 +24,7 @@ export function NewMazeForm() {
   const [open, setOpen] = useState(false);
   const [cellCount, setCellCount] = useState<CellCount>(CELL_COUNT_PRESETS[0]);
   const [gateCount, setGateCount] = useState<GateCount>(2);
-  const create = api.maze.createDraft.useMutation({
+  const create = api.maze.createConcept.useMutation({
     onSuccess: ({ id }) => {
       void utils.maze.list.invalidate();
       router.push(`/labyrinths/${id}`);
@@ -31,35 +32,33 @@ export function NewMazeForm() {
   });
   // Same query as the list below, so this costs no extra request.
   const { data: mazes } = api.maze.list.useQuery();
-  const createError = create.isError
-    ? resolveErrorKey(te, create.error, "errors.unknown")
-    : null;
-  const kept = mazes?.length ?? 0;
+  const { error: createError, dialog } = useReplaceConcept(create);
+  const kept = mazes ? savedCount(mazes) : 0;
   const atLimit = kept >= MAZE_LIMIT;
 
-  if (!open || atLimit) {
+  const counts = mazes && (
+    <span data-maze-count className="text-muted text-sm">
+      {t("count", { count: kept, limit: MAZE_LIMIT })}
+    </span>
+  );
+  const limitNote = atLimit && (
+    <p className="text-muted text-sm">{t("atLimit", { limit: MAZE_LIMIT })}</p>
+  );
+
+  if (!open) {
     return (
       <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-3">
           <button
             type="button"
-            disabled={atLimit}
             onClick={() => setOpen(true)}
             className="bg-accent text-on-accent rounded px-3 py-2 text-sm disabled:opacity-50"
           >
             {t("new")}
           </button>
-          {mazes && (
-            <span data-maze-count className="text-muted text-sm">
-              {t("count", { count: kept, limit: MAZE_LIMIT })}
-            </span>
-          )}
+          {counts}
         </div>
-        {atLimit && (
-          <p className="text-muted text-sm">
-            {t("atLimit", { limit: MAZE_LIMIT })}
-          </p>
-        )}
+        {limitNote}
       </div>
     );
   }
@@ -103,6 +102,8 @@ export function NewMazeForm() {
         onChange={setGateCount}
       />
 
+      {limitNote}
+
       {createError && (
         <p role="alert" data-create-error className="text-danger text-sm">
           {te(createError.key as never, createError.params as never)}
@@ -111,11 +112,13 @@ export function NewMazeForm() {
 
       <button
         type="submit"
-        disabled={create.isPending}
+        disabled={create.isPending || create.isSuccess}
         className="bg-accent text-on-accent rounded px-3 py-2 text-sm disabled:opacity-50"
       >
         {t("create")}
       </button>
+
+      {dialog}
     </form>
   );
 }

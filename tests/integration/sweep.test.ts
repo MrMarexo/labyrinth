@@ -37,7 +37,11 @@ async function savedMaze(
   caller: ReturnType<typeof createCaller>,
   name: string,
 ) {
-  const created = await caller.maze.createDraft({ name, ...settings });
+  const created = await caller.maze.createConcept({
+    name,
+    ...settings,
+    replace: true,
+  });
   await caller.maze.saveDraft({
     id: created.id,
     data: solvableDraft(),

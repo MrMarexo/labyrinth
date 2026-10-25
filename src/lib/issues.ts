@@ -59,7 +59,19 @@ function issueToTranslatable(issue: ZodIssue): TranslatableIssue {
   return params ? { key, params, path: issue.path } : { key, path: issue.path };
 }
 
+/**
+ * The cause of a server refusal whose message needs parameters, such as a
+ * name: passed as a `TRPCError`'s `cause`, it reaches the client as the
+ * error's one issue.
+ */
+export class IssueCause extends Error {
+  constructor(readonly issue: TranslatableIssue) {
+    super(issue.key);
+  }
+}
+
 export function toTranslatableIssues(cause: unknown): TranslatableIssue[] {
+  if (cause instanceof IssueCause) return [cause.issue];
   if (!(cause instanceof ZodError)) return [];
   return cause.issues.map(issueToTranslatable);
 }

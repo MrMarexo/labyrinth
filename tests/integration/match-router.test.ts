@@ -3,6 +3,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 
 import { CODE_LENGTH, HOURS_24_MS, HOURS_48_MS } from "~/match";
+import { emptyDraft } from "~/maze";
 import { createCaller } from "~/server/api/root";
 import { createTRPCContext } from "~/server/api/trpc";
 import { auth } from "~/server/auth";
@@ -31,17 +32,22 @@ async function savedMaze(
   caller: ReturnType<typeof createCaller>,
   name = "Mine",
 ) {
-  const created = await caller.maze.createDraft({
+  const created = await caller.maze.createConcept({
     name,
     cellCount: SOLVABLE_MAZE_CELL_COUNT,
     gateCount: SOLVABLE_MAZE_GATE_COUNT,
+    replace: true,
   });
-  await caller.maze.saveDraft({
+  const { version } = await caller.maze.saveDraft({
     id: created.id,
     data: solvableDraft(),
     expectedVersion: 0,
   });
-  return created.id;
+  const saved = await caller.maze.saveConcept({
+    id: created.id,
+    expectedVersion: version,
+  });
+  return saved.id;
 }
 
 const settings = { cellCount: 36 as const, gateCount: 0 };
@@ -479,12 +485,64 @@ describe("match.submitMaze", () => {
     });
   });
 
+  it("saves a concept it is given into the library as used", async () => {
+    const host = createCaller(await signedIn());
+    const created = await host.match.create(settings);
+    await createCaller(await signedIn()).match.join({ matchId: created.id });
+    const concept = await host.maze.createConcept({
+      name: "Fresh",
+      ...settings,
+    });
+    await host.maze.saveDraft({
+      id: concept.id,
+      data: solvableDraft(),
+      expectedVersion: 0,
+    });
+
+    await host.match.submitMaze({ matchId: created.id, mazeId: concept.id });
+
+    const [row] = await db.select().from(maze).where(eq(maze.id, concept.id));
+    expect(row).toMatchObject({ concept: false, status: "submitted" });
+    expect((await host.maze.list()).map((m) => m.state)).toEqual(["used"]);
+  });
+
+  it("uses an edit of a ready labyrinth as that labyrinth, with the edit in it", async () => {
+    const hostCtx = await signedIn();
+    const host = createCaller(hostCtx);
+    const created = await host.match.create(settings);
+    await createCaller(await signedIn()).match.join({ matchId: created.id });
+    const original = await savedMaze(host, "Original");
+    const concept = await host.maze.editAsConcept({
+      id: original,
+      copyName: "unused",
+    });
+    const opened = await host.maze.get({ id: concept.id });
+    const moved = { ...solvableDraft(), treasure: { x: 0, y: 5 } };
+    await host.maze.saveDraft({
+      id: concept.id,
+      data: moved,
+      expectedVersion: opened.version,
+    });
+
+    await host.match.submitMaze({ matchId: created.id, mazeId: concept.id });
+
+    const [row] = await db.select().from(maze).where(eq(maze.id, original));
+    expect(row).toMatchObject({ status: "submitted", data: moved });
+    const [gone] = await db.select().from(maze).where(eq(maze.id, concept.id));
+    expect(gone).toBeUndefined();
+    const [seat] = await db
+      .select()
+      .from(matchPlayer)
+      .where(eq(matchPlayer.userId, hostCtx.session!.user.id));
+    expect(seat?.mazeId).toBe(original);
+  });
+
   it("refuses a maze that does not validate", async () => {
     const host = createCaller(await signedIn());
     const created = await host.match.create(settings);
     await createCaller(await signedIn()).match.join({ matchId: created.id });
     // Created but never drawn: no start, no treasure, no cells.
-    const empty = await host.maze.createDraft({
+    const empty = await host.maze.createConcept({
       name: "Empty",
       cellCount: SOLVABLE_MAZE_CELL_COUNT,
       gateCount: SOLVABLE_MAZE_GATE_COUNT,
@@ -635,6 +693,36 @@ describe("match.submitMaze", () => {
     ).toEqual({ code: "CONFLICT", message: "errors.mazeAlreadyFaced" });
   });
 
+  it("treats an unchanged copy as the maze it was copied from", async () => {
+    const host = createCaller(await signedIn());
+    const rival = createCaller(await signedIn());
+
+    const first = await host.match.create(settings);
+    await rival.match.join({ matchId: first.id });
+    const mazeId = await savedMaze(host, "Seen it");
+    await host.match.submitMaze({ matchId: first.id, mazeId });
+    await rival.match.submitMaze({
+      matchId: first.id,
+      mazeId: await savedMaze(rival, "Rival's own"),
+    });
+    await endMatch(first.id);
+
+    const copy = await host.maze.editAsConcept({
+      id: mazeId,
+      copyName: "Edit of Seen it",
+    });
+    const second = await host.match.create(settings);
+    await rival.match.join({ matchId: second.id });
+
+    const offered = await host.match.eligibleMazes({ matchId: second.id });
+    expect(offered.map((m) => m.id)).not.toContain(copy.id);
+    expect(
+      await rejection(
+        host.match.submitMaze({ matchId: second.id, mazeId: copy.id }),
+      ),
+    ).toEqual({ code: "CONFLICT", message: "errors.mazeAlreadyFaced" });
+  });
+
   it("releases a maze from a match the sweep abandoned during drawing", async () => {
     const host = createCaller(await signedIn());
     const rivalCtx = await signedIn();
@@ -723,7 +811,7 @@ describe("match.eligibleMazes", () => {
     await createCaller(await signedIn()).match.join({ matchId: created.id });
 
     const right = await savedMaze(host, "Right size");
-    const wrong = await host.maze.createDraft({
+    const wrong = await host.maze.createConcept({
       name: "Wrong size",
       cellCount: 64,
       gateCount: 0,
@@ -757,21 +845,62 @@ describe("match.eligibleMazes", () => {
     expect(offered.map((m) => m.id)).not.toContain(mazeId);
   });
 
-  it("omits a draft that has never validated, so the picker never offers what submitMaze would reject", async () => {
+  it("omits a saved labyrinth that never validated, so the picker never offers what submitMaze would reject", async () => {
+    const hostCtx = await signedIn();
+    const host = createCaller(hostCtx);
+    const created = await host.match.create(settings);
+    await createCaller(await signedIn()).match.join({ matchId: created.id });
+
+    // Saved before concepts existed, never drawn: no `contentHash`.
+    const [legacy] = await db
+      .insert(maze)
+      .values({
+        authorId: hostCtx.session!.user.id,
+        name: "Half-drawn",
+        cellCount: settings.cellCount,
+        gateCount: settings.gateCount,
+        data: emptyDraft(),
+      })
+      .returning({ id: maze.id });
+
+    const offered = await host.match.eligibleMazes({ matchId: created.id });
+    expect(offered.map((m) => m.id)).not.toContain(legacy!.id);
+  });
+
+  it("offers the concept at the match's settings, marked valid or not", async () => {
     const host = createCaller(await signedIn());
     const created = await host.match.create(settings);
     await createCaller(await signedIn()).match.join({ matchId: created.id });
 
-    // Created but never drawn: no `contentHash`, because `saveDraft` only
-    // sets one once the maze validates at these settings.
-    const draft = await host.maze.createDraft({
+    const concept = await host.maze.createConcept({
       name: "Half-drawn",
-      cellCount: settings.cellCount,
-      gateCount: settings.gateCount,
+      ...settings,
+    });
+    let offered = await host.match.eligibleMazes({ matchId: created.id });
+    expect(offered.find((m) => m.id === concept.id)).toMatchObject({
+      concept: true,
+      valid: false,
     });
 
-    const offered = await host.match.eligibleMazes({ matchId: created.id });
-    expect(offered.map((m) => m.id)).not.toContain(draft.id);
+    await host.maze.saveDraft({
+      id: concept.id,
+      data: solvableDraft(),
+      expectedVersion: 0,
+    });
+    offered = await host.match.eligibleMazes({ matchId: created.id });
+    expect(offered.find((m) => m.id === concept.id)).toMatchObject({
+      concept: true,
+      valid: true,
+    });
+
+    await host.maze.createConcept({
+      name: "Other size",
+      cellCount: 64,
+      gateCount: 0,
+      replace: true,
+    });
+    offered = await host.match.eligibleMazes({ matchId: created.id });
+    expect(offered.some((m) => m.concept)).toBe(false);
   });
 
   it("refuses a stranger, indistinguishably from a match that does not exist", async () => {

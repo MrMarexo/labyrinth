@@ -76,7 +76,9 @@
     "fieldRequired": "This field is required.",
     "emailInvalid": "Enter a valid email address.",
     "matchNotCancellable": "Only a match still waiting for an opponent can be cancelled.",
-    "draftChangedElsewhere": "This labyrinth was changed somewhere else. Reload to see the latest version."
+    "draftChangedElsewhere": "This labyrinth was changed somewhere else. Reload to see the latest version.",
+    "conceptExists": "You already have a concept in progress. Continuing will delete it.",
+    "mazeIsSaved": "This labyrinth is saved. Open it from your labyrinths and choose Edit to change it."
   },
   "play": {
     "title": "Your games",
@@ -99,13 +101,13 @@
     "confirmDeleteShort": "Confirm",
     "deleteCancel": "Cancel",
     "deleting": "Deleting…",
-    "readOnly": "This labyrinth has been used in a match, so it can't be edited. You can reuse it in other matches of the same size.",
+    "readOnly": "This labyrinth has been used in a match, so it can't be changed. Editing makes a copy you can change.",
     "backToList": "Back to your labyrinths",
     "count": "{count} / {limit} labyrinths",
-    "atLimit": "You have {limit} labyrinths, the most you can keep. Delete one to draw another.",
+    "atLimit": "You have {limit} labyrinths, the most you can keep. You can still draw, but delete one before saving another.",
     "filterState": "Show",
     "filterAll": "All",
-    "filterDrafts": "Drafts",
+    "filterDrafts": "Unfinished",
     "filterReady": "Ready",
     "filterUsed": "Used",
     "filterAny": "Any",
@@ -115,7 +117,13 @@
     "sortSize": "Size",
     "noMatches": "No labyrinths match these filters.",
     "usedBadge": "Used",
-    "deleteUsedHint": "Past matches keep their results."
+    "deleteUsedHint": "Past matches keep their results.",
+    "conceptBadge": "Concept",
+    "conceptHint": "Not in your labyrinths until you save it.",
+    "edit": "Edit",
+    "editCopy": "Edit a copy",
+    "editing": "Opening…",
+    "editOfName": "Edit of {name}"
   },
   "matches": {
     "title": "Matches",
@@ -222,15 +230,20 @@
     "keyOption": "Key {gate}",
     "keyOptionPlaced": "Key {gate}, placed",
     "saving": "Saving…",
-    "saved": "Saved",
-    "savedAndReady": "This labyrinth is saved and ready to be used in a game.",
+    "saved": "Concept saved",
+    "savedAndReady": "This labyrinth is ready.",
     "notYetValid": "Not ready yet:",
     "undo": "Undo",
     "redo": "Redo",
     "saveFailed": "Your changes could not be saved.",
     "retry": "Retry",
     "useInMatch": "Use in this match",
-    "reload": "Reload"
+    "reload": "Reload",
+    "conceptNote": "Concept: autosaved, but not in your labyrinths until you save it.",
+    "conceptOf": "Concept: changes to {name}. The saved labyrinth stays as it was until you save.",
+    "saveLabyrinth": "Save labyrinth",
+    "savingLabyrinth": "Saving…",
+    "saveAtLimit": "You have {limit} labyrinths, the most you can keep. Delete one to save this one."
   },
   "lobby": {
     "title": "Match",
@@ -252,7 +265,6 @@
     "opponentForfeited": "Your opponent ran out of time.",
     "newMazeName": "Labyrinth for match {code}",
     "creatingNew": "Creating…",
-    "atLimit": "You have {limit} labyrinths, the most you can keep. Delete one on the Labyrinths page to draw a new one.",
     "waitingOpen": "Waiting for an opponent — your match is in the lobby.",
     "waitingLocked": "Waiting for an opponent. Your match is locked: share the link, then accept a request.",
     "heading": "Lobby",
@@ -280,7 +292,8 @@
     "declineName": "Decline {name}",
     "joinTitle": "Join a match",
     "closed": "This match is no longer open.",
-    "backToLobby": "Back to the lobby"
+    "backToLobby": "Back to the lobby",
+    "continueConcept": "Finish your concept: {name}"
   },
   "run": {
     "watching": "{count, plural, one {# watching} other {# watching}}",
@@ -361,5 +374,12 @@
     "jumpToLive": "Jump to live",
     "step": "Move {step} of {length}",
     "back": "Back to the match"
+  },
+  "concept": {
+    "replaceTitle": "Delete your concept?",
+    "replaceBody": "You have a concept in progress, {name}. If you continue, it will be deleted.",
+    "replaceBodyUnnamed": "You have a concept in progress. If you continue, it will be deleted.",
+    "replaceConfirm": "Delete it and continue",
+    "replaceCancel": "Keep it"
   }
 }

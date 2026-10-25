@@ -229,9 +229,9 @@ test.describe("save status", () => {
     await expect(status).toHaveAttribute("data-save-state", "saving");
     await expect(status).toContainText("Saving…");
     await expect(status).toHaveAttribute("data-save-state", "saved");
-    // Saved, but not valid: the reasons stay, with a small "Saved" under them.
+    // Saved, but not valid: the reasons stay, with a small note under them.
     await expect(page.locator('[data-validity="invalid"]')).toBeVisible();
-    await expect(status).toHaveText("Saved");
+    await expect(status).toHaveText("Concept saved");
 
     // 36 squares, a start and a treasure: a valid 0-gate maze.
     await drag(page, cell(page, 1, 0), cell(page, 11, 0));
@@ -244,9 +244,7 @@ test.describe("save status", () => {
     await cell(page, 3, 2).click();
 
     await expect(status).toHaveAttribute("data-save-state", "saved");
-    await expect(status).toHaveText(
-      "This labyrinth is saved and ready to be used in a game.",
-    );
+    await expect(status).toHaveText("This labyrinth is ready.");
     await expect(page.locator('[data-validity="valid"]')).toBeAttached();
   });
 });

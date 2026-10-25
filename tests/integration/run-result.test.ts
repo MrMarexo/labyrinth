@@ -182,10 +182,11 @@ describe("run.result", () => {
     const guest = createCaller(await signedIn());
     const created = await host.match.create({ cellCount: 36, gateCount: 1 });
     await guest.match.join({ matchId: created.id });
-    const draft = await host.maze.createDraft({
+    const draft = await host.maze.createConcept({
       name: "Mine",
       cellCount: 36,
       gateCount: 1,
+      replace: true,
     });
     await host.maze.saveDraft({
       id: draft.id,

@@ -28,7 +28,11 @@ async function submitGated(
   caller: ReturnType<typeof createCaller>,
   matchId: string,
 ) {
-  const created = await caller.maze.createDraft({ name: "Gated", ...settings });
+  const created = await caller.maze.createConcept({
+    name: "Gated",
+    ...settings,
+    replace: true,
+  });
   await caller.maze.saveDraft({
     id: created.id,
     data: gatedMazeDraft(),

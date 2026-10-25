@@ -31,6 +31,7 @@ import { api } from "~/trpc/react";
 import { Board } from "./board";
 import { DetailTools } from "./detail-tools";
 import { discardsSettled, trackDiscard } from "./pending-discards";
+import { SaveConcept } from "./save-concept";
 import { ShapeTools } from "./shape-tools";
 import { UseInMatch } from "./use-in-match";
 import { ValidationPanel, type SaveState } from "./validation-panel";
@@ -46,6 +47,8 @@ export type MazeEditorProps = {
   gateCount: number;
   /** The match this editor was opened from, checked by the page. */
   forMatch: { id: string; code: string } | null;
+  /** Saving writes back into a saved labyrinth rather than adding one. */
+  savesInto: boolean;
 };
 
 export function MazeEditor({
@@ -55,6 +58,7 @@ export function MazeEditor({
   cellCount,
   gateCount,
   forMatch,
+  savesInto,
 }: MazeEditorProps) {
   const t = useTranslations();
   // Invariant the first-render guard below depends on: `lastSentRef` and the
@@ -164,6 +168,12 @@ export function MazeEditor({
       setSaveError({ key: "errors.mazeIsSubmitted" });
       return;
     }
+    // Saved from another tab since this page was rendered.
+    if (!latest.concept) {
+      setLocked(true);
+      setSaveError({ key: "errors.mazeIsSaved" });
+      return;
+    }
     if (latest.version <= versionRef.current || savingRef.current) return;
     const { past, future, strokeBase } = stateRef.current;
     if (past.length > 0 || future.length > 0 || strokeBase !== null) return;
@@ -219,6 +229,7 @@ export function MazeEditor({
       // stale copy would overwrite whatever the other copy saved.
       if (
         resolved.key === "errors.mazeIsSubmitted" ||
+        resolved.key === "errors.mazeIsSaved" ||
         resolved.key === "errors.draftChangedElsewhere"
       ) {
         setLocked(true);
@@ -276,7 +287,7 @@ export function MazeEditor({
       try {
         await discardIfEmpty.mutateAsync({ id });
       } catch {
-        // Left in place; draftForMatch may hand it out again, harmlessly.
+        // Left in place; conceptForMatch may hand it out again, harmlessly.
       } finally {
         finishLeaving();
       }
@@ -623,13 +634,20 @@ export function MazeEditor({
           saveState={saveState}
         />
 
-        {forMatch && (
+        {/* The server must hold exactly what is on screen before it is
+            used or saved, so a pending autosave keeps either disabled. */}
+        {forMatch ? (
           <UseInMatch
             mazeId={id}
             match={forMatch}
-            // The server must hold exactly what is on screen before it is
-            // submitted, so a pending autosave keeps this disabled.
             ready={validation?.ok === true && saveState === "saved"}
+          />
+        ) : (
+          <SaveConcept
+            conceptId={id}
+            version={() => versionRef.current}
+            ready={validation?.ok === true && saveState === "saved" && !locked}
+            editsSaved={savesInto}
           />
         )}
       </aside>

@@ -93,7 +93,11 @@ describe("publishing", () => {
     await guest.match.join({ matchId: created.id });
     expect(on(matchChannel(created.id))).toHaveLength(1);
 
-    const draft = await host.maze.createDraft({ name: "M", ...settings });
+    const draft = await host.maze.createConcept({
+      name: "M",
+      ...settings,
+      replace: true,
+    });
     await host.maze.saveDraft({
       id: draft.id,
       data: gatedMazeDraft(),

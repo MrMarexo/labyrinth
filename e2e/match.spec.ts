@@ -91,7 +91,7 @@ test.describe("match lifecycle", () => {
     ).toBeVisible();
     await expect(view).toContainText("36 squares, 0 gates");
     await expect(view).toContainText(
-      "This labyrinth has been used in a match, so it can't be edited. You can reuse it in other matches of the same size.",
+      "This labyrinth has been used in a match, so it can't be changed. Editing makes a copy you can change.",
     );
     expect(await view.locator("[data-outline]").count()).toBeGreaterThan(0);
     await expect(host.locator("svg[data-board]")).toHaveCount(0);
