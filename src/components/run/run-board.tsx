@@ -63,9 +63,14 @@ const MIN_SPAN = 7;
 const MAX_SPAN = 16;
 /** How near an edge of the camera, in cells, the runner may come. */
 const FOLLOW_MARGIN = 2;
-/** How far the runner leans toward an unanswered move, in cells. */
-const LEAN = 0.35;
-const LEAN_MS = 90;
+/**
+ * How far the runner steps toward an unanswered move, in cells: up to where
+ * a wall would stand. The answer then carries it on into the cell or bounces
+ * it back, so a step reads as one motion rather than a wait and a jump. The
+ * same for every move, so it discloses nothing (invariant 6).
+ */
+const LEAN = 0.5;
+const LEAN_MS = 100;
 const SETTLE_MS = 120;
 const PULSE_MS = 200;
 const ZOOM_MS = 200;
@@ -489,7 +494,11 @@ export function RunBoard({ map, at, heldKeys, bump, lean }: RunBoardProps) {
           transform: `translate(${runnerX}px, ${runnerY}px)`,
           transition: reduced
             ? "none"
-            : `transform ${lean ? LEAN_MS : SETTLE_MS}ms ease-out`,
+            : lean
+              ? // Easing out, so a slow answer leaves the runner resting
+                // on the wall line rather than stopping hard against it.
+                `transform ${LEAN_MS}ms ease-out`
+              : `transform ${SETTLE_MS}ms ease-out`,
         }}
       >
         <g

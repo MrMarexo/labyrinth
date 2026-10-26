@@ -120,13 +120,18 @@ function WatchPlayer({
     setLive((l) => l && data.live);
   }, [data]);
   const timeline = useMemo(() => playable(moves), [moves]);
+  // Only once the finish is playable: moves are published after the
+  // response, so the finishing move can arrive ahead of the one before it,
+  // and unsubscribing then would drop that one.
+  const finished = timeline.at(-1)?.delta.finished === true;
+  useEffect(() => {
+    if (finished) setLive(false);
+  }, [finished]);
 
   useChannel(live ? data.channel : null, {
     onEvent: (event, payload) => {
       if (event !== EVENTS.move) return;
-      const move = payload as LoggedMove;
-      setMoves((m) => mergeMoves(m, [move]));
-      if (move.delta.finished) setLive(false);
+      setMoves((m) => mergeMoves(m, [payload as LoggedMove]));
     },
     onCatchUp: () => void refetch(),
   });

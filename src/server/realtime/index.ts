@@ -1,5 +1,6 @@
 import "server-only";
 
+import { after } from "next/server";
 import Pusher from "pusher";
 
 import { env } from "~/env";
@@ -82,6 +83,24 @@ export async function publishSafely(
     console.error(`[realtime] publishing ${event} on ${channel} failed`, error);
   } finally {
     clearTimeout(timer);
+  }
+}
+
+/**
+ * Runs `work` once the response has gone out, so the caller does not wait on
+ * Pusher. Outside a request (the integration tests) `after` throws, and the
+ * work starts at once instead; `publishSafely` never rejects either way.
+ */
+export function afterResponse(work: () => Promise<unknown>): void {
+  try {
+    after(work);
+  } catch (error) {
+    // Expected only in the tests. Anywhere else an unawaited publish may be
+    // frozen with the function and never sent, which should not go unnoticed.
+    if (process.env.NODE_ENV === "production") {
+      console.error("[realtime] after() unavailable; publishing inline", error);
+    }
+    void work();
   }
 }
 

@@ -2,6 +2,7 @@ import "server-only";
 
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { nextCookies } from "better-auth/next-js";
 import { cache } from "react";
 
 import { env } from "~/env";
@@ -57,7 +58,15 @@ export const auth = betterAuth({
   session: {
     expiresIn: 60 * 60 * 24 * 30,
     updateAge: 60 * 60 * 24,
+    // A signed copy of the session in a cookie, so a request (every move)
+    // skips the session query. A revoked session lives on in it for up to
+    // maxAge; nothing reads more than `session.user.id` from it.
+    cookieCache: { enabled: true, maxAge: 5 * 60 },
   },
+  // Writes the cache cookie that `getSession` refreshes back onto the
+  // response; without it the cache would lapse five minutes after sign-in.
+  // Must stay the last plugin.
+  plugins: [nextCookies()],
   user: {
     additionalFields: {
       locale: {
