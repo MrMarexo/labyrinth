@@ -298,6 +298,7 @@ describe("match.get", () => {
     expect(JSON.stringify(view)).not.toContain("mazeId");
     expect(Object.keys(view.opponent ?? {})).toEqual([
       "displayName",
+      "guest",
       "hasSubmitted",
       "hasForfeited",
     ]);
