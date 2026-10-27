@@ -33,9 +33,16 @@ function edgeLine(edge: Edge) {
  * is just background), the start, the treasure, the keys, then the shape's
  * outline, walls and gates on top. Shared by the result screen, the replay,
  * the lobby's previews and the read-only labyrinth page, so none of them can
- * draw a maze differently.
+ * draw a maze differently. `dimTreasure` fades the treasure for a caller that
+ * draws something over it.
  */
-export function MazeDrawing({ maze }: { maze: DrawableMaze }) {
+export function MazeDrawing({
+  maze,
+  dimTreasure = false,
+}: {
+  maze: DrawableMaze;
+  dimTreasure?: boolean;
+}) {
   return (
     <>
       {maze.cells.map((c) => (
@@ -54,7 +61,12 @@ export function MazeDrawing({ maze }: { maze: DrawableMaze }) {
         <StartIcon x={maze.start.x} y={maze.start.y} size={CELL_PX} />
       )}
       {maze.treasure && (
-        <TreasureIcon x={maze.treasure.x} y={maze.treasure.y} size={CELL_PX} />
+        <TreasureIcon
+          x={maze.treasure.x}
+          y={maze.treasure.y}
+          size={CELL_PX}
+          opacity={dimTreasure ? 0.4 : undefined}
+        />
       )}
 
       {maze.keys.map((k) => (
