@@ -5,6 +5,7 @@ import { useFormatter, useNow, useTranslations } from "next-intl";
 import { useEffect, useRef } from "react";
 
 import { LobbyAction, LobbyBlockedNote } from "~/components/match/lobby-action";
+import { usePlayerName } from "~/components/player-name";
 import { POLL_MS } from "~/components/realtime/poll";
 import { useChannel } from "~/components/realtime/use-channel";
 import { useRouter } from "~/i18n/navigation";
@@ -37,6 +38,7 @@ export function useTimeAgo(): (date: Date) => string {
 /** Everyone else's waiting matches, kept live by the lobby channel. */
 export function LobbyList() {
   const t = useTranslations("lobby");
+  const playerName = usePlayerName();
   const tm = useTranslations("matches");
   const ago = useTimeAgo();
   const router = useRouter();
@@ -103,7 +105,9 @@ export function LobbyList() {
               className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between"
             >
               <div className="space-y-1">
-                <p className="text-sm font-medium">{m.creatorName}</p>
+                <p className="text-sm font-medium">
+                  {playerName({ name: m.creatorName, guest: m.creatorGuest })}
+                </p>
                 <p className="text-muted text-sm">
                   {tm("sizeAndGates", {
                     cells: m.cellCount,

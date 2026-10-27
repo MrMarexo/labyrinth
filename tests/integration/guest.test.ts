@@ -101,3 +101,44 @@ describe("guest identity", () => {
     expect((await member.match.list()).map((m) => m.id)).toContain(matchId);
   });
 });
+
+describe("guest names", () => {
+  it("a member sees a joined guest as a guest with their number", async () => {
+    const { member, matchId } = await guestInMembersMatch();
+    const view = await member.match.get({ id: matchId });
+    expect(view.opponent?.guest).toBe(true);
+    expect(view.opponent?.displayName).toMatch(/^[1-9]\d{3}$/);
+  });
+
+  it("a member sees a requesting guest as a guest in match.requests", async () => {
+    const member = createCaller(await signedIn());
+    const guest = createCaller(await guestSignedIn());
+    const created = await member.match.create({
+      ...settings,
+      access: "locked",
+    });
+    await guest.match.requestJoin({ matchId: created.id });
+
+    const rows = await member.match.requests({ matchId: created.id });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.guest).toBe(true);
+    expect(rows[0]?.name).toMatch(/^[1-9]\d{3}$/);
+  });
+
+  it("the lobby reports a member creator as not a guest", async () => {
+    const created = await createCaller(await signedIn()).match.create(settings);
+    const viewer = createCaller(await signedIn());
+
+    const { matches } = await viewer.match.lobby();
+    expect(matches.find((m) => m.id === created.id)?.creatorGuest).toBe(false);
+  });
+
+  it("a member opponent is not marked as a guest", async () => {
+    const a = createCaller(await signedIn());
+    const b = createCaller(await signedIn());
+    const created = await a.match.create(settings);
+    await b.match.join({ matchId: created.id });
+
+    expect((await a.match.get({ id: created.id })).opponent?.guest).toBe(false);
+  });
+});

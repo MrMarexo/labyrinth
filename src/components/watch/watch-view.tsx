@@ -10,6 +10,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
 
+import { usePlayerName } from "~/components/player-name";
 import { isTypingTarget } from "~/components/keyboard";
 import { POLL_MS } from "~/components/realtime/poll";
 import { useChannel } from "~/components/realtime/use-channel";
@@ -107,6 +108,7 @@ function WatchPlayer({
   refetch: () => Promise<unknown>;
 }) {
   const t = useTranslations("watch");
+  const playerName = usePlayerName();
   const tr = useTranslations("run");
 
   const [moves, setMoves] = useState<LoggedMove[]>(() =>
@@ -223,8 +225,18 @@ function WatchPlayer({
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-3xl font-bold">
           {whose === "opponent"
-            ? t("opponentTitle", { name: data.runnerName })
-            : t("mineTitle", { name: data.authorName })}
+            ? t("opponentTitle", {
+                name: playerName({
+                  name: data.runnerName,
+                  guest: data.runnerGuest,
+                }),
+              })
+            : t("mineTitle", {
+                name: playerName({
+                  name: data.authorName,
+                  guest: data.authorGuest,
+                }),
+              })}
         </h1>
         {state.live && (
           <span

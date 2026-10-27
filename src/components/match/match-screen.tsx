@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { usePlayerName } from "~/components/player-name";
 import { POLL_MS } from "~/components/realtime/poll";
 import { useChannel } from "~/components/realtime/use-channel";
 import { MatchLobby } from "~/components/match/match-lobby";
@@ -24,6 +25,7 @@ export function MatchScreen({
   matchId: string;
   initialData: RouterOutputs["match"]["get"];
 }) {
+  const playerName = usePlayerName();
   const { data } = api.match.get.useQuery(
     { id: matchId },
     {
@@ -64,7 +66,14 @@ export function MatchScreen({
     screen = (
       <RunView
         matchId={matchId}
-        opponentName={data.opponent?.displayName ?? ""}
+        opponentName={
+          data.opponent
+            ? playerName({
+                name: data.opponent.displayName,
+                guest: data.opponent.guest,
+              })
+            : ""
+        }
         deadlineAt={data.deadlineAt}
         runChannel={data.channels.yourRun}
         onFinish={setFinish}

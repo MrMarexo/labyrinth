@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { usePlayerName } from "~/components/player-name";
 
 import { ResultMaze } from "~/components/run/result-maze";
 import { Link } from "~/components/link";
@@ -14,6 +15,7 @@ type Score = Result["you"];
 export function MatchResult({ matchId }: { matchId: string }) {
   const t = useTranslations("result");
   const te = useTranslations();
+  const playerName = usePlayerName();
 
   const { data, error, isPending } = api.run.result.useQuery({ matchId });
 
@@ -33,7 +35,9 @@ export function MatchResult({ matchId }: { matchId: string }) {
     mazes,
     replayable,
   } = data;
-  const name = opponent?.displayName ?? "";
+  const name = opponent
+    ? playerName({ name: opponent.displayName, guest: opponent.guest })
+    : "";
 
   let reasonText: string;
   switch (reason) {
@@ -74,7 +78,7 @@ export function MatchResult({ matchId }: { matchId: string }) {
   if (opponent) {
     rows.push({
       who: "opponent",
-      label: opponent.displayName,
+      label: name,
       score: opponent,
     });
   }

@@ -81,6 +81,7 @@ const createInput = settingsInput.extend({
 export type LobbyItem = {
   id: string;
   creatorName: string;
+  creatorGuest: boolean;
   cellCount: number;
   gateCount: number;
   access: MatchAccess;
@@ -105,6 +106,7 @@ async function waitingMatches(
       id: match.id,
       creatorId: match.createdById,
       creatorName: user.name,
+      creatorGuest: user.isAnonymous,
       cellCount: match.cellCount,
       gateCount: match.gateCount,
       access: match.access,
@@ -428,7 +430,7 @@ export const matchRouter = createTRPCRouter({
 
       const names = them
         ? await ctx.db
-            .select({ id: user.id, name: user.name })
+            .select({ id: user.id, name: user.name, guest: user.isAnonymous })
             .from(user)
             .where(eq(user.id, them.userId))
         : [];
@@ -451,6 +453,7 @@ export const matchRouter = createTRPCRouter({
         opponent: them
           ? {
               displayName: names[0]?.name ?? "",
+              guest: names[0]?.guest ?? false,
               hasSubmitted: them.submittedAt !== null,
               hasForfeited: them.forfeitedAt !== null,
             }
@@ -661,6 +664,7 @@ export const matchRouter = createTRPCRouter({
         .select({
           userId: matchRequest.userId,
           name: user.name,
+          guest: user.isAnonymous,
           createdAt: matchRequest.createdAt,
         })
         .from(matchRequest)

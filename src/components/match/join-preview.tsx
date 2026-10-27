@@ -5,6 +5,7 @@ import { useEffect, useRef } from "react";
 
 import { LobbyAction, LobbyBlockedNote } from "~/components/match/lobby-action";
 import { LockedBadge } from "~/components/match/lobby-list";
+import { usePlayerName } from "~/components/player-name";
 import { POLL_MS } from "~/components/realtime/poll";
 import { useChannel } from "~/components/realtime/use-channel";
 import { Link } from "~/components/link";
@@ -38,6 +39,7 @@ export function JoinPreview({
   initialData: RouterOutputs["match"]["preview"];
 }) {
   const t = useTranslations("lobby");
+  const playerName = usePlayerName();
   const tm = useTranslations("matches");
   const router = useRouter();
   const utils = api.useUtils();
@@ -81,7 +83,12 @@ export function JoinPreview({
   return (
     <div className="space-y-3">
       <p className="font-medium">
-        {t("byCreator", { name: data.creatorName })}
+        {t("byCreator", {
+          name: playerName({
+            name: data.creatorName,
+            guest: data.creatorGuest,
+          }),
+        })}
       </p>
       <p className="text-muted text-sm">
         {tm("sizeAndGates", { cells: data.cellCount, gates: data.gateCount })}

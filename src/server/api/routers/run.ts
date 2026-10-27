@@ -103,12 +103,13 @@ async function mazeToSolve(tx: DbClient, opponent: PlayerRow): Promise<Maze> {
 async function displayNames(
   db: DbClient,
   ids: string[],
-): Promise<(id: string) => string> {
+): Promise<(id: string) => { id: string; name: string; guest: boolean }> {
   const rows = await db
-    .select({ id: user.id, name: user.name })
+    .select({ id: user.id, name: user.name, guest: user.isAnonymous })
     .from(user)
     .where(inArray(user.id, ids));
-  return (id) => rows.find((r) => r.id === id)?.name ?? "";
+  return (id) =>
+    rows.find((r) => r.id === id) ?? { id, name: "", guest: false };
 }
 
 export const runRouter = createTRPCRouter({
@@ -365,7 +366,8 @@ export const runRouter = createTRPCRouter({
       );
 
       const score = (p: PlayerRow) => ({
-        displayName: nameOf(p.userId),
+        displayName: nameOf(p.userId).name,
+        guest: nameOf(p.userId).guest,
         penalties: p.runState?.state.penalties ?? 0,
         moves: p.runState?.state.moves ?? 0,
         elapsedMs: elapsedMs(factsFor(p)),
@@ -516,8 +518,10 @@ export const runRouter = createTRPCRouter({
         moves: log,
         live,
         channel: live ? runChannel(row.id, runner.userId) : null,
-        runnerName: nameOf(runner.userId),
-        authorName: nameOf(author.userId),
+        runnerName: nameOf(runner.userId).name,
+        runnerGuest: nameOf(runner.userId).guest,
+        authorName: nameOf(author.userId).name,
+        authorGuest: nameOf(author.userId).guest,
       };
     }),
 });
