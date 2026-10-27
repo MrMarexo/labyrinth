@@ -746,7 +746,7 @@ export function Board({
         "data-hover-edge": key,
         ...edgeLine(target.edge),
         strokeWidth: 4,
-        strokeLinecap: "round",
+        strokeLinecap: "square",
       } as const;
       const existing = segmentAt.get(key);
       // A tap with the same segment removes it (spec §10.2), so the preview
@@ -843,7 +843,7 @@ export function Board({
                 key={edgeKey(s)}
                 {...edgeLine(s)}
                 strokeWidth={6}
-                strokeLinecap="round"
+                strokeLinecap="square"
                 opacity={0.6}
                 className="stroke-danger"
               />
@@ -970,7 +970,7 @@ export function Board({
             pointerEvents="none"
             {...edgeLine(edge)}
             strokeWidth={4}
-            strokeLinecap="round"
+            strokeLinecap="square"
             className="stroke-wall"
           />
         ))}
@@ -997,7 +997,7 @@ export function Board({
               pointerEvents="none"
               {...edgeLine(segment)}
               strokeWidth={4}
-              strokeLinecap="round"
+              strokeLinecap="square"
               className="stroke-wall"
             />
           );
@@ -1101,7 +1101,6 @@ export function Board({
             y={ring.at.y * CELL_PX + 2.5}
             width={CELL_PX - 5}
             height={CELL_PX - 5}
-            rx={3}
             fill="none"
             strokeWidth={3}
             className="stroke-accent"
@@ -1113,13 +1112,13 @@ export function Board({
             <line
               {...edgeLine(ring.edge)}
               strokeWidth={9}
-              strokeLinecap="round"
+              strokeLinecap="square"
               className="stroke-accent"
             />
             <line
               {...edgeLine(ring.edge)}
               strokeWidth={4}
-              strokeLinecap="round"
+              strokeLinecap="square"
               className="stroke-bg"
             />
           </g>

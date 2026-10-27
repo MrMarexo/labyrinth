@@ -230,7 +230,7 @@ export function RunView({
                 role="img"
                 aria-label={t("keyName", { gate })}
                 title={t("keyName", { gate })}
-                className="border-border-strong inline-block size-4 rounded-full border"
+                className="border-border-strong inline-block size-4 border"
                 style={{ backgroundColor: gateColour(gate) }}
               />
             ))

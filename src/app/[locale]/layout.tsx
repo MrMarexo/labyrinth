@@ -3,7 +3,7 @@ import "~/styles/globals.css";
 import { hasLocale, NextIntlClientProvider } from "next-intl";
 import { getTranslations } from "next-intl/server";
 import { type Metadata } from "next";
-import { Geist } from "next/font/google";
+import { VT323 } from "next/font/google";
 import { notFound } from "next/navigation";
 import { type ReactNode } from "react";
 
@@ -12,9 +12,11 @@ import { ThemeScript } from "~/components/theme-script";
 import { routing } from "~/i18n/routing";
 import { TRPCReactProvider } from "~/trpc/react";
 
-const geist = Geist({
-  subsets: ["latin"],
-  variable: "--font-geist-sans",
+const vt323 = VT323({
+  weight: "400",
+  // latin-ext carries Slovak's diacritics.
+  subsets: ["latin", "latin-ext"],
+  variable: "--font-vt323",
 });
 
 export function generateStaticParams() {
@@ -48,7 +50,7 @@ export default async function LocaleLayout({
   if (!hasLocale(routing.locales, locale)) notFound();
 
   return (
-    <html lang={locale} className={geist.variable} suppressHydrationWarning>
+    <html lang={locale} className={vt323.variable} suppressHydrationWarning>
       <head>
         <ThemeScript />
       </head>

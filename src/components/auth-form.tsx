@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 import { Link } from "~/components/link";
+import { PixelIcon } from "~/components/pixel-icons";
 import { useRouter } from "~/i18n/navigation";
 import { locales } from "~/i18n/routing";
 import { signIn, signUp } from "~/lib/auth-client";
@@ -69,23 +70,7 @@ const INPUT_CLASS =
   "border-border-strong bg-bg w-full rounded border px-3 py-2 aria-[invalid=true]:border-danger";
 
 function EyeIcon({ crossed }: { crossed: boolean }) {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 24 24"
-      width="20"
-      height="20"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
-      <circle cx="12" cy="12" r="3" />
-      {crossed && <path d="M3 3l18 18" />}
-    </svg>
-  );
+  return <PixelIcon name={crossed ? "eye-off" : "eye"} className="size-5" />;
 }
 
 export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {

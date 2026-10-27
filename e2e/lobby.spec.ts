@@ -24,7 +24,7 @@ test.describe("the lobby's maze picker", () => {
     const preview = option.locator(":scope > svg");
     await expect(preview).toHaveCount(1);
     await expect(preview).toHaveAttribute("aria-hidden", "true");
-    await expect(preview.locator(".lucide-trophy")).toHaveCount(1);
+    await expect(preview.locator(".pixel-icon-treasure")).toHaveCount(1);
     // The shape's outer walls are drawn, not just its squares.
     expect(await preview.locator("[data-outline]").count()).toBeGreaterThan(0);
     await expect(option).not.toContainText("Draft");

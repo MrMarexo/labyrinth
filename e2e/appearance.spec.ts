@@ -60,7 +60,7 @@ test.describe("appearance", () => {
     const button = page.getByRole("button", { name: "Menu" });
     await expect(button).toHaveAttribute("data-menu");
     await expect(button).toHaveAttribute("aria-expanded", "false");
-    await expect(button.locator("svg.lucide-menu")).toHaveCount(1);
+    await expect(button.locator("svg.pixel-icon-menu")).toHaveCount(1);
     // Closed: the controls are out of the way.
     await expect(page.getByRole("combobox", { name: "Theme" })).toHaveCount(0);
 
@@ -95,7 +95,7 @@ test.describe("appearance", () => {
     await expect(page.getByRole("button", { name: "Ponuka" })).toBeVisible();
   });
 
-  test("accent buttons are near-white in the dark theme and near-black in the light one", async ({
+  test("accent buttons are bright violet in the dark theme and deep violet in the light one", async ({
     page,
   }) => {
     await page.addInitScript(() => {
@@ -106,11 +106,13 @@ test.describe("appearance", () => {
     const button = page.getByRole("button", { name: "New labyrinth" });
     await expect(button).toHaveClass(/bg-accent/);
 
-    const dark = await rgbOf(button, "backgroundColor");
-    for (const channel of dark) expect(channel).toBeGreaterThan(200);
-    // Its label is dark on the white button.
+    const [red, green, blue] = await rgbOf(button, "backgroundColor");
+    expect(blue).toBeGreaterThan(220);
+    expect(red).toBeGreaterThan(green);
+    expect(green).toBeGreaterThan(100);
+    // Its label is black on the violet button.
     for (const channel of await rgbOf(button, "color")) {
-      expect(channel).toBeLessThan(80);
+      expect(channel).toBeLessThan(40);
     }
 
     await openMenu(page);
@@ -119,7 +121,7 @@ test.describe("appearance", () => {
     // Polled: the colours transition over 150ms.
     await expect
       .poll(async () => Math.max(...(await rgbOf(button, "backgroundColor"))))
-      .toBeLessThan(80);
+      .toBeLessThan(140);
     await expect
       .poll(async () => Math.min(...(await rgbOf(button, "color"))))
       .toBeGreaterThan(200);

@@ -1,10 +1,10 @@
 "use client";
 
-import { Key } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 
 import { gateColour } from "~/components/editor/gate-colours";
+import { PixelIcon } from "~/components/pixel-icons";
 import type { Discovery } from "~/maze";
 
 /** How long a notice stays up; the fade in `globals.css` runs this long. */
@@ -37,14 +37,14 @@ export function FoundToast({ found }: { found: Found | null }) {
       key={shown.id}
       data-found-toast={shown.kind}
       aria-hidden="true"
-      className="bg-bg border-border-strong motion-safe:animate-found-toast pointer-events-none absolute top-3 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full border px-3 py-1.5 text-sm shadow"
+      className="bg-bg border-border-strong motion-safe:animate-found-toast pointer-events-none absolute top-3 left-1/2 flex -translate-x-1/2 items-center gap-2 border-2 px-3 py-1.5 text-sm shadow-[4px_4px_0_var(--border-strong)]"
     >
       {shown.kind === "key" ? (
-        <Key aria-hidden="true" className="size-4" style={{ color: colour }} />
+        <PixelIcon name="key" className="size-4" style={{ color: colour }} />
       ) : (
         <span
           aria-hidden="true"
-          className="inline-block size-3 rounded-full"
+          className="inline-block size-3"
           style={{ backgroundColor: colour }}
         />
       )}

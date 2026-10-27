@@ -1,10 +1,10 @@
 "use client";
 
-import { Lock } from "lucide-react";
 import { useFormatter, useNow, useTranslations } from "next-intl";
 import { useEffect, useRef } from "react";
 
 import { LobbyAction, LobbyBlockedNote } from "~/components/match/lobby-action";
+import { PixelIcon } from "~/components/pixel-icons";
 import { POLL_MS } from "~/components/realtime/poll";
 import { useChannel } from "~/components/realtime/use-channel";
 import { useRouter } from "~/i18n/navigation";
@@ -16,7 +16,7 @@ export function LockedBadge() {
   const t = useTranslations("lobby");
   return (
     <span data-locked className="text-muted flex items-center gap-1 text-sm">
-      <Lock aria-hidden="true" className="size-3.5" />
+      <PixelIcon name="lock" className="size-3.5" />
       {t("locked")}
     </span>
   );

@@ -1,7 +1,7 @@
-import { DoorStairwell, Key, PersonStanding, Trophy } from "lucide-react";
 import type { SVGProps } from "react";
 
 import { gateColour } from "~/components/editor/gate-colours";
+import { PixelIcon } from "~/components/pixel-icons";
 
 /**
  * Markers drawn inside one square of a board: the square at `x`, `y` (in
@@ -16,7 +16,7 @@ export type IconProps = Omit<SVGProps<SVGGElement>, "x" | "y"> & {
   size: number;
 };
 
-/** A lucide glyph's box inside its square: `scale` of it, centred. */
+/** A glyph's box inside its square: `scale` of it, centred. */
 function glyphBox(x: number, y: number, size: number, scale = 0.7) {
   const inset = (1 - scale) / 2;
   return {
@@ -39,10 +39,9 @@ export function KeyIcon({
 }: IconProps & { gate: number }) {
   return (
     <g {...rest} aria-hidden="true">
-      <Key
+      <PixelIcon
+        name="key"
         {...glyphBox(x, y, size, KEY_SCALE)}
-        aria-hidden="true"
-        strokeWidth={2.5}
         style={{ color: gateColour(gate) }}
       />
     </g>
@@ -52,12 +51,7 @@ export function KeyIcon({
 export function StartIcon({ x, y, size, ...rest }: IconProps) {
   return (
     <g {...rest} aria-hidden="true">
-      <DoorStairwell
-        {...glyphBox(x, y, size)}
-        aria-hidden="true"
-        strokeWidth={2.5}
-        className="text-fg"
-      />
+      <PixelIcon name="start" {...glyphBox(x, y, size)} className="text-fg" />
     </g>
   );
 }
@@ -65,10 +59,9 @@ export function StartIcon({ x, y, size, ...rest }: IconProps) {
 export function TreasureIcon({ x, y, size, ...rest }: IconProps) {
   return (
     <g {...rest} aria-hidden="true">
-      <Trophy
+      <PixelIcon
+        name="treasure"
         {...glyphBox(x, y, size)}
-        aria-hidden="true"
-        strokeWidth={2.5}
         className="text-fg"
       />
     </g>
@@ -85,12 +78,7 @@ export function RunnerIcon({ x, y, size, ...rest }: IconProps) {
   };
   return (
     <g {...rest} aria-hidden="true">
-      <PersonStanding
-        {...box}
-        aria-hidden="true"
-        strokeWidth={2.5}
-        className="text-fg"
-      />
+      <PixelIcon name="runner" {...box} className="text-fg" />
     </g>
   );
 }
@@ -130,7 +118,7 @@ export function GateSegment({
   return (
     <g
       {...rest}
-      strokeLinecap="round"
+      strokeLinecap="square"
       fill="none"
       style={{ stroke: gateColour(gate), ...style }}
     >

@@ -1,9 +1,9 @@
 "use client";
 
-import { Check } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useRef, type KeyboardEvent } from "react";
 
+import { PixelIcon } from "~/components/pixel-icons";
 import { iconButtonClass, Tooltip } from "~/components/tooltip";
 import type { Tool } from "~/maze";
 import { gateColour } from "./gate-colours";
@@ -254,9 +254,8 @@ function NumberPicker({
               />
             </svg>
             {placed.has(n) && (
-              <Check
-                aria-hidden="true"
-                strokeWidth={3}
+              <PixelIcon
+                name="check"
                 className="absolute top-0.5 right-0.5 size-3"
               />
             )}

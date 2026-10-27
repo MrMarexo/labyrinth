@@ -37,7 +37,7 @@ test.describe("watching and replay", () => {
     // The full-maze view shows the runner too, with the same person icon.
     await expect(
       host.locator(
-        "[data-watch-maze-view] [data-path-end] svg.lucide-person-standing",
+        "[data-watch-maze-view] [data-path-end] svg.pixel-icon-runner",
       ),
     ).not.toHaveCount(0);
 

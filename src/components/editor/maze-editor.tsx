@@ -1,9 +1,9 @@
 "use client";
 
-import { Redo2, Undo2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 
+import { PixelIcon } from "~/components/pixel-icons";
 import { iconButtonClass, Tooltip } from "~/components/tooltip";
 import type { TranslatableIssue } from "~/lib/issues";
 import { resolveErrorKey } from "~/lib/resolve-error-key";
@@ -613,7 +613,7 @@ export function MazeEditor({
             aria-label={t("editor.undo")}
             className={`${iconButtonClass(false)} disabled:opacity-50`}
           >
-            <Undo2 aria-hidden="true" className="size-5" />
+            <PixelIcon name="undo" className="size-5" />
             <Tooltip label={t("editor.undo")} />
           </button>
           <button
@@ -623,7 +623,7 @@ export function MazeEditor({
             aria-label={t("editor.redo")}
             className={`${iconButtonClass(false)} disabled:opacity-50`}
           >
-            <Redo2 aria-hidden="true" className="size-5" />
+            <PixelIcon name="redo" className="size-5" />
             <Tooltip label={t("editor.redo")} />
           </button>
         </div>

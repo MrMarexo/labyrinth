@@ -229,7 +229,7 @@ function WatchPlayer({
         {state.live && (
           <span
             data-live-badge
-            className="border-danger text-danger rounded-full border px-2 py-0.5 text-xs font-medium uppercase"
+            className="border-danger text-danger border px-2 py-0.5 text-xs font-medium uppercase"
           >
             {t("live")}
           </span>

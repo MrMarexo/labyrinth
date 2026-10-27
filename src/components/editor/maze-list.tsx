@@ -1,6 +1,5 @@
 "use client";
 
-import { Lock } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useState } from "react";
 
@@ -12,6 +11,7 @@ import {
 } from "~/components/editor/maze-library";
 
 import { MazeTile, mazeTileClass } from "~/components/maze-tile";
+import { PixelIcon } from "~/components/pixel-icons";
 import { resolveErrorKey } from "~/lib/resolve-error-key";
 import { Link } from "~/components/link";
 import { api } from "~/trpc/react";
@@ -98,7 +98,7 @@ export function MazeList() {
         )}
         {item.state === "used" && (
           <span data-used-badge className="text-muted flex items-center gap-1">
-            <Lock aria-hidden="true" className="size-3.5" />
+            <PixelIcon name="lock" className="size-3.5" />
             {t("usedBadge")}
           </span>
         )}

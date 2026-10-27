@@ -42,8 +42,8 @@ export function ResultMaze({ maze, path, label, which }: ResultMazeProps) {
             .join(" ")}
           fill="none"
           strokeWidth={3}
-          strokeLinejoin="round"
-          strokeLinecap="round"
+          strokeLinejoin="miter"
+          strokeLinecap="square"
           // A quiet neutral trail: only keys and gates carry colour.
           className="stroke-fg"
           opacity={0.35}

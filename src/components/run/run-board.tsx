@@ -380,7 +380,7 @@ export function RunBoard({ map, at, heldKeys, bump, lean }: RunBoardProps) {
         aria-hidden="true"
         {...edgeLine(segment)}
         strokeWidth={extra.strokeWidth}
-        strokeLinecap="round"
+        strokeLinecap="square"
         className="stroke-wall"
       />
     );

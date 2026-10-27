@@ -1,9 +1,29 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans:
-    var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif,
-    "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --font-sans: var(--font-vt323), ui-monospace, monospace;
+
+  /* VT323 draws about two thirds the size of a proportional face at the
+     same em, so every step of the scale is raised to read the same. */
+  --text-xs: 1.125rem;
+  --text-sm: 1.25rem;
+  --text-base: 1.375rem;
+  --text-lg: 1.5rem;
+  --text-xl: 1.75rem;
+  --text-2xl: 2.125rem;
+  --text-3xl: 2.5rem;
+  --text-4xl: 3rem;
+
+  /* Square corners everywhere: the pixel look has no curves. */
+  --radius-xs: 0;
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-xl: 0;
+  --radius-2xl: 0;
+  --radius-3xl: 0;
+  --radius-4xl: 0;
+  --radius: 0;
 
   --animate-bump-pulse: bump-pulse 200ms ease-out;
 
@@ -54,47 +74,44 @@
   /* Native select popups and scrollbars follow the theme. */
   color-scheme: light;
 
-  --bg: oklch(99% 0 0);
-  --fg: oklch(22% 0 0);
-  --muted: oklch(55% 0 0);
-  /* Non-interactive dividers only — 1.31:1 against --bg. */
-  --border: oklch(90% 0 0);
-  /* The boundary of an interactive control: WCAG 1.4.11 wants 3:1.
-     3.14:1 against --bg. */
-  --border-strong: oklch(65% 0 0);
-  /* The foreground, not a hue: 16.8:1 against --bg and --on-accent. */
-  --accent: oklch(22% 0 0);
-  --on-accent: oklch(99% 0 0);
+  /* Light: violet ink on pale paper. */
+  --bg: oklch(97% 0.012 300);
+  --fg: oklch(32% 0.15 297);
+  --muted: oklch(50% 0.11 297);
+  /* Non-interactive dividers only. */
+  --border: oklch(86% 0.04 300);
+  /* The boundary of an interactive control: WCAG 1.4.11 wants 3:1. */
+  --border-strong: oklch(58% 0.13 297);
+  --accent: oklch(32% 0.15 297);
+  --on-accent: oklch(97% 0.012 300);
   /* Gates and keys rotate this to their own hues (gate-colours.ts). */
   --gate-base: oklch(55% 0.18 260);
-  --danger: oklch(55% 0.19 25);
+  --danger: oklch(52% 0.19 25);
 
-  --cell-painted: oklch(93% 0 0);
-  --cell-void: oklch(97% 0 0);
-  --grid-line: oklch(88% 0 0);
-  --wall: oklch(25% 0 0);
+  --cell-painted: oklch(90% 0.035 300);
+  --cell-void: oklch(97% 0.012 300);
+  --grid-line: oklch(84% 0.04 300);
+  --wall: oklch(32% 0.15 297);
 }
 
+/* Dark: the phosphor terminal — violet on black. */
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --bg: oklch(18% 0 0);
-  --fg: oklch(95% 0 0);
-  --muted: oklch(65% 0 0);
-  /* 1.48:1 against --bg. */
-  --border: oklch(32% 0 0);
-  /* 3.13:1 against --bg. */
-  --border-strong: oklch(50% 0 0);
-  /* 15.6:1 against --bg and --on-accent. */
-  --accent: oklch(95% 0 0);
-  --on-accent: oklch(18% 0 0);
-  --gate-base: oklch(70% 0.16 260);
-  --danger: oklch(68% 0.17 25);
+  --bg: oklch(0% 0 0);
+  --fg: oklch(72% 0.16 297);
+  --muted: oklch(60% 0.12 297);
+  --border: oklch(30% 0.08 297);
+  --border-strong: oklch(50% 0.12 297);
+  --accent: oklch(72% 0.16 297);
+  --on-accent: oklch(0% 0 0);
+  --gate-base: oklch(72% 0.16 260);
+  --danger: oklch(68% 0.19 25);
 
-  --cell-painted: oklch(30% 0 0);
-  --cell-void: oklch(21% 0 0);
-  --grid-line: oklch(27% 0 0);
-  --wall: oklch(88% 0 0);
+  --cell-painted: oklch(22% 0.07 297);
+  --cell-void: oklch(0% 0 0);
+  --grid-line: oklch(26% 0.07 297);
+  --wall: oklch(78% 0.15 297);
 }
 
 @theme inline {
@@ -122,6 +139,18 @@ html {
 body {
   background-color: var(--bg);
   color: var(--fg);
+  font-size: var(--text-base);
+  line-height: 1.2;
+  /* VT323 has one weight. A synthesised bold smears its pixels, so weight
+     and size alone carry emphasis. */
+  font-synthesis: none;
+  -webkit-font-smoothing: none;
+}
+
+h1,
+h2 {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 /*

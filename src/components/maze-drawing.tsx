@@ -86,7 +86,7 @@ export function MazeDrawing({
           data-outline={edgeKey(edge)}
           {...edgeLine(edge)}
           strokeWidth={4}
-          strokeLinecap="round"
+          strokeLinecap="square"
           className="stroke-wall"
         />
       ))}
@@ -103,7 +103,7 @@ export function MazeDrawing({
             key={`seg-${edgeKey(s)}`}
             {...edgeLine(s)}
             strokeWidth={4}
-            strokeLinecap="round"
+            strokeLinecap="square"
             className="stroke-wall"
           />
         ),
