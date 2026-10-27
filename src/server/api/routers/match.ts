@@ -32,7 +32,11 @@ import {
   draftMazeSchema,
   validateMaze,
 } from "~/maze";
-import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import {
+  createTRPCRouter,
+  memberProcedure,
+  protectedProcedure,
+} from "~/server/api/trpc";
 import { lockAuthor, promoteConcept } from "~/server/maze/concept";
 import {
   match,
@@ -215,7 +219,7 @@ function waitingOrThrow(
 }
 
 export const matchRouter = createTRPCRouter({
-  create: protectedProcedure
+  create: memberProcedure
     .input(createInput)
     .mutation(async ({ ctx, input }) => {
       const now = new Date();
@@ -481,7 +485,11 @@ export const matchRouter = createTRPCRouter({
     // newest first within each.
     const rank = (r: { active: boolean; status: MatchStatus }) =>
       r.active ? 0 : isTerminal(r.status) ? 2 : 1;
-    return rows
+    // A guest keeps no history: their finished matches are not listed.
+    const visible = ctx.session.user.isAnonymous
+      ? rows.filter((r) => !isTerminal(r.status))
+      : rows;
+    return visible
       .map(({ finishedAt, gaveUpAt, forfeitedAt, winnerId, ...row }) => ({
         ...row,
         active: holdsPlayer(row, { finishedAt, gaveUpAt, forfeitedAt }, now),

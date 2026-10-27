@@ -12,7 +12,11 @@ import {
   mazeState,
   validateMaze,
 } from "~/maze";
-import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import {
+  createTRPCRouter,
+  memberProcedure,
+  protectedProcedure,
+} from "~/server/api/trpc";
 import { maze } from "~/server/db/schema";
 import {
   notYours,
@@ -75,7 +79,7 @@ const isEmptyConcept = and(
 );
 
 export const mazeRouter = createTRPCRouter({
-  list: protectedProcedure.query(async ({ ctx }) =>
+  list: memberProcedure.query(async ({ ctx }) =>
     ctx.db
       .select({
         id: maze.id,
@@ -134,7 +138,7 @@ export const mazeRouter = createTRPCRouter({
     }),
 
   /** A new, empty concept, in place of the one the author has. */
-  createConcept: protectedProcedure
+  createConcept: memberProcedure
     .input(settingsInput.extend({ replace: replaceInput }))
     .mutation(({ ctx, input }) => {
       const authorId = ctx.session.user.id;
@@ -203,7 +207,7 @@ export const mazeRouter = createTRPCRouter({
    * it is copied under `copyName` instead. The concept already editing this
    * labyrinth is handed back as it is.
    */
-  editAsConcept: protectedProcedure
+  editAsConcept: memberProcedure
     .input(
       z.object({
         id: z.string(),
@@ -250,7 +254,7 @@ export const mazeRouter = createTRPCRouter({
    * Puts a valid concept in the author's library (see `promoteConcept`),
    * only at `expectedVersion`, so what is saved is what the editor showed.
    */
-  saveConcept: protectedProcedure
+  saveConcept: memberProcedure
     .input(
       z.object({ id: z.string(), expectedVersion: z.number().int().min(0) }),
     )
@@ -398,7 +402,7 @@ export const mazeRouter = createTRPCRouter({
       };
     }),
 
-  remove: protectedProcedure
+  remove: memberProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const mine = ownedBy(input.id, ctx.session.user.id);

@@ -3,13 +3,13 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { locales } from "~/i18n/routing";
-import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { createTRPCRouter, memberProcedure } from "~/server/api/trpc";
 import { user } from "~/server/db/schema";
 
 export const profileRouter = createTRPCRouter({
   // Read from the table, not the session: the session's cookie cache can
   // hold a name changed in the last few minutes.
-  get: protectedProcedure.query(async ({ ctx }) => {
+  get: memberProcedure.query(async ({ ctx }) => {
     const [row] = await ctx.db
       .select({ name: user.name, email: user.email })
       .from(user)
@@ -18,7 +18,7 @@ export const profileRouter = createTRPCRouter({
     return row;
   }),
 
-  setName: protectedProcedure
+  setName: memberProcedure
     .input(z.object({ name: z.string().trim().min(1).max(80) }))
     .mutation(async ({ ctx, input }) => {
       await ctx.db
@@ -29,7 +29,7 @@ export const profileRouter = createTRPCRouter({
       return { name: input.name };
     }),
 
-  setLocale: protectedProcedure
+  setLocale: memberProcedure
     .input(z.object({ locale: z.enum(locales) }))
     .mutation(async ({ ctx, input }) => {
       await ctx.db
