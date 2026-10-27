@@ -123,3 +123,17 @@ export const protectedProcedure = t.procedure
     }
     return next({ ctx: { ...ctx, session: ctx.session } });
   });
+
+/**
+ * Member-only procedure: a signed-in session that is not a guest. Guests may
+ * play but not own labyrinths, so anything that needs an account uses this.
+ */
+export const memberProcedure = protectedProcedure.use(({ ctx, next }) => {
+  if (ctx.session.user.isAnonymous) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "errors.guestNotAllowed",
+    });
+  }
+  return next();
+});

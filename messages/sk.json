@@ -73,6 +73,7 @@
     "replayNotReady": "Svoj beh si môžete prehrať, keď sa zápas skončí.",
     "replayExpired": "Tento záznam už nie je dostupný. Záznamy sa uchovávajú mesiac po skončení zápasu.",
     "notSignedIn": "Na túto akciu sa musíte prihlásiť.",
+    "guestNotAllowed": "Na toto sa musíte zaregistrovať.",
     "invalidCredentials": "Nesprávny e-mail alebo heslo.",
     "emailTaken": "Tento e-mail je už zaregistrovaný.",
     "passwordTooShort": "Heslo musí mať aspoň {min} znakov.",
@@ -112,6 +113,9 @@
     "conceptExists": "Už máte rozpracovaný koncept. Ak budete pokračovať, zmaže sa.",
     "mazeIsSaved": "Toto bludisko je uložené. Ak ho chcete zmeniť, otvorte ho vo svojich bludiskách a zvoľte Upraviť.",
     "wrongCurrentPassword": "Súčasné heslo nie je správne."
+  },
+  "players": {
+    "guestName": "Hosť {number}"
   },
   "play": {
     "title": "Vaše hry",

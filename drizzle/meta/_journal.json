@@ -71,6 +71,13 @@
       "when": 1792936339548,
       "tag": "0009_slimy_plazm",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793123235282,
+      "tag": "0010_futuristic_malice",
+      "breakpoints": true
     }
   ]
 }

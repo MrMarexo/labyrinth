@@ -3,6 +3,8 @@ import "server-only";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
+import { anonymous } from "better-auth/plugins";
+import { randomInt } from "node:crypto";
 import { cache } from "react";
 
 import { env } from "~/env";
@@ -51,7 +53,10 @@ export const auth = betterAuth({
   // Better Auth's rate limiter caps /sign-up and /sign-in at 3 requests per
   // 10s per IP. Playwright's desktop and mobile projects share a loopback
   // address and trip it. See `disableRateLimit` above for the guard.
-  ...(disableRateLimit ? { rateLimit: { enabled: false } } : {}),
+  rateLimit: {
+    ...(disableRateLimit ? { enabled: false } : {}),
+    customRules: { "/sign-in/anonymous": { window: 60, max: 20 } },
+  },
   emailAndPassword: {
     enabled: true,
     minPasswordLength: MIN_PASSWORD_LENGTH,
@@ -67,7 +72,13 @@ export const auth = betterAuth({
   // Writes the cache cookie that `getSession` refreshes back onto the
   // response; without it the cache would lapse five minutes after sign-in.
   // Must stay the last plugin.
-  plugins: [nextCookies()],
+  plugins: [
+    anonymous({
+      generateName: () => String(1000 + randomInt(9000)),
+      disableDeleteAnonymousUser: true,
+    }),
+    nextCookies(),
+  ],
   user: {
     additionalFields: {
       locale: {

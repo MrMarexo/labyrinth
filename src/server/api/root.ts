@@ -2,6 +2,7 @@ import { matchRouter } from "~/server/api/routers/match";
 import { mazeRouter } from "~/server/api/routers/maze";
 import { profileRouter } from "~/server/api/routers/profile";
 import { runRouter } from "~/server/api/routers/run";
+import { viewerRouter } from "~/server/api/routers/viewer";
 import { testSupportRouter } from "~/server/api/routers/test-support";
 import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
 
@@ -22,6 +23,7 @@ export const appRouter = createTRPCRouter({
   match: matchRouter,
   run: runRouter,
   testSupport: testSupportRouter,
+  viewer: viewerRouter,
 });
 
 // export type definition of API

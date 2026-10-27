@@ -73,6 +73,7 @@
     "replayNotReady": "Your run can be replayed once the match is over.",
     "replayExpired": "This replay is no longer available. Replays are kept for a month after a match ends.",
     "notSignedIn": "You need to sign in to do that.",
+    "guestNotAllowed": "Sign up to do this.",
     "invalidCredentials": "Wrong email or password.",
     "emailTaken": "That email is already registered.",
     "passwordTooShort": "Password must be at least {min} characters.",
@@ -112,6 +113,9 @@
     "conceptExists": "You already have a concept in progress. Continuing will delete it.",
     "mazeIsSaved": "This labyrinth is saved. Open it from your labyrinths and choose Edit to change it.",
     "wrongCurrentPassword": "Your current password is not right."
+  },
+  "players": {
+    "guestName": "Guest {number}"
   },
   "play": {
     "title": "Your games",

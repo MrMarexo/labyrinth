@@ -19,6 +19,13 @@ export async function signedIn() {
   return Object.assign(ctx, { cookie });
 }
 
+export async function guestSignedIn() {
+  const response = await auth.api.signInAnonymous({ asResponse: true });
+  const cookie = response.headers.get("set-cookie") ?? "";
+  const ctx = await createTRPCContext({ headers: new Headers({ cookie }) });
+  return Object.assign(ctx, { cookie });
+}
+
 const settings = {
   cellCount: GATED_MAZE_CELL_COUNT,
   gateCount: GATED_MAZE_GATE_COUNT,
