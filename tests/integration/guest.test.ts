@@ -1,12 +1,15 @@
+import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 
 import { createCaller } from "~/server/api/root";
 import { createTRPCContext } from "~/server/api/trpc";
 import { db } from "~/server/db";
+import { matchPlayer, maze } from "~/server/db/schema";
 
 import {
   GATED_MAZE_CELL_COUNT,
   GATED_MAZE_GATE_COUNT,
+  GATED_MAZE_ROUTE,
   gatedMazeDraft,
 } from "../fixtures/maze";
 import { guestSignedIn, signedIn } from "./players";
@@ -140,5 +143,63 @@ describe("guest names", () => {
     await b.match.join({ matchId: created.id });
 
     expect((await a.match.get({ id: created.id })).opponent?.guest).toBe(false);
+  });
+});
+
+describe("what a guest leaves behind", () => {
+  it("a guest's submitted maze is marked deleted", async () => {
+    const member = createCaller(await signedIn());
+    const guestCtx = await guestSignedIn();
+    const guest = createCaller(guestCtx);
+    const created = await member.match.create(settings);
+    await guest.match.join({ matchId: created.id });
+
+    const submit = async (caller: typeof member) => {
+      const concept = await caller.maze.conceptForMatch({
+        matchId: created.id,
+        name: "Gated",
+        replace: true,
+      });
+      await caller.maze.saveDraft({
+        id: concept.id,
+        data: gatedMazeDraft(),
+        expectedVersion: 0,
+      });
+      await caller.match.submitMaze({
+        matchId: created.id,
+        mazeId: concept.id,
+      });
+    };
+    await submit(member);
+    await submit(guest);
+
+    const seats = await db
+      .select({
+        userId: matchPlayer.userId,
+        submittedAt: matchPlayer.submittedAt,
+        deletedAt: maze.deletedAt,
+      })
+      .from(matchPlayer)
+      .innerJoin(maze, eq(maze.id, matchPlayer.mazeId))
+      .where(eq(matchPlayer.matchId, created.id));
+    const guestSeat = seats.find((s) => s.userId === guestCtx.session!.user.id);
+    const memberSeat = seats.find(
+      (s) => s.userId !== guestCtx.session!.user.id,
+    );
+    expect(guestSeat?.deletedAt).not.toBeNull();
+    expect(guestSeat?.deletedAt).toEqual(guestSeat?.submittedAt);
+    expect(memberSeat?.deletedAt).toBeNull();
+
+    for (const caller of [member, guest]) {
+      for (const [i, dir] of GATED_MAZE_ROUTE.entries()) {
+        await caller.run.move({
+          matchId: created.id,
+          seq: i + 1,
+          dir: dir,
+        });
+      }
+    }
+    const result = await member.run.result({ matchId: created.id });
+    expect(result.mazes?.theirs).not.toBeNull();
   });
 });

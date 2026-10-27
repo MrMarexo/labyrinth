@@ -3,7 +3,8 @@ import { describe, expect, it } from "vitest";
 
 import { createCaller } from "~/server/api/root";
 import { db } from "~/server/db";
-import { match, matchPlayer, maze } from "~/server/db/schema";
+import { match, matchPlayer, maze, user } from "~/server/db/schema";
+import { purgeIdleGuests } from "~/server/guest/purge";
 import { purgeDeletedMazes } from "~/server/maze/purge";
 
 import {
@@ -11,7 +12,7 @@ import {
   SOLVABLE_MAZE_GATE_COUNT,
   solvableDraft,
 } from "../fixtures/maze";
-import { signedIn } from "./players";
+import { guestSignedIn, signedIn } from "./players";
 
 type Caller = ReturnType<typeof createCaller>;
 
@@ -153,5 +154,77 @@ describe("purgeDeletedMazes", () => {
     await purgeAll();
 
     expect(await exists(mazeId)).toBe(true);
+  });
+});
+
+describe("purgeDeletedMazes for a guest's maze", () => {
+  it("removes it once the match ended 30 days ago and keeps both seats", async () => {
+    const member = await player();
+    const guestCtx = await guestSignedIn();
+    const guest = createCaller(guestCtx);
+    const guestId = guestCtx.session!.user.id;
+    const created = await member.caller.match.create(settings);
+    await guest.match.join({ matchId: created.id });
+    await member.caller.match.submitMaze({
+      matchId: created.id,
+      mazeId: await savedMaze(member.caller, "Host's"),
+    });
+    const concept = await guest.maze.conceptForMatch({
+      matchId: created.id,
+      name: "Guest's",
+      replace: true,
+    });
+    await guest.maze.saveDraft({
+      id: concept.id,
+      data: solvableDraft(),
+      expectedVersion: 0,
+    });
+    await guest.match.submitMaze({ matchId: created.id, mazeId: concept.id });
+    await endAgo(member.caller, created.id, 31);
+
+    await purgeAll();
+
+    expect(await exists(concept.id)).toBe(false);
+    const seats = await db
+      .select({ userId: matchPlayer.userId, mazeId: matchPlayer.mazeId })
+      .from(matchPlayer)
+      .where(eq(matchPlayer.matchId, created.id));
+    expect(seats).toHaveLength(2);
+    expect(seats.find((s) => s.userId === guestId)?.mazeId).toBeNull();
+  });
+});
+
+describe("purgeIdleGuests", () => {
+  async function aged(id: string, days: number) {
+    await db
+      .update(user)
+      .set({ createdAt: new Date(Date.now() - days * DAY) })
+      .where(eq(user.id, id));
+    return id;
+  }
+  async function present(id: string) {
+    return (await db.select().from(user).where(eq(user.id, id))).length === 1;
+  }
+
+  it("deletes only idle guests past 30 days", async () => {
+    const idle = await aged((await guestSignedIn()).session!.user.id, 31);
+    const young = await aged((await guestSignedIn()).session!.user.id, 29);
+    const member = await aged((await signedIn()).session!.user.id, 31);
+    const seated = await aged((await guestSignedIn()).session!.user.id, 31);
+    const host = createCaller(await signedIn());
+    const created = await host.match.create(settings);
+    await db
+      .insert(matchPlayer)
+      .values({ matchId: created.id, userId: seated });
+
+    for (;;) {
+      const { capped } = await purgeIdleGuests(db, new Date());
+      if (!capped) break;
+    }
+
+    expect(await present(idle)).toBe(false);
+    expect(await present(young)).toBe(true);
+    expect(await present(member)).toBe(true);
+    expect(await present(seated)).toBe(true);
   });
 });

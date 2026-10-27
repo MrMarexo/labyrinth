@@ -57,10 +57,13 @@ describe("GET /api/cron/sweep", () => {
       closed: number;
       capped: boolean;
       purge: { purged: number; capped: boolean };
+      guests: { purged: number; capped: boolean };
     };
     expect(typeof body.closed).toBe("number");
     expect(typeof body.capped).toBe("boolean");
     expect(typeof body.purge.purged).toBe("number");
     expect(typeof body.purge.capped).toBe("boolean");
+    expect(typeof body.guests.purged).toBe("number");
+    expect(typeof body.guests.capped).toBe("boolean");
   });
 });

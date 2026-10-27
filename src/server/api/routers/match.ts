@@ -912,6 +912,9 @@ export const matchRouter = createTRPCRouter({
             status: "submitted",
             contentHash: validation.contentHash,
             optimalMoves: validation.optimalMoves,
+            // A guest's labyrinth is never kept: the purge removes it once
+            // no match can show it.
+            ...(ctx.session.user.isAnonymous ? { deletedAt: now } : {}),
           })
           .where(eq(maze.id, mazeId));
 
