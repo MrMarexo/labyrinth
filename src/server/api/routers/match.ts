@@ -12,6 +12,7 @@ import {
   ne,
   notInArray,
   or,
+  sql,
 } from "drizzle-orm";
 import { z } from "zod";
 
@@ -36,6 +37,7 @@ import {
   createTRPCRouter,
   memberProcedure,
   protectedProcedure,
+  publicProcedure,
 } from "~/server/api/trpc";
 import { lockAuthor, promoteConcept } from "~/server/maze/concept";
 import {
@@ -88,12 +90,13 @@ export type LobbyItem = {
 };
 
 /**
- * Waiting, unexpired matches with the caller's own request state. Never
+ * Waiting, unexpired matches with the caller's own request state (always
+ * "none" for a visitor, `callerId` null). Never
  * selects `code` or any maze column: the lobby is not a way into a match.
  */
 async function waitingMatches(
   db: DbClient,
-  callerId: string,
+  callerId: string | null,
   now: Date,
   opts: { excludeCreator?: string; matchId?: string } = {},
 ) {
@@ -116,7 +119,7 @@ async function waitingMatches(
       matchRequest,
       and(
         eq(matchRequest.matchId, match.id),
-        eq(matchRequest.userId, callerId),
+        callerId === null ? sql`false` : eq(matchRequest.userId, callerId),
       ),
     )
     .where(
@@ -380,19 +383,20 @@ export const matchRouter = createTRPCRouter({
       return joined;
     }),
 
-  lobby: protectedProcedure.query(async ({ ctx }) => {
-    const rows = await waitingMatches(ctx.db, ctx.session.user.id, new Date(), {
-      excludeCreator: ctx.session.user.id,
+  lobby: publicProcedure.query(async ({ ctx }) => {
+    const you = ctx.session?.user.id ?? null;
+    const rows = await waitingMatches(ctx.db, you, new Date(), {
+      excludeCreator: you ?? undefined,
     });
-    return { you: ctx.session.user.id, matches: rows.map((r) => r.item) };
+    return { you, matches: rows.map((r) => r.item) };
   }),
 
-  preview: protectedProcedure
+  preview: publicProcedure
     .input(z.object({ matchId: z.string().min(1) }))
     .query(async ({ ctx, input }) => {
       const [found] = await waitingMatches(
         ctx.db,
-        ctx.session.user.id,
+        ctx.session?.user.id ?? null,
         new Date(),
         { matchId: input.matchId },
       );
@@ -404,7 +408,7 @@ export const matchRouter = createTRPCRouter({
       }
       return {
         ...found.item,
-        isYours: found.creatorId === ctx.session.user.id,
+        isYours: found.creatorId === ctx.session?.user.id,
       };
     }),
 

@@ -77,7 +77,7 @@ export function LobbyList() {
     },
     onCatchUp: refreshLobby,
   });
-  useChannel(data ? userChannel(data.you) : null, {
+  useChannel(data?.you ? userChannel(data.you) : null, {
     onEvent: (event) => {
       if (event === EVENTS.changed) void refreshMine();
     },

@@ -212,3 +212,47 @@ describe("match.get access", () => {
     expect(asJoiner).toMatchObject({ access: "open", isCreator: false });
   });
 });
+
+describe("lobby and preview without a session", () => {
+  const visitor = async () =>
+    createCaller(await createTRPCContext({ headers: new Headers() }));
+
+  it("lists a member's open match with no request state", async () => {
+    const creator = createCaller(await signedIn());
+    const open = await creator.match.create({ ...settings, access: "open" });
+
+    const lobby = await (await visitor()).match.lobby();
+    expect(lobby.you).toBeNull();
+    const item = lobby.matches.find((m) => m.id === open.id)!;
+    expect(item).toMatchObject({ access: "open", request: "none" });
+    expect(item).not.toHaveProperty("code");
+  });
+
+  it("previews a locked match as not the visitor's own", async () => {
+    const creator = createCaller(await signedIn());
+    const locked = await creator.match.create({
+      ...settings,
+      access: "locked",
+    });
+
+    const preview = await (
+      await visitor()
+    ).match.preview({ matchId: locked.id });
+    expect(preview).toMatchObject({
+      id: locked.id,
+      access: "locked",
+      isYours: false,
+      request: "none",
+    });
+  });
+
+  it("still refuses match.join", async () => {
+    const creator = createCaller(await signedIn());
+    const open = await creator.match.create(settings);
+
+    const error = await rejection(
+      (await visitor()).match.join({ matchId: open.id }),
+    );
+    expect(error).toMatchObject({ code: "UNAUTHORIZED" });
+  });
+});
