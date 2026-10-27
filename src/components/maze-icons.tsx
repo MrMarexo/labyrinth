@@ -136,7 +136,14 @@ export function GateSegment({
         y2={y2}
         strokeWidth={strokeWidth}
       />
-      <circle cx={cx} cy={cy} r={GATE_RING} strokeWidth={strokeWidth * 0.75} />
+      <PixelIcon
+        name="ring"
+        x={cx - GATE_RING - 1}
+        y={cy - GATE_RING - 1}
+        width={(GATE_RING + 1) * 2}
+        height={(GATE_RING + 1) * 2}
+        style={{ color: gateColour(gate) }}
+      />
     </g>
   );
 }

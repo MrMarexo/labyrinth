@@ -37,6 +37,7 @@ import {
   StartIcon,
   TreasureIcon,
 } from "~/components/maze-icons";
+import { PixelIcon } from "~/components/pixel-icons";
 import {
   clampCamera,
   follow,
@@ -830,12 +831,14 @@ export function Board({
         return (
           <g {...cell}>
             {holdsSomething && (
-              <circle
-                cx={cx}
-                cy={cy}
-                r={CELL_PX * 0.22}
+              <PixelIcon
+                name="dot"
+                x={cx - CELL_PX * 0.22}
+                y={cy - CELL_PX * 0.22}
+                width={CELL_PX * 0.44}
+                height={CELL_PX * 0.44}
                 opacity={0.6}
-                className="fill-danger"
+                className="text-danger"
               />
             )}
             {sides.map((s) => (

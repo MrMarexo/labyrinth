@@ -244,15 +244,12 @@ function NumberPicker({
             onKeyDown={handleKeyDown}
             className={iconButtonClass(active)}
           >
-            <svg aria-hidden="true" viewBox="0 0 10 10" className="size-5">
-              <circle
-                data-swatch
-                cx={5}
-                cy={5}
-                r={5}
-                style={{ fill: gateColour(n) }}
-              />
-            </svg>
+            <PixelIcon
+              name="dot"
+              data-swatch
+              className="size-5"
+              style={{ fill: gateColour(n) }}
+            />
             {placed.has(n) && (
               <PixelIcon
                 name="check"

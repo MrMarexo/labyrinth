@@ -74,44 +74,44 @@
   /* Native select popups and scrollbars follow the theme. */
   color-scheme: light;
 
-  /* Light: violet ink on pale paper. */
-  --bg: oklch(97% 0.012 300);
-  --fg: oklch(32% 0.15 297);
-  --muted: oklch(50% 0.11 297);
+  /* Light: warm ink on cream paper. */
+  --bg: oklch(97% 0.016 85);
+  --fg: oklch(22% 0.01 70);
+  --muted: oklch(48% 0.015 70);
   /* Non-interactive dividers only. */
-  --border: oklch(86% 0.04 300);
+  --border: oklch(88% 0.02 85);
   /* The boundary of an interactive control: WCAG 1.4.11 wants 3:1. */
-  --border-strong: oklch(58% 0.13 297);
-  --accent: oklch(32% 0.15 297);
-  --on-accent: oklch(97% 0.012 300);
+  --border-strong: oklch(60% 0.02 80);
+  --accent: oklch(22% 0.01 70);
+  --on-accent: oklch(97% 0.016 85);
   /* Gates and keys rotate this to their own hues (gate-colours.ts). */
   --gate-base: oklch(55% 0.18 260);
   --danger: oklch(52% 0.19 25);
 
-  --cell-painted: oklch(90% 0.035 300);
-  --cell-void: oklch(97% 0.012 300);
-  --grid-line: oklch(84% 0.04 300);
-  --wall: oklch(32% 0.15 297);
+  --cell-painted: oklch(91% 0.025 85);
+  --cell-void: oklch(97% 0.016 85);
+  --grid-line: oklch(86% 0.025 85);
+  --wall: oklch(22% 0.01 70);
 }
 
-/* Dark: the phosphor terminal — violet on black. */
+/* Dark: cream on near-black, the paper inverted. */
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --bg: oklch(0% 0 0);
-  --fg: oklch(72% 0.16 297);
-  --muted: oklch(60% 0.12 297);
-  --border: oklch(30% 0.08 297);
-  --border-strong: oklch(50% 0.12 297);
-  --accent: oklch(72% 0.16 297);
-  --on-accent: oklch(0% 0 0);
-  --gate-base: oklch(72% 0.16 260);
+  --bg: oklch(15% 0.005 80);
+  --fg: oklch(94% 0.025 85);
+  --muted: oklch(70% 0.02 80);
+  --border: oklch(30% 0.01 80);
+  --border-strong: oklch(55% 0.015 80);
+  --accent: oklch(94% 0.025 85);
+  --on-accent: oklch(15% 0.005 80);
+  --gate-base: oklch(70% 0.16 260);
   --danger: oklch(68% 0.19 25);
 
-  --cell-painted: oklch(22% 0.07 297);
-  --cell-void: oklch(0% 0 0);
-  --grid-line: oklch(26% 0.07 297);
-  --wall: oklch(78% 0.15 297);
+  --cell-painted: oklch(27% 0.01 80);
+  --cell-void: oklch(15% 0.005 80);
+  --grid-line: oklch(25% 0.01 80);
+  --wall: oklch(90% 0.025 85);
 }
 
 @theme inline {
@@ -177,6 +177,30 @@ h2 {
   button:disabled,
   select:disabled {
     cursor: not-allowed;
+  }
+
+  /* Radios as pixels: a square box, filled with an inset square when
+     checked. Radios hidden behind a styled label opt out with
+     `appearance-none`. */
+  input[type="radio"]:not(.appearance-none) {
+    appearance: none;
+    flex-shrink: 0;
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid var(--border-strong);
+    background-color: var(--bg);
+    cursor: pointer;
+  }
+
+  input[type="radio"]:not(.appearance-none):checked {
+    border-color: var(--fg);
+    background-color: var(--fg);
+    box-shadow: inset 0 0 0 2px var(--bg);
+  }
+
+  input[type="radio"]:not(.appearance-none):focus-visible {
+    outline: 2px dashed var(--fg);
+    outline-offset: 2px;
   }
 
   /* `isolation` keeps the z-index -1 overlay above the button's own

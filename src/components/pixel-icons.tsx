@@ -223,6 +223,19 @@ const MAPS = {
     ".........#",
     "..........",
   ],
+  dot: [
+    "...####...",
+    ".########.",
+    ".########.",
+    "##########",
+    "##########",
+    "##########",
+    "##########",
+    ".########.",
+    ".########.",
+    "...####...",
+  ],
+  ring: [".####.", "##..##", "#....#", "#....#", "##..##", ".####."],
 } satisfies Record<string, string[]>;
 
 /** Redo is undo, mirrored. */
@@ -250,6 +263,7 @@ export function PixelIcon({
       viewBox={`0 0 ${map[0]!.length} ${map.length}`}
       shapeRendering="crispEdges"
       fill="currentColor"
+      stroke="none"
       aria-hidden="true"
       {...rest}
       className={`pixel-icon pixel-icon-${name}${className ? ` ${className}` : ""}`}
