@@ -44,7 +44,8 @@ already has an account.
 | `/matches` | Lobby (read-only list with "Join as guest"), sign-up notice in place of the new-match form | Lobby and current match, sign-up notice in place of the new-match form, no match history | As now |
 | `/matches/[id]/join` | Preview with "Join as guest" and Sign in | Preview with Join | As now |
 | `/matches/[id]` (and the editor with `?match=`) | Sign-in redirect | Their own match only: drawing, running, result | As now |
-| `/labyrinths`, `/labyrinths/[id]` | A sign-up notice only | A sign-up notice only | As now |
+| `/labyrinths` | A sign-up notice only | A sign-up notice only | As now |
+| `/labyrinths/[id]` | Sign-in redirect | Only their concept opened from their match (`?match=`); otherwise the sign-up notice | As now |
 | `/profile` | Sign-in redirect | Redirect to sign-up | As now |
 
 - The **sign-up notice** on `/matches` always says that you need an account
@@ -63,9 +64,11 @@ These rules are enforced on the server, not only hidden in the UI. Every
 procedure a guest must not use refuses `isAnonymous` users with
 `errors.guestNotAllowed` (a message key, invariant 3):
 
-- `match.create`, `match.list`. `CurrentMatch` and the home summary read
-  `match.list` today, so a guest-safe "current match" read takes its place
-  for guests.
+- `match.create`.
+- `match.list` is not refused, because `CurrentMatch`, the lobby's
+  "accepted, take me there" check and the one-match-at-a-time note all read
+  it. For a guest it returns only matches that are not over, so there is
+  no history to show even by calling it directly.
 - Every `maze.*` procedure except those the editor needs while drawing a maze
   for a match the guest sits in (autosaving the concept, opening the editor
   with `?match=`).
@@ -143,6 +146,12 @@ in the hook, only after the reassign has committed.
 - Better Auth's 3-per-10s limit on `/sign-in*` also covers
   `/sign-in/anonymous`. Give it a custom, looser rule, so friends on one
   network can all join at once.
+
+## Who is looking
+
+A public `viewer.get` procedure answers `visitor`, `guest` (with the number)
+or `member`. Pages and components ask it to decide what to show, since pages
+may not read the session themselves (invariant 11).
 
 ## Lobby for visitors
 
