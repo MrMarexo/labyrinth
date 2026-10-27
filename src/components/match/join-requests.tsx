@@ -55,7 +55,7 @@ export function JoinRequests({ matchId }: { matchId: string }) {
               className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between"
             >
               <div className="space-y-1">
-                <p className="text-sm font-medium">{r.name}</p>
+                <p className="text-sm font-medium">{playerName(r)}</p>
                 <p className="text-muted text-sm">
                   {t("askedAgo", {
                     when: ago(r.createdAt),

@@ -1,8 +1,8 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { usePlayerName } from "~/components/player-name";
 
+import { usePlayerName } from "~/components/player-name";
 import { ResultMaze } from "~/components/run/result-maze";
 import { Link } from "~/components/link";
 import { formatElapsed } from "~/lib/format-elapsed";

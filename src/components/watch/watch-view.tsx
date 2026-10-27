@@ -10,8 +10,8 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
 
-import { usePlayerName } from "~/components/player-name";
 import { isTypingTarget } from "~/components/keyboard";
+import { usePlayerName } from "~/components/player-name";
 import { POLL_MS } from "~/components/realtime/poll";
 import { useChannel } from "~/components/realtime/use-channel";
 import { ResultMaze } from "~/components/run/result-maze";
