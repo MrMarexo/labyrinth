@@ -2,6 +2,7 @@ import { expect, type Page } from "@playwright/test";
 
 import { cell, drag, panToCorner } from "./support/board";
 import { createMatch, joinMatch, test } from "./support/match";
+import { clickNavLink } from "./support/menu";
 
 test.describe("the lobby's maze picker", () => {
   test("shows a preview of each option, no status label, and always offers a new one", async ({
@@ -241,7 +242,7 @@ test.describe("leaving the editor for the lobby", () => {
     });
     await host.getByRole("radio", { name: "Erase square" }).click();
     await host.locator('[data-cell="0,0"]').click();
-    await host.getByRole("link", { name: "Matches" }).click();
+    await clickNavLink(host, "Matches");
     await host
       .locator("[data-current-match]")
       .getByRole("link", { name: "Continue" })

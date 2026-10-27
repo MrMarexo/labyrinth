@@ -9,10 +9,9 @@ import { Link } from "~/components/link";
 import { useRouter } from "~/i18n/navigation";
 import { locales } from "~/i18n/routing";
 import { signIn, signUp } from "~/lib/auth-client";
+import { MIN_PASSWORD_LENGTH } from "~/lib/password";
 import { safeNext } from "~/lib/safe-next";
 import { api } from "~/trpc/react";
-
-const MIN_PASSWORD_LENGTH = 10;
 
 type ErrorMessageKey =
   "invalidCredentials" | "emailTaken" | "passwordTooShort" | "unknown";

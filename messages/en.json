@@ -9,7 +9,39 @@
     "signOut": "Sign out",
     "matches": "Matches",
     "labyrinths": "Labyrinths",
-    "settings": "Settings"
+    "menu": "Menu",
+    "profile": "Profile"
+  },
+  "home": {
+    "startHeading": "Start something new",
+    "newMatch": "New match",
+    "newLabyrinth": "New labyrinth",
+    "matchesHeading": "Matches",
+    "inProgress": "In progress",
+    "played": "Finished",
+    "won": "Won",
+    "labyrinthsHeading": "Labyrinths",
+    "saved": "Saved",
+    "savedOf": "{count} / {limit}",
+    "ready": "Ready",
+    "unfinished": "Unfinished"
+  },
+  "profile": {
+    "title": "Profile",
+    "accountHeading": "Account",
+    "email": "Email",
+    "name": "Name",
+    "nameHint": "Your opponents see this name.",
+    "saveName": "Save name",
+    "saving": "Saving…",
+    "nameSaved": "Saved.",
+    "passwordHeading": "Password",
+    "passwordHint": "Changing it signs you out on your other devices within a few minutes.",
+    "currentPassword": "Current password",
+    "newPassword": "New password",
+    "changePassword": "Change password",
+    "changing": "Changing…",
+    "passwordChanged": "Password changed."
   },
   "theme": {
     "label": "Theme",
@@ -78,7 +110,8 @@
     "matchNotCancellable": "Only a match still waiting for an opponent can be cancelled.",
     "draftChangedElsewhere": "This labyrinth was changed somewhere else. Reload to see the latest version.",
     "conceptExists": "You already have a concept in progress. Continuing will delete it.",
-    "mazeIsSaved": "This labyrinth is saved. Open it from your labyrinths and choose Edit to change it."
+    "mazeIsSaved": "This labyrinth is saved. Open it from your labyrinths and choose Edit to change it.",
+    "wrongCurrentPassword": "Your current password is not right."
   },
   "play": {
     "title": "Your games",

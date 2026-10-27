@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { signUp, signUpAndOpenNewMaze } from "./support/maze";
+import { clickNavLink } from "./support/menu";
 
 test.describe("creating a labyrinth", () => {
   test("a whitespace-only name fails visibly instead of silently", async ({
@@ -156,7 +157,7 @@ test.describe("leaving the editor", () => {
       (r) =>
         r.url().includes("/api/trpc/maze.discardIfEmpty") && r.status() === 200,
     );
-    await page.getByRole("link", { name: "Labyrinths" }).click();
+    await clickNavLink(page, "Labyrinths");
     await expect(page).toHaveURL(/\/en\/labyrinths$/);
     await discarded;
 
@@ -182,7 +183,7 @@ test.describe("leaving the editor", () => {
     const flushed = page.waitForResponse(
       (r) => r.url().includes("/api/trpc/maze.saveDraft") && r.status() === 200,
     );
-    await page.getByRole("link", { name: "Labyrinths" }).click();
+    await clickNavLink(page, "Labyrinths");
     await expect(page).toHaveURL(/\/en\/labyrinths$/);
     await flushed;
     // The batch link streams, so the 200 above can arrive before the write
@@ -213,7 +214,7 @@ test.describe("leaving the editor", () => {
       (r) =>
         r.url().includes("/api/trpc/maze.discardIfEmpty") && r.status() === 200,
     );
-    await page.getByRole("link", { name: "Labyrinths" }).click();
+    await clickNavLink(page, "Labyrinths");
     await expect(page).toHaveURL(/\/en\/labyrinths$/);
     await discarded;
 
@@ -242,7 +243,7 @@ test.describe("a stale copy of the editor", () => {
       "saved",
     );
 
-    await page.getByRole("link", { name: "Labyrinths" }).click();
+    await clickNavLink(page, "Labyrinths");
     await expect(page).toHaveURL(/\/en\/labyrinths$/);
     await page.goBack();
     await expect(page).toHaveURL(/\/en\/labyrinths\/[^/]+$/);
@@ -284,7 +285,7 @@ test.describe("a stale copy of the editor", () => {
     });
 
     await page.locator('[data-cell="1,0"]').click();
-    await page.getByRole("link", { name: "Labyrinths" }).click();
+    await clickNavLink(page, "Labyrinths");
     await expect(page).toHaveURL(/\/en\/labyrinths$/);
     await page.goBack();
     await expect(page.locator("svg[data-board]")).toBeVisible();

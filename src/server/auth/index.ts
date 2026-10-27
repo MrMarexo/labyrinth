@@ -6,6 +6,7 @@ import { nextCookies } from "better-auth/next-js";
 import { cache } from "react";
 
 import { env } from "~/env";
+import { MIN_PASSWORD_LENGTH } from "~/lib/password";
 import { db } from "~/server/db";
 import { servingLoopback } from "~/server/env-guards";
 
@@ -53,7 +54,7 @@ export const auth = betterAuth({
   ...(disableRateLimit ? { rateLimit: { enabled: false } } : {}),
   emailAndPassword: {
     enabled: true,
-    minPasswordLength: 10,
+    minPasswordLength: MIN_PASSWORD_LENGTH,
   },
   session: {
     expiresIn: 60 * 60 * 24 * 30,

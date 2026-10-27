@@ -482,9 +482,10 @@ export const matchRouter = createTRPCRouter({
     const rank = (r: { active: boolean; status: MatchStatus }) =>
       r.active ? 0 : isTerminal(r.status) ? 2 : 1;
     return rows
-      .map(({ finishedAt, gaveUpAt, forfeitedAt, ...row }) => ({
+      .map(({ finishedAt, gaveUpAt, forfeitedAt, winnerId, ...row }) => ({
         ...row,
         active: holdsPlayer(row, { finishedAt, gaveUpAt, forfeitedAt }, now),
+        won: winnerId === ctx.session.user.id,
       }))
       .sort((a, b) => rank(a) - rank(b));
   }),

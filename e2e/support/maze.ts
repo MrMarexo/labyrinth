@@ -2,6 +2,7 @@ import { expect, type Page } from "@playwright/test";
 
 import { PASSWORD, uniqueEmail } from "./auth";
 import { panToCorner } from "./board";
+import { expectSignedIn } from "./menu";
 
 export async function signUp(page: Page): Promise<void> {
   await page.goto("/en/sign-up");
@@ -9,7 +10,7 @@ export async function signUp(page: Page): Promise<void> {
   await page.getByLabel("Email").fill(uniqueEmail());
   await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
   await page.getByRole("button", { name: "Sign up" }).click();
-  await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
+  await expectSignedIn(page);
 }
 
 /**

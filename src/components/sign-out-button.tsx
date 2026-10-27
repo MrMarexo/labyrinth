@@ -8,7 +8,8 @@ import { useRouter } from "~/i18n/navigation";
 import { cn } from "~/lib/cn";
 import { signOut } from "~/lib/auth-client";
 
-export function SignOutButton() {
+/** `onSignedOut` runs once the session is gone, before the redirect. */
+export function SignOutButton({ onSignedOut }: { onSignedOut?: () => void }) {
   const t = useTranslations("nav");
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -26,6 +27,7 @@ export function SignOutButton() {
         // `match.list` or `match.get` cached under the account that just
         // signed out — join codes and an opponent's name included.
         queryClient.clear();
+        onSignedOut?.();
         router.replace("/");
         router.refresh();
       }}

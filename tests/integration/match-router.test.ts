@@ -15,6 +15,7 @@ import {
   SOLVABLE_MAZE_GATE_COUNT,
   solvableDraft,
 } from "../fixtures/maze";
+import { runningMatch } from "./players";
 import { rejection, sweepAll } from "./support";
 
 async function signedIn() {
@@ -344,6 +345,16 @@ describe("match.list", () => {
 
     const listed = await guest.match.list();
     expect(listed.map((m) => m.id)).toContain(created.id);
+  });
+
+  it("says which player won, from each player's side", async () => {
+    const { host, guest, matchId } = await runningMatch();
+    await guest.run.giveUp({ matchId });
+
+    const forHost = (await host.match.list()).find((m) => m.id === matchId);
+    const forGuest = (await guest.match.list()).find((m) => m.id === matchId);
+    expect(forHost?.won).toBe(true);
+    expect(forGuest?.won).toBe(false);
   });
 });
 

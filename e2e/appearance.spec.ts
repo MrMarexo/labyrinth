@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 import { rgbOf } from "./support/colour";
 import { signUp, signUpAndOpenNewMaze } from "./support/maze";
-import { openSettings } from "./support/settings";
+import { openMenu } from "./support/menu";
 
 test.describe("appearance", () => {
   test("applies the stored theme before the page paints", async ({ page }) => {
@@ -31,7 +31,7 @@ test.describe("appearance", () => {
 
   test("theme choice survives a reload", async ({ page }) => {
     await page.goto("/en");
-    await openSettings(page);
+    await openMenu(page);
     await page.getByRole("combobox", { name: "Theme" }).selectOption("dark");
     await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
 
@@ -45,7 +45,7 @@ test.describe("appearance", () => {
       "Labyrinth",
     );
 
-    await openSettings(page);
+    await openMenu(page);
     await page.getByRole("combobox", { name: "Language" }).selectOption("sk");
     await expect(page).toHaveURL(/\/sk$/);
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(
@@ -53,20 +53,20 @@ test.describe("appearance", () => {
     );
   });
 
-  test("the settings menu opens, switches theme and language, and closes on Escape", async ({
+  test("the menu opens, switches theme and language, and closes on Escape", async ({
     page,
   }) => {
     await page.goto("/en");
-    const button = page.getByRole("button", { name: "Settings" });
-    await expect(button).toHaveAttribute("data-settings");
+    const button = page.getByRole("button", { name: "Menu" });
+    await expect(button).toHaveAttribute("data-menu");
     await expect(button).toHaveAttribute("aria-expanded", "false");
-    await expect(button.locator("svg.lucide-settings")).toHaveCount(1);
+    await expect(button.locator("svg.lucide-menu")).toHaveCount(1);
     // Closed: the controls are out of the way.
     await expect(page.getByRole("combobox", { name: "Theme" })).toHaveCount(0);
 
     await button.click();
     await expect(button).toHaveAttribute("aria-expanded", "true");
-    const panel = page.getByRole("region", { name: "Settings" });
+    const panel = page.getByRole("region", { name: "Menu" });
     await expect(panel).toBeVisible();
     await expect(button).toHaveAttribute(
       "aria-controls",
@@ -92,9 +92,7 @@ test.describe("appearance", () => {
     await button.click();
     await panel.getByRole("combobox", { name: "Language" }).selectOption("sk");
     await expect(page).toHaveURL(/\/sk$/);
-    await expect(
-      page.getByRole("button", { name: "Nastavenia" }),
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Ponuka" })).toBeVisible();
   });
 
   test("accent buttons are near-white in the dark theme and near-black in the light one", async ({
@@ -115,7 +113,7 @@ test.describe("appearance", () => {
       expect(channel).toBeLessThan(80);
     }
 
-    await openSettings(page);
+    await openMenu(page);
     await page.getByRole("combobox", { name: "Theme" }).selectOption("light");
     await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
     // Polled: the colours transition over 150ms.

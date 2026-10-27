@@ -9,7 +9,39 @@
     "signOut": "Odhlásiť sa",
     "matches": "Zápasy",
     "labyrinths": "Bludiská",
-    "settings": "Nastavenia"
+    "menu": "Ponuka",
+    "profile": "Profil"
+  },
+  "home": {
+    "startHeading": "Začať niečo nové",
+    "newMatch": "Nový zápas",
+    "newLabyrinth": "Nové bludisko",
+    "matchesHeading": "Zápasy",
+    "inProgress": "Prebieha",
+    "played": "Dohrané",
+    "won": "Výhry",
+    "labyrinthsHeading": "Bludiská",
+    "saved": "Uložené",
+    "savedOf": "{count} / {limit}",
+    "ready": "Pripravené",
+    "unfinished": "Nedokončené"
+  },
+  "profile": {
+    "title": "Profil",
+    "accountHeading": "Účet",
+    "email": "E-mail",
+    "name": "Meno",
+    "nameHint": "Toto meno vidia vaši súperi.",
+    "saveName": "Uložiť meno",
+    "saving": "Ukladá sa…",
+    "nameSaved": "Uložené.",
+    "passwordHeading": "Heslo",
+    "passwordHint": "Zmena hesla vás do niekoľkých minút odhlási na ostatných zariadeniach.",
+    "currentPassword": "Súčasné heslo",
+    "newPassword": "Nové heslo",
+    "changePassword": "Zmeniť heslo",
+    "changing": "Mení sa…",
+    "passwordChanged": "Heslo bolo zmenené."
   },
   "theme": {
     "label": "Vzhľad",
@@ -78,7 +110,8 @@
     "matchNotCancellable": "Zrušiť sa dá len zápas, ktorý ešte čaká na súpera.",
     "draftChangedElsewhere": "Toto bludisko sa medzitým zmenilo inde. Načítajte ho znova, aby ste videli najnovšiu verziu.",
     "conceptExists": "Už máte rozpracovaný koncept. Ak budete pokračovať, zmaže sa.",
-    "mazeIsSaved": "Toto bludisko je uložené. Ak ho chcete zmeniť, otvorte ho vo svojich bludiskách a zvoľte Upraviť."
+    "mazeIsSaved": "Toto bludisko je uložené. Ak ho chcete zmeniť, otvorte ho vo svojich bludiskách a zvoľte Upraviť.",
+    "wrongCurrentPassword": "Súčasné heslo nie je správne."
   },
   "play": {
     "title": "Vaše hry",

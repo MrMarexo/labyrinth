@@ -55,3 +55,39 @@ describe("profile.setLocale", () => {
     });
   });
 });
+
+describe("profile.get", () => {
+  it("returns the caller's own name and email", async () => {
+    const ctx = await signedInContext();
+    const caller = createCaller(ctx);
+
+    await expect(caller.profile.get()).resolves.toEqual({
+      name: "Test Person",
+      email: ctx.session!.user.email,
+    });
+  });
+});
+
+describe("profile.setName", () => {
+  it("stores the trimmed name", async () => {
+    const ctx = await signedInContext();
+    const caller = createCaller(ctx);
+
+    await caller.profile.setName({ name: "  New Name  " });
+
+    const [row] = await db
+      .select()
+      .from(user)
+      .where(eq(user.id, ctx.session!.user.id));
+    expect(row?.name).toBe("New Name");
+  });
+
+  it("refuses a blank name", async () => {
+    const ctx = await signedInContext();
+    const caller = createCaller(ctx);
+
+    await expect(
+      rejection(caller.profile.setName({ name: "   " })),
+    ).resolves.toMatchObject({ code: "BAD_REQUEST" });
+  });
+});

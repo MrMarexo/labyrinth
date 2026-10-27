@@ -44,8 +44,22 @@ export async function signedInContext(
   request: APIRequestContext,
   baseURL: string,
 ): Promise<BrowserContext> {
-  const { cookies } = await signUpViaApi(request);
   const context = await browser.newContext({ baseURL });
+  await signIntoContext(context, request, baseURL);
+  return context;
+}
+
+/**
+ * Signs an existing context in as a brand-new account and returns its email.
+ * For the test's own `page`, whose context keeps the project's device — a
+ * phone viewport on mobile — where `signedInContext` starts a bare one.
+ */
+export async function signIntoContext(
+  context: BrowserContext,
+  request: APIRequestContext,
+  baseURL: string,
+): Promise<string> {
+  const { email, cookies } = await signUpViaApi(request);
   const { hostname } = new URL(baseURL);
   await context.addCookies(
     cookies.map((raw) => {
@@ -59,5 +73,5 @@ export async function signedInContext(
       };
     }),
   );
-  return context;
+  return email;
 }

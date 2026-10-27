@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { PASSWORD, uniqueEmail } from "./support/auth";
-import { openSettings } from "./support/settings";
+import { expectSignedIn, openMenu, signOut } from "./support/menu";
 
 test.describe("protected area", () => {
   test("redirects an anonymous visitor to sign in", async ({ page }) => {
@@ -21,14 +21,14 @@ test.describe("protected area", () => {
     // or /en/play races the sign-up and the (app) layout redirects to
     // sign-in, which also has an <h1> and a Language combobox, so a generic
     // assertion below would pass on the wrong page.
-    await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
+    await expectSignedIn(page);
 
     await page.goto("/en/play");
     await expect(
       page.getByRole("heading", { level: 1, name: "Your games" }),
     ).toBeVisible();
 
-    await openSettings(page);
+    await openMenu(page);
     await page.getByRole("combobox", { name: "Language" }).selectOption("sk");
     await expect(page).toHaveURL(/\/sk\/play$/);
     await expect(
@@ -53,9 +53,7 @@ test.describe("language preference", () => {
     await page.getByLabel("Heslo", { exact: true }).fill(PASSWORD);
     await page.getByRole("button", { name: "Registrovať sa" }).click();
 
-    await expect(
-      page.getByRole("button", { name: "Odhlásiť sa" }),
-    ).toBeVisible();
+    await expectSignedIn(page);
     await expect(page).toHaveURL(/\/sk$/);
   });
 
@@ -81,12 +79,10 @@ test.describe("language preference", () => {
     await page.getByLabel("Heslo", { exact: true }).fill(PASSWORD);
     await page.getByRole("button", { name: "Registrovať sa" }).click();
 
-    await expect(
-      page.getByRole("button", { name: "Odhlásiť sa" }),
-    ).toBeVisible();
+    await expectSignedIn(page);
     await localeSaved;
 
-    await page.getByRole("button", { name: "Odhlásiť sa" }).click();
+    await signOut(page, "Odhlásiť sa");
     await expect(
       page.getByRole("link", { name: "Prihlásiť sa" }),
     ).toBeVisible();
@@ -112,13 +108,13 @@ test.describe("language preference", () => {
     await page.getByLabel("Email").fill(email);
     await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
     await page.getByRole("button", { name: "Sign up" }).click();
-    await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
+    await expectSignedIn(page);
 
-    await openSettings(page);
+    await openMenu(page);
     await page.getByRole("combobox", { name: "Language" }).selectOption("sk");
     await expect(page).toHaveURL(/\/sk$/);
 
-    await page.getByRole("button", { name: "Odhlásiť sa" }).click();
+    await signOut(page, "Odhlásiť sa");
     await expect(
       page.getByRole("link", { name: "Prihlásiť sa" }),
     ).toBeVisible();

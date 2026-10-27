@@ -1,9 +1,8 @@
 import { headers } from "next/headers";
 import { getTranslations } from "next-intl/server";
 
-import { SettingsMenu } from "~/components/settings-menu";
-import { SignOutButton } from "~/components/sign-out-button";
 import { Link } from "~/components/link";
+import { SiteMenu } from "~/components/site-menu";
 import { getSession } from "~/server/auth";
 
 export async function SiteHeader() {
@@ -16,8 +15,9 @@ export async function SiteHeader() {
         {t("app.name")}
       </Link>
       <div className="flex items-center gap-3">
+        {/* On a phone these two move into the menu. */}
         {session && (
-          <nav className="flex items-center gap-3">
+          <nav data-header-nav className="hidden items-center gap-3 sm:flex">
             <Link href="/matches" className="text-sm">
               {t("nav.matches")}
             </Link>
@@ -26,10 +26,7 @@ export async function SiteHeader() {
             </Link>
           </nav>
         )}
-        <SettingsMenu />
-        {session ? (
-          <SignOutButton />
-        ) : (
+        {!session && (
           <>
             <Link href="/sign-in" className="text-sm">
               {t("nav.signIn")}
@@ -39,6 +36,7 @@ export async function SiteHeader() {
             </Link>
           </>
         )}
+        <SiteMenu signedIn={!!session} />
       </div>
     </header>
   );

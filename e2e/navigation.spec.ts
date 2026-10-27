@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { signedInContext } from "./support/auth";
+import { clickNavLink } from "./support/menu";
 
 test.describe("navigation", () => {
   // Every other spec that touches the match lifecycle opens straight on
@@ -17,11 +18,11 @@ test.describe("navigation", () => {
     const page = await context.newPage();
 
     await page.goto("/en");
-    await page.getByRole("link", { name: "Matches" }).click();
+    await clickNavLink(page, "Matches");
     await expect(page).toHaveURL(/\/en\/matches$/);
 
     await page.goto("/en");
-    await page.getByRole("link", { name: "Labyrinths" }).click();
+    await clickNavLink(page, "Labyrinths");
     await expect(page).toHaveURL(/\/en\/labyrinths$/);
 
     await context.close();

@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { rgbOf } from "./support/colour";
 import { signUpAndOpenNewMaze } from "./support/maze";
-import { openSettings } from "./support/settings";
+import { openMenu } from "./support/menu";
 
 /** Computed `stroke` of the segment at `edge` (e.g. `"V:0,0"`). */
 async function strokeAt(page: Page, edge: string): Promise<string> {
@@ -148,7 +148,7 @@ test.describe("gate colours", () => {
       path: testInfo.outputPath("gate-colours-light.png"),
     });
 
-    await openSettings(page);
+    await openMenu(page);
     await page.getByRole("combobox", { name: "Theme" }).selectOption("dark");
     await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
     // The resolution mechanism doesn't differ by theme, but both themes are

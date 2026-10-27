@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+import { expectSignedIn, signOut } from "./support/menu";
+
 function uniqueEmail() {
   return `e2e-${Date.now()}-${Math.random().toString(36).slice(2)}@example.test`;
 }
@@ -18,9 +20,9 @@ test.describe("authentication", () => {
     await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
     await page.getByRole("button", { name: "Sign up" }).click();
 
-    await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
+    await expectSignedIn(page);
 
-    await page.getByRole("button", { name: "Sign out" }).click();
+    await signOut(page);
     await expect(page.getByRole("link", { name: "Sign in" })).toBeVisible();
 
     await page.goto("/en/sign-in");
@@ -28,7 +30,7 @@ test.describe("authentication", () => {
     await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
     await page.getByRole("button", { name: "Sign in" }).click();
 
-    await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
+    await expectSignedIn(page);
   });
 
   test("sign-up states the password rule and refuses a short password", async ({
@@ -51,7 +53,7 @@ test.describe("authentication", () => {
     );
     await expect(password).toHaveAttribute("aria-invalid", "true");
     await expect(page).toHaveURL(/\/en\/sign-up$/);
-    await expect(page.getByRole("button", { name: "Sign out" })).toHaveCount(0);
+    await expect(page.locator("[data-menu][data-signed-in]")).toHaveCount(0);
   });
 
   test("sign-in refuses a short password before sending it", async ({
@@ -94,7 +96,7 @@ test.describe("authentication", () => {
     await page.getByLabel("Email").fill(email);
     await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
     await page.getByRole("button", { name: "Sign up" }).click();
-    await page.getByRole("button", { name: "Sign out" }).click();
+    await signOut(page);
     // Wait for the sign-out to land. The (auth) layout now bounces a
     // signed-in visitor to the home page, so navigating while the session
     // cookie is still alive never reaches the form.
