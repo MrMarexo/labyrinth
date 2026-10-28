@@ -6,7 +6,13 @@ import {
   TreasureIcon,
 } from "~/components/maze-icons";
 import { mazeViewBox } from "~/lib/maze-view-box";
-import { edgeKey, outlineEdges, type DraftMaze, type Edge } from "~/maze";
+import {
+  edgeKey,
+  outlineEdges,
+  type DraftMaze,
+  type Edge,
+  type Point,
+} from "~/maze";
 
 /**
  * Anything drawable: a finished maze, or a draft that may not have its start
@@ -16,6 +22,9 @@ export type DrawableMaze = Pick<
   DraftMaze,
   "cells" | "segments" | "keys" | "start" | "treasure"
 >;
+
+/** A start or treasure with the runner on it. */
+const UNDER_RUNNER_OPACITY = 0.4;
 
 /** Endpoints of the line an edge is drawn as, in board pixels. */
 function edgeLine(edge: Edge) {
@@ -33,16 +42,19 @@ function edgeLine(edge: Edge) {
  * is just background), the start, the treasure, the keys, then the shape's
  * outline, walls and gates on top. Shared by the result screen, the replay,
  * the lobby's previews and the read-only labyrinth page, so none of them can
- * draw a maze differently. `dimTreasure` fades the treasure for a caller that
- * draws something over it.
+ * draw a maze differently. `runnerAt` is the square a caller draws a runner
+ * on: the start or treasure there fades, so the runner reads on top of it.
  */
 export function MazeDrawing({
   maze,
-  dimTreasure = false,
+  runnerAt,
 }: {
   maze: DrawableMaze;
-  dimTreasure?: boolean;
+  runnerAt?: Point;
 }) {
+  const under = (p: Point | null) =>
+    runnerAt !== undefined && p?.x === runnerAt.x && p.y === runnerAt.y;
+
   return (
     <>
       {maze.cells.map((c) => (
@@ -58,14 +70,21 @@ export function MazeDrawing({
       ))}
 
       {maze.start && (
-        <StartIcon x={maze.start.x} y={maze.start.y} size={CELL_PX} />
+        <StartIcon
+          data-maze-start=""
+          x={maze.start.x}
+          y={maze.start.y}
+          size={CELL_PX}
+          opacity={under(maze.start) ? UNDER_RUNNER_OPACITY : undefined}
+        />
       )}
       {maze.treasure && (
         <TreasureIcon
+          data-maze-treasure=""
           x={maze.treasure.x}
           y={maze.treasure.y}
           size={CELL_PX}
-          opacity={dimTreasure ? 0.4 : undefined}
+          opacity={under(maze.treasure) ? UNDER_RUNNER_OPACITY : undefined}
         />
       )}
 
@@ -86,7 +105,7 @@ export function MazeDrawing({
           data-outline={edgeKey(edge)}
           {...edgeLine(edge)}
           strokeWidth={4}
-          strokeLinecap="round"
+          strokeLinecap="square"
           className="stroke-wall"
         />
       ))}
@@ -103,7 +122,7 @@ export function MazeDrawing({
             key={`seg-${edgeKey(s)}`}
             {...edgeLine(s)}
             strokeWidth={4}
-            strokeLinecap="round"
+            strokeLinecap="square"
             className="stroke-wall"
           />
         ),

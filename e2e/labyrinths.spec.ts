@@ -45,7 +45,9 @@ async function createFromForm(page: Page, name: string) {
 
 async function submitForm(page: Page, name: string) {
   await page.getByRole("textbox", { name: "Name" }).fill(name);
+  // The form's own picker: the library's filters have a Gates group too.
   await page
+    .locator("form")
     .getByRole("radiogroup", { name: "Gates" })
     .getByRole("radio", { name: "0", exact: true })
     .click();
@@ -108,9 +110,9 @@ test.describe("/labyrinths", () => {
     await expect(concept).toBeVisible();
 
     await host.getByRole("radio", { name: "All" }).click();
-    const squares = host.getByLabel("Squares");
-    await expect(squares.locator("option")).toHaveText(["Any", "36", "64"]);
-    await squares.selectOption("64");
+    const squares = host.getByRole("radiogroup", { name: "Squares" });
+    await expect(squares.getByRole("radio")).toHaveText(["Any", "36", "64"]);
+    await squares.getByRole("radio", { name: "64" }).click();
     await expect(items).toHaveCount(1);
     await expect(items).toContainText("Wide");
   });
@@ -122,11 +124,15 @@ test.describe("/labyrinths", () => {
     await seedSaved(page, { name: "Big", cellCount: 64 });
     await page.goto("/en/labyrinths");
 
-    await page.getByLabel("Squares").selectOption("64");
+    const squares = page.getByRole("radiogroup", { name: "Squares" });
+    await squares.getByRole("radio", { name: "64" }).click();
     await page.getByRole("button", { name: "Delete Big" }).click();
     await page.getByRole("button", { name: "Confirm delete Big" }).click();
 
-    await expect(page.getByLabel("Squares")).toHaveValue("any");
+    await expect(squares.getByRole("radio", { name: "Any" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
     await expect(page.locator("[data-maze-item]")).toHaveCount(1);
     await expect(page.locator("[data-maze-item]")).toContainText("Small");
   });

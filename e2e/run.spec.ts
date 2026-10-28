@@ -24,10 +24,8 @@ test.describe("the run", () => {
     );
     // The runner is a person icon alone, with no disc behind it.
     await expect(
-      host.locator("[data-runner-at] svg.lucide-person-standing"),
+      host.locator("[data-runner-at] svg.pixel-icon-runner"),
     ).not.toHaveCount(0);
-    // (The person glyph draws its own head as a circle, so look only for a
-    // disc directly under the runner group.)
     await expect(host.locator("[data-runner-at] > circle")).toHaveCount(0);
 
     const route = [...GATED_MAZE_ROUTE];
@@ -86,7 +84,7 @@ test.describe("the run", () => {
       const maze = host.locator(`[data-result-maze="${which}"]`);
       await expect(maze.locator("[data-path]")).toHaveClass(/stroke-fg/);
       await expect(
-        maze.locator("[data-path-end] svg.lucide-person-standing"),
+        maze.locator("[data-path-end] svg.pixel-icon-runner"),
       ).not.toHaveCount(0);
     }
   });

@@ -1,9 +1,9 @@
 "use client";
 
-import { Check } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useRef, type KeyboardEvent } from "react";
 
+import { PixelIcon } from "~/components/pixel-icons";
 import { iconButtonClass, Tooltip } from "~/components/tooltip";
 import type { Tool } from "~/maze";
 import { gateColour } from "./gate-colours";
@@ -244,20 +244,16 @@ function NumberPicker({
             onKeyDown={handleKeyDown}
             className={iconButtonClass(active)}
           >
-            <svg aria-hidden="true" viewBox="0 0 10 10" className="size-5">
-              <circle
-                data-swatch
-                cx={5}
-                cy={5}
-                r={5}
-                style={{ fill: gateColour(n) }}
-              />
-            </svg>
+            <PixelIcon
+              name="dot"
+              data-swatch
+              className="size-5"
+              style={{ fill: gateColour(n) }}
+            />
             {placed.has(n) && (
-              <Check
-                aria-hidden="true"
-                strokeWidth={3}
-                className="absolute top-0.5 right-0.5 size-3"
+              <PixelIcon
+                name="check"
+                className="absolute top-0.5 right-0.5 size-2.5"
               />
             )}
           </button>

@@ -31,7 +31,7 @@ export function ValidationPanel({
     <div data-validity={valid ? "valid" : "invalid"} className="space-y-2">
       {!valid && (
         <>
-          <p className="text-sm font-medium">{t("editor.notYetValid")}</p>
+          <p className="text-sm">{t("editor.notYetValid")}</p>
           <ul className="text-danger space-y-1 text-sm">
             {issues.map((issue, index) => {
               // `TranslatableIssue.key` is only guaranteed key-shaped, not

@@ -17,7 +17,7 @@ export default async function HomePage() {
   return (
     <main className="mx-auto max-w-3xl space-y-6 p-8">
       <div>
-        <h1 className="text-3xl font-bold">{t("app.name")}</h1>
+        <h1 className="text-3xl">{t("app.name")}</h1>
         <p className="mt-2">{t("app.tagline")}</p>
       </div>
       {viewer.kind === "member" ? (

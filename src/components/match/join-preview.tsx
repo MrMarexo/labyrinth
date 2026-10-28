@@ -87,7 +87,7 @@ export function JoinPreview({
 
   return (
     <div className="space-y-3">
-      <p className="font-medium">
+      <p>
         {t("byCreator", {
           name: playerName({
             name: data.creatorName,

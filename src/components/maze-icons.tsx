@@ -1,7 +1,7 @@
-import { DoorStairwell, Key, PersonStanding, Trophy } from "lucide-react";
 import type { SVGProps } from "react";
 
 import { gateColour } from "~/components/editor/gate-colours";
+import { PixelIcon } from "~/components/pixel-icons";
 
 /**
  * Markers drawn inside one square of a board: the square at `x`, `y` (in
@@ -16,7 +16,7 @@ export type IconProps = Omit<SVGProps<SVGGElement>, "x" | "y"> & {
   size: number;
 };
 
-/** A lucide glyph's box inside its square: `scale` of it, centred. */
+/** A glyph's box inside its square: `scale` of it, centred. */
 function glyphBox(x: number, y: number, size: number, scale = 0.7) {
   const inset = (1 - scale) / 2;
   return {
@@ -39,10 +39,9 @@ export function KeyIcon({
 }: IconProps & { gate: number }) {
   return (
     <g {...rest} aria-hidden="true">
-      <Key
+      <PixelIcon
+        name="key"
         {...glyphBox(x, y, size, KEY_SCALE)}
-        aria-hidden="true"
-        strokeWidth={2.5}
         style={{ color: gateColour(gate) }}
       />
     </g>
@@ -52,12 +51,7 @@ export function KeyIcon({
 export function StartIcon({ x, y, size, ...rest }: IconProps) {
   return (
     <g {...rest} aria-hidden="true">
-      <DoorStairwell
-        {...glyphBox(x, y, size)}
-        aria-hidden="true"
-        strokeWidth={2.5}
-        className="text-fg"
-      />
+      <PixelIcon name="start" {...glyphBox(x, y, size)} className="text-fg" />
     </g>
   );
 }
@@ -65,10 +59,9 @@ export function StartIcon({ x, y, size, ...rest }: IconProps) {
 export function TreasureIcon({ x, y, size, ...rest }: IconProps) {
   return (
     <g {...rest} aria-hidden="true">
-      <Trophy
+      <PixelIcon
+        name="treasure"
         {...glyphBox(x, y, size)}
-        aria-hidden="true"
-        strokeWidth={2.5}
         className="text-fg"
       />
     </g>
@@ -85,12 +78,7 @@ export function RunnerIcon({ x, y, size, ...rest }: IconProps) {
   };
   return (
     <g {...rest} aria-hidden="true">
-      <PersonStanding
-        {...box}
-        aria-hidden="true"
-        strokeWidth={2.5}
-        className="text-fg"
-      />
+      <PixelIcon name="runner" {...box} className="text-fg" />
     </g>
   );
 }
@@ -102,7 +90,9 @@ const GATE_RING = 6;
  * A gate on the edge from (x1, y1) to (x2, y2): the edge in the gate's
  * colour, broken in the middle by a ring, the same keyhole the palette's gate
  * tool shows. The colour and any dash are set on the `<g>` and inherited, so
- * a hook or test reads them from the root.
+ * a hook or test reads them from the root. The ring is pixel art, so it can't
+ * inherit those: it is drawn dotted when the gate is dashed, and its pixels
+ * are half the line's width, so a thicker gate has a thicker ring.
  */
 export function GateSegment({
   x1,
@@ -127,10 +117,12 @@ export function GateSegment({
   // Unit vector along the edge, to stop each half at the ring.
   const ux = (x2 - x1) / length;
   const uy = (y2 - y1) / length;
+  // The ring map is 6 pixels across.
+  const ring = (strokeWidth / 2) * 6;
   return (
     <g
       {...rest}
-      strokeLinecap="round"
+      strokeLinecap="square"
       fill="none"
       style={{ stroke: gateColour(gate), ...style }}
     >
@@ -148,7 +140,14 @@ export function GateSegment({
         y2={y2}
         strokeWidth={strokeWidth}
       />
-      <circle cx={cx} cy={cy} r={GATE_RING} strokeWidth={strokeWidth * 0.75} />
+      <PixelIcon
+        name={rest.strokeDasharray === undefined ? "ring" : "ring-dotted"}
+        x={cx - ring / 2}
+        y={cy - ring / 2}
+        width={ring}
+        height={ring}
+        style={{ color: gateColour(gate) }}
+      />
     </g>
   );
 }

@@ -37,6 +37,7 @@ import {
   StartIcon,
   TreasureIcon,
 } from "~/components/maze-icons";
+import { PixelIcon } from "~/components/pixel-icons";
 import {
   clampCamera,
   follow,
@@ -746,7 +747,7 @@ export function Board({
         "data-hover-edge": key,
         ...edgeLine(target.edge),
         strokeWidth: 4,
-        strokeLinecap: "round",
+        strokeLinecap: "square",
       } as const;
       const existing = segmentAt.get(key);
       // A tap with the same segment removes it (spec §10.2), so the preview
@@ -830,12 +831,14 @@ export function Board({
         return (
           <g {...cell}>
             {holdsSomething && (
-              <circle
-                cx={cx}
-                cy={cy}
-                r={CELL_PX * 0.22}
+              <PixelIcon
+                name="dot"
+                x={cx - CELL_PX * 0.22}
+                y={cy - CELL_PX * 0.22}
+                width={CELL_PX * 0.44}
+                height={CELL_PX * 0.44}
                 opacity={0.6}
-                className="fill-danger"
+                className="text-danger"
               />
             )}
             {sides.map((s) => (
@@ -843,7 +846,7 @@ export function Board({
                 key={edgeKey(s)}
                 {...edgeLine(s)}
                 strokeWidth={6}
-                strokeLinecap="round"
+                strokeLinecap="square"
                 opacity={0.6}
                 className="stroke-danger"
               />
@@ -970,7 +973,7 @@ export function Board({
             pointerEvents="none"
             {...edgeLine(edge)}
             strokeWidth={4}
-            strokeLinecap="round"
+            strokeLinecap="square"
             className="stroke-wall"
           />
         ))}
@@ -997,7 +1000,7 @@ export function Board({
               pointerEvents="none"
               {...edgeLine(segment)}
               strokeWidth={4}
-              strokeLinecap="round"
+              strokeLinecap="square"
               className="stroke-wall"
             />
           );
@@ -1101,7 +1104,6 @@ export function Board({
             y={ring.at.y * CELL_PX + 2.5}
             width={CELL_PX - 5}
             height={CELL_PX - 5}
-            rx={3}
             fill="none"
             strokeWidth={3}
             className="stroke-accent"
@@ -1113,13 +1115,13 @@ export function Board({
             <line
               {...edgeLine(ring.edge)}
               strokeWidth={9}
-              strokeLinecap="round"
+              strokeLinecap="square"
               className="stroke-accent"
             />
             <line
               {...edgeLine(ring.edge)}
               strokeWidth={4}
-              strokeLinecap="round"
+              strokeLinecap="square"
               className="stroke-bg"
             />
           </g>

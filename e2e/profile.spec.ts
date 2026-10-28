@@ -33,9 +33,11 @@ test.describe("the menu", () => {
       await expect(panelNav).toBeHidden();
     }
     await expect(
-      panel.getByRole("combobox", { name: "Language" }),
+      panel.getByRole("radiogroup", { name: "Language" }),
     ).toBeVisible();
-    await expect(panel.getByRole("combobox", { name: "Theme" })).toBeVisible();
+    await expect(
+      panel.getByRole("radiogroup", { name: "Theme" }),
+    ).toBeVisible();
     await expect(panel.getByRole("button", { name: "Sign out" })).toBeVisible();
 
     await panel.getByRole("link", { name: "Profile" }).click();
@@ -49,7 +51,9 @@ test.describe("the menu", () => {
     await page.goto("/en");
     await openMenu(page);
     const panel = page.locator("[data-menu-panel]");
-    await expect(panel.getByRole("combobox", { name: "Theme" })).toBeVisible();
+    await expect(
+      panel.getByRole("radiogroup", { name: "Theme" }),
+    ).toBeVisible();
     await expect(panel.getByRole("link", { name: "Profile" })).toHaveCount(0);
     await expect(panel.getByRole("button", { name: "Sign out" })).toHaveCount(
       0,

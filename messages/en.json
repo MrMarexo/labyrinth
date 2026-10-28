@@ -154,6 +154,8 @@
     "filterReady": "Ready",
     "filterUsed": "Used",
     "filterAny": "Any",
+    "filterSquaresName": "Filter by squares",
+    "filterGatesName": "Filter by gates",
     "sortLabel": "Sort by",
     "sortEdited": "Last edited",
     "sortName": "Name",

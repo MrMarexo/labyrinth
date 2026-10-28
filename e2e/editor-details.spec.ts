@@ -262,16 +262,16 @@ test.describe("icons", () => {
     await cell(page, 3, 0).click();
 
     const start = page.locator("[data-start]");
-    await expect(start.locator("svg.lucide-door-stairwell")).toHaveCount(1);
+    await expect(start.locator("svg.pixel-icon-start")).toHaveCount(1);
     await expect(start.locator("circle, text")).toHaveCount(0);
     const treasure = page.locator("[data-treasure]");
     await expect(treasure).toHaveCount(1);
     expect(await treasure.evaluate((el) => el.tagName)).toBe("g");
-    await expect(treasure.locator("svg.lucide-trophy")).toHaveCount(1);
+    await expect(treasure.locator("svg.pixel-icon-treasure")).toHaveCount(1);
     // Only keys and gates carry colour: the start and the treasure are drawn
     // in the text colour.
     for (const icon of [start, treasure]) {
-      await expect(icon.locator("svg.lucide")).toHaveClass(/text-fg/);
+      await expect(icon.locator("svg.pixel-icon")).toHaveClass(/text-fg/);
     }
   });
 });

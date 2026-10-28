@@ -20,19 +20,17 @@ export type ResultMazeProps = {
  */
 export function ResultMaze({ maze, path, label, which }: ResultMazeProps) {
   const last = path.at(-1);
-  // A finished run ends on the treasure: fade it so the runner reads on top.
-  const onTreasure = last?.x === maze.treasure.x && last.y === maze.treasure.y;
 
   return (
     <figure data-result-maze={which} className="space-y-2">
-      <figcaption className="text-sm font-medium">{label}</figcaption>
+      <figcaption className="text-sm">{label}</figcaption>
       <svg
         role="img"
         aria-label={label}
         viewBox={mazeViewBox(maze.cells, CELL_PX)}
         className="border-border-strong h-auto w-full max-w-[560px] rounded border"
       >
-        <MazeDrawing maze={maze} dimTreasure={onTreasure} />
+        <MazeDrawing maze={maze} runnerAt={last} />
 
         <polyline
           data-path
@@ -42,8 +40,8 @@ export function ResultMaze({ maze, path, label, which }: ResultMazeProps) {
             .join(" ")}
           fill="none"
           strokeWidth={3}
-          strokeLinejoin="round"
-          strokeLinecap="round"
+          strokeLinejoin="miter"
+          strokeLinecap="square"
           // A quiet neutral trail: only keys and gates carry colour.
           className="stroke-fg"
           opacity={0.35}

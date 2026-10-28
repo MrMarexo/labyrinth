@@ -211,7 +211,7 @@ export function RunView({
         {t.rich("rule", { b: (chunks) => <strong>{chunks}</strong> })}
       </p>
       <p className="text-muted text-sm">{t("penaltiesLabel")}</p>
-      <p data-penalties={data.penalties} className="text-4xl font-bold">
+      <p data-penalties={data.penalties} className="text-4xl">
         {data.penalties}
       </p>
       <div className="flex flex-wrap items-center gap-4 text-sm">
@@ -230,7 +230,7 @@ export function RunView({
                 role="img"
                 aria-label={t("keyName", { gate })}
                 title={t("keyName", { gate })}
-                className="border-border-strong inline-block size-4 rounded-full border"
+                className="border-border-strong inline-block size-4 border"
                 style={{ backgroundColor: gateColour(gate) }}
               />
             ))

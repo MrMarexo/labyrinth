@@ -1,9 +1,29 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans:
-    var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif,
-    "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --font-sans: var(--font-vt323), ui-monospace, monospace;
+
+  /* VT323 draws about two thirds the size of a proportional face at the
+     same em, so every step of the scale is raised to read the same. */
+  --text-xs: 1.125rem;
+  --text-sm: 1.25rem;
+  --text-base: 1.375rem;
+  --text-lg: 1.5rem;
+  --text-xl: 1.75rem;
+  --text-2xl: 2.125rem;
+  --text-3xl: 2.5rem;
+  --text-4xl: 3rem;
+
+  /* Square corners everywhere: the pixel look has no curves. */
+  --radius-xs: 0;
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-xl: 0;
+  --radius-2xl: 0;
+  --radius-3xl: 0;
+  --radius-4xl: 0;
+  --radius: 0;
 
   --animate-bump-pulse: bump-pulse 200ms ease-out;
 
@@ -51,50 +71,47 @@
 }
 
 :root {
-  /* Native select popups and scrollbars follow the theme. */
+  /* Native scrollbars and form controls follow the theme. */
   color-scheme: light;
 
-  --bg: oklch(99% 0 0);
-  --fg: oklch(22% 0 0);
-  --muted: oklch(55% 0 0);
-  /* Non-interactive dividers only — 1.31:1 against --bg. */
-  --border: oklch(90% 0 0);
-  /* The boundary of an interactive control: WCAG 1.4.11 wants 3:1.
-     3.14:1 against --bg. */
-  --border-strong: oklch(65% 0 0);
-  /* The foreground, not a hue: 16.8:1 against --bg and --on-accent. */
-  --accent: oklch(22% 0 0);
-  --on-accent: oklch(99% 0 0);
+  /* Light: warm ink on cream paper. */
+  --bg: oklch(97% 0.016 85);
+  --fg: oklch(22% 0.01 70);
+  --muted: oklch(48% 0.015 70);
+  /* Non-interactive dividers only. */
+  --border: oklch(88% 0.02 85);
+  /* The boundary of an interactive control: WCAG 1.4.11 wants 3:1. */
+  --border-strong: oklch(60% 0.02 80);
+  --accent: oklch(22% 0.01 70);
+  --on-accent: oklch(97% 0.016 85);
   /* Gates and keys rotate this to their own hues (gate-colours.ts). */
   --gate-base: oklch(55% 0.18 260);
-  --danger: oklch(55% 0.19 25);
+  --danger: oklch(52% 0.19 25);
 
-  --cell-painted: oklch(93% 0 0);
-  --cell-void: oklch(97% 0 0);
-  --grid-line: oklch(88% 0 0);
-  --wall: oklch(25% 0 0);
+  --cell-painted: oklch(91% 0.025 85);
+  --cell-void: oklch(97% 0.016 85);
+  --grid-line: oklch(86% 0.025 85);
+  --wall: oklch(22% 0.01 70);
 }
 
+/* Dark: cream on near-black, the paper inverted. */
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --bg: oklch(18% 0 0);
-  --fg: oklch(95% 0 0);
-  --muted: oklch(65% 0 0);
-  /* 1.48:1 against --bg. */
-  --border: oklch(32% 0 0);
-  /* 3.13:1 against --bg. */
-  --border-strong: oklch(50% 0 0);
-  /* 15.6:1 against --bg and --on-accent. */
-  --accent: oklch(95% 0 0);
-  --on-accent: oklch(18% 0 0);
+  --bg: oklch(15% 0.005 80);
+  --fg: oklch(94% 0.025 85);
+  --muted: oklch(70% 0.02 80);
+  --border: oklch(30% 0.01 80);
+  --border-strong: oklch(55% 0.015 80);
+  --accent: oklch(94% 0.025 85);
+  --on-accent: oklch(15% 0.005 80);
   --gate-base: oklch(70% 0.16 260);
-  --danger: oklch(68% 0.17 25);
+  --danger: oklch(68% 0.19 25);
 
-  --cell-painted: oklch(30% 0 0);
-  --cell-void: oklch(21% 0 0);
-  --grid-line: oklch(27% 0 0);
-  --wall: oklch(88% 0 0);
+  --cell-painted: oklch(27% 0.01 80);
+  --cell-void: oklch(15% 0.005 80);
+  --grid-line: oklch(25% 0.01 80);
+  --wall: oklch(90% 0.025 85);
 }
 
 @theme inline {
@@ -122,6 +139,18 @@ html {
 body {
   background-color: var(--bg);
   color: var(--fg);
+  font-size: var(--text-base);
+  line-height: 1.2;
+  /* VT323 has one weight. A synthesised bold smears its pixels, so weight
+     and size alone carry emphasis. */
+  font-synthesis: none;
+  -webkit-font-smoothing: none;
+}
+
+h1,
+h2 {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 /*
@@ -140,14 +169,35 @@ body {
   button:not(:disabled),
   [role="button"]:not([aria-disabled="true"]),
   [role="radio"]:not([aria-disabled="true"]),
-  summary,
-  select:not(:disabled) {
+  summary {
     cursor: pointer;
   }
 
-  button:disabled,
-  select:disabled {
+  button:disabled {
     cursor: not-allowed;
+  }
+
+  /* Radios as pixels: a square box, filled with an inset square when
+     checked. */
+  input[type="radio"] {
+    appearance: none;
+    flex-shrink: 0;
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid var(--border-strong);
+    background-color: var(--bg);
+    cursor: pointer;
+  }
+
+  input[type="radio"]:checked {
+    border-color: var(--fg);
+    background-color: var(--fg);
+    box-shadow: inset 0 0 0 2px var(--bg);
+  }
+
+  input[type="radio"]:focus-visible {
+    outline: 2px dashed var(--fg);
+    outline-offset: 2px;
   }
 
   /* `isolation` keeps the z-index -1 overlay above the button's own
@@ -177,8 +227,7 @@ body {
 
   @media (prefers-reduced-motion: no-preference) {
     button,
-    a,
-    select {
+    a {
       transition-property: color, background-color, border-color, opacity;
       transition-duration: 150ms;
       transition-timing-function: ease-out;

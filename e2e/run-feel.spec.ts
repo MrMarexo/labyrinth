@@ -223,6 +223,23 @@ test.describe("how the run feels", () => {
     await expect(toast).toHaveCount(0);
   });
 
+  test("a gate's ring turns dotted once its key is held", async ({
+    players,
+  }, testInfo) => {
+    const { host } = await startRunningMatch(players, createMatch);
+    const gate = host.locator('[data-run-segment="H:5,2"]');
+
+    // Down to the gate without its key: bumped, so drawn, and solid.
+    await walk(host, ["E", "E", "E", "E", "E", "S", "S", "S"], testInfo);
+    await expect(gate.locator("svg.pixel-icon-ring")).toHaveCount(1);
+    await expect(gate).not.toHaveAttribute("stroke-dasharray");
+
+    // West along row 2 onto the key: the gate is now openable.
+    await walk(host, ["W", "W", "W", "W", "W"], testInfo);
+    await expect(gate.locator("svg.pixel-icon-ring-dotted")).toHaveCount(1);
+    await expect(gate).toHaveAttribute("stroke-dasharray", "6 4");
+  });
+
   test("the treasure opens a popup once, which Escape closes", async ({
     players,
   }, testInfo) => {

@@ -1,11 +1,11 @@
 "use client";
 
-import { Menu } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useEffect, useId, useRef, useState } from "react";
 
 import { Link } from "~/components/link";
 import { LocaleSwitcher } from "~/components/locale-switcher";
+import { PixelIcon } from "~/components/pixel-icons";
 import { SignOutButton } from "~/components/sign-out-button";
 import { ThemeToggle } from "~/components/theme-toggle";
 
@@ -68,7 +68,7 @@ export function SiteMenu({
         onClick={() => setOpen((was) => !was)}
         className="border-border-strong flex size-9 items-center justify-center rounded border"
       >
-        <Menu aria-hidden="true" className="size-5" />
+        <PixelIcon name="menu" className="size-5" />
       </button>
       <div
         id={panelId}
@@ -76,7 +76,7 @@ export function SiteMenu({
         aria-label={t("menu")}
         data-menu-panel
         hidden={!open}
-        className="bg-bg border-border-strong absolute top-full right-0 z-20 mt-2 w-max min-w-48 space-y-3 rounded border p-3 shadow-lg"
+        className="bg-bg border-border-strong absolute top-full right-0 z-20 mt-2 w-max max-w-[calc(100vw-2rem)] min-w-48 space-y-3 border-2 p-3 shadow-[4px_4px_0_var(--border-strong)]"
       >
         {viewer !== "visitor" && (
           <div data-menu-nav className="space-y-3 sm:hidden">
@@ -98,8 +98,8 @@ export function SiteMenu({
             {t("profile")}
           </Link>
         )}
-        <LocaleSwitcher showLabel />
-        <ThemeToggle showLabel />
+        <LocaleSwitcher />
+        <ThemeToggle />
         {member && (
           <>
             <hr className="border-border" />

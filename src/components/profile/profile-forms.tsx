@@ -64,7 +64,7 @@ export function NameForm() {
 
   return (
     <section className="space-y-4">
-      <h2 className="text-xl font-semibold">{t("accountHeading")}</h2>
+      <h2 className="text-xl">{t("accountHeading")}</h2>
       <div className="space-y-1">
         <p className="text-muted text-sm">{t("email")}</p>
         <p data-profile-email>{data.email}</p>
@@ -182,7 +182,7 @@ export function PasswordForm() {
 
   return (
     <section className="space-y-4">
-      <h2 className="text-xl font-semibold">{t("passwordHeading")}</h2>
+      <h2 className="text-xl">{t("passwordHeading")}</h2>
       <p className="text-muted text-sm">{t("passwordHint")}</p>
       <form noValidate onSubmit={onSubmit} className="space-y-3">
         <div className="space-y-1">

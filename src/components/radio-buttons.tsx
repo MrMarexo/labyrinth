@@ -23,6 +23,7 @@ export function RadioButtons<T extends number | string>({
   optionLabel,
   buttonClass,
   className,
+  disabled = false,
   ...group
 }: {
   options: readonly T[];
@@ -33,6 +34,7 @@ export function RadioButtons<T extends number | string>({
   optionLabel?: (option: T) => string;
   buttonClass: (active: boolean) => string;
   className?: string;
+  disabled?: boolean;
 } & ({ "aria-label": string } | { "aria-labelledby": string })) {
   const buttonRefs = useRef(new Map<T, HTMLButtonElement>());
 
@@ -75,6 +77,7 @@ export function RadioButtons<T extends number | string>({
             aria-checked={active}
             aria-label={optionLabel?.(option)}
             tabIndex={index === tabStopIndex ? 0 : -1}
+            disabled={disabled}
             onClick={() => onChange(option)}
             onKeyDown={handleKeyDown}
             className={buttonClass(active)}

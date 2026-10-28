@@ -45,12 +45,12 @@ export function FinishPopup({
       onClose={onClose}
       className="bg-bg text-fg border-border-strong backdrop:bg-fg/40 m-auto w-[min(24rem,calc(100vw-2rem))] space-y-4 rounded border p-6"
     >
-      <h2 id={titleId} className="text-2xl font-bold">
+      <h2 id={titleId} className="text-2xl">
         {t("finishTitle")}
       </h2>
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
         <dt className="text-muted">{t("penaltiesLabel")}</dt>
-        <dd data-finish-penalties={finish.penalties} className="font-bold">
+        <dd data-finish-penalties={finish.penalties} className="text-xl">
           {finish.penalties}
         </dd>
         <dt className="text-muted">{t("movesLabel")}</dt>

@@ -37,7 +37,7 @@ export default async function JoinPage({
 
   return (
     <main className="mx-auto max-w-3xl space-y-6 p-8">
-      <h1 className="text-3xl font-bold">{t("joinTitle")}</h1>
+      <h1 className="text-3xl">{t("joinTitle")}</h1>
       {preview ? (
         <JoinPreview
           matchId={id}

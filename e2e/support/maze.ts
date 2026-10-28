@@ -26,7 +26,9 @@ export async function signUpAndOpenNewMaze(
   await page.getByRole("button", { name: "New labyrinth" }).click();
   await page.getByLabel("Name").fill("Test maze");
   if (options.gates !== undefined) {
+    // The form's own picker: the library's filters have a Gates group too.
     await page
+      .locator("form")
       .getByRole("radiogroup", { name: "Gates" })
       .getByRole("radio", { name: String(options.gates), exact: true })
       .click();

@@ -38,7 +38,7 @@ export function NewMatchForm() {
         data-already-waiting
         className="border-border-strong space-y-2 rounded border p-4"
       >
-        <h2 className="text-xl font-semibold">{t("createHeading")}</h2>
+        <h2 className="text-xl">{t("createHeading")}</h2>
         <p className="text-sm">{t("alreadyWaiting")}</p>
         <Link href={`/matches/${active.id}`} className="text-sm">
           {t("alreadyWaitingLink")}
@@ -52,7 +52,7 @@ export function NewMatchForm() {
         data-already-active
         className="border-border-strong space-y-2 rounded border p-4"
       >
-        <h2 className="text-xl font-semibold">{t("createHeading")}</h2>
+        <h2 className="text-xl">{t("createHeading")}</h2>
         <p className="text-sm">{t("alreadyActive")}</p>
       </div>
     );
@@ -87,7 +87,7 @@ function CreateMatchForm() {
         create.mutate({ cellCount, gateCount, access });
       }}
     >
-      <h2 className="text-xl font-semibold">{t("createHeading")}</h2>
+      <h2 className="text-xl">{t("createHeading")}</h2>
 
       <OptionPicker
         label={t("size")}
@@ -117,10 +117,10 @@ function CreateMatchForm() {
               checked={access === option}
               onChange={() => setAccess(option)}
               aria-describedby={`new-match-access-${option}-hint`}
-              className="accent-accent mt-1"
+              className="mt-1"
             />
             <span className="space-y-0.5">
-              <span className="block text-sm font-medium">
+              <span className="block text-sm">
                 {t(ACCESS_COPY[option].label)}
               </span>
               <span

@@ -75,7 +75,7 @@ export default async function EditorPage({
     // Wide, unlike the other pages: the board grows to fill the screen.
     <main className="mx-auto max-w-[120rem] space-y-6 px-4 py-6 lg:px-8">
       <div className="space-y-1">
-        <h1 className="text-2xl font-bold">{row.name}</h1>
+        <h1 className="text-2xl">{row.name}</h1>
         <p data-concept-note className="text-muted text-sm">
           {sourceName ? t("conceptOf", { name: sourceName }) : t("conceptNote")}
         </p>

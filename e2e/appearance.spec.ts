@@ -32,7 +32,10 @@ test.describe("appearance", () => {
   test("theme choice survives a reload", async ({ page }) => {
     await page.goto("/en");
     await openMenu(page);
-    await page.getByRole("combobox", { name: "Theme" }).selectOption("dark");
+    await page
+      .getByRole("radiogroup", { name: "Theme" })
+      .getByRole("radio", { name: "Dark" })
+      .click();
     await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
 
     await page.reload();
@@ -46,7 +49,10 @@ test.describe("appearance", () => {
     );
 
     await openMenu(page);
-    await page.getByRole("combobox", { name: "Language" }).selectOption("sk");
+    await page
+      .getByRole("radiogroup", { name: "Language" })
+      .getByRole("radio", { name: "Slovenčina" })
+      .click();
     await expect(page).toHaveURL(/\/sk$/);
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(
       "Labyrint",
@@ -60,9 +66,11 @@ test.describe("appearance", () => {
     const button = page.getByRole("button", { name: "Menu" });
     await expect(button).toHaveAttribute("data-menu");
     await expect(button).toHaveAttribute("aria-expanded", "false");
-    await expect(button.locator("svg.lucide-menu")).toHaveCount(1);
+    await expect(button.locator("svg.pixel-icon-menu")).toHaveCount(1);
     // Closed: the controls are out of the way.
-    await expect(page.getByRole("combobox", { name: "Theme" })).toHaveCount(0);
+    await expect(page.getByRole("radiogroup", { name: "Theme" })).toHaveCount(
+      0,
+    );
 
     await button.click();
     await expect(button).toHaveAttribute("aria-expanded", "true");
@@ -73,7 +81,10 @@ test.describe("appearance", () => {
       (await panel.getAttribute("id"))!,
     );
 
-    await panel.getByRole("combobox", { name: "Theme" }).selectOption("dark");
+    await panel
+      .getByRole("radiogroup", { name: "Theme" })
+      .getByRole("radio", { name: "Dark" })
+      .click();
     await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
 
     await page.keyboard.press("Escape");
@@ -90,7 +101,10 @@ test.describe("appearance", () => {
     await expect(panel).toBeHidden();
 
     await button.click();
-    await panel.getByRole("combobox", { name: "Language" }).selectOption("sk");
+    await panel
+      .getByRole("radiogroup", { name: "Language" })
+      .getByRole("radio", { name: "Slovenčina" })
+      .click();
     await expect(page).toHaveURL(/\/sk$/);
     await expect(page.getByRole("button", { name: "Ponuka" })).toBeVisible();
   });
@@ -114,7 +128,10 @@ test.describe("appearance", () => {
     }
 
     await openMenu(page);
-    await page.getByRole("combobox", { name: "Theme" }).selectOption("light");
+    await page
+      .getByRole("radiogroup", { name: "Theme" })
+      .getByRole("radio", { name: "Light" })
+      .click();
     await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
     // Polled: the colours transition over 150ms.
     await expect

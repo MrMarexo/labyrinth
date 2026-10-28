@@ -12,7 +12,7 @@ export default async function LabyrinthsPage() {
 
   return (
     <main className="mx-auto max-w-3xl space-y-6 p-8">
-      <h1 className="text-3xl font-bold">{t("title")}</h1>
+      <h1 className="text-3xl">{t("title")}</h1>
       {viewer.kind === "member" ? (
         <>
           <NewMazeForm />

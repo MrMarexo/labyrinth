@@ -154,6 +154,8 @@
     "filterReady": "Pripravené",
     "filterUsed": "Použité",
     "filterAny": "Ľubovoľný",
+    "filterSquaresName": "Filtrovať podľa políčok",
+    "filterGatesName": "Filtrovať podľa brán",
     "sortLabel": "Zoradiť podľa",
     "sortEdited": "Naposledy upravené",
     "sortName": "Názov",

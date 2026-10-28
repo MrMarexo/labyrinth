@@ -1,6 +1,5 @@
 "use client";
 
-import { Lock } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useState } from "react";
 
@@ -12,6 +11,7 @@ import {
 } from "~/components/editor/maze-library";
 
 import { MazeTile, mazeTileClass } from "~/components/maze-tile";
+import { PixelIcon } from "~/components/pixel-icons";
 import { resolveErrorKey } from "~/lib/resolve-error-key";
 import { Link } from "~/components/link";
 import { api } from "~/trpc/react";
@@ -71,7 +71,7 @@ export function MazeList() {
             // Not prefetched: the prefetch would cache the editor page
             // with the draft as it is now, and a save still landing from
             // the editor just left would be missing when it opens.
-            <Link href={href} prefetch={false} className="truncate font-medium">
+            <Link href={href} prefetch={false} className="truncate">
               {item.name}
             </Link>
           }
@@ -92,13 +92,13 @@ export function MazeList() {
         />
         {item.state === "concept" && (
           <span data-concept-badge className="flex flex-col">
-            <span className="font-medium">{t("conceptBadge")}</span>
+            <span>{t("conceptBadge")}</span>
             <span className="text-muted">{t("conceptHint")}</span>
           </span>
         )}
         {item.state === "used" && (
           <span data-used-badge className="text-muted flex items-center gap-1">
-            <Lock aria-hidden="true" className="size-3.5" />
+            <PixelIcon name="lock" className="size-5" />
             {t("usedBadge")}
           </span>
         )}
