@@ -22,7 +22,7 @@ type PlayerOptions = {
  */
 export async function seedMaze(
   page: Page,
-  options: Omit<PlayerOptions, never>,
+  options: PlayerOptions,
 ): Promise<void> {
   await page.goto("/en/matches");
   const seeded = await page.evaluate<unknown, typeof options>(async (input) => {

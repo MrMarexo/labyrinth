@@ -1,4 +1,4 @@
-import { expect, type Page } from "@playwright/test";
+import { expect, type Page, type TestInfo } from "@playwright/test";
 
 import { GATED_MAZE_ROUTE } from "~/lib/open-maze";
 
@@ -34,7 +34,7 @@ async function submitFirstMaze(page: Page): Promise<void> {
 async function playAsGuest(
   host: Page,
   visitor: Page,
-  testInfo: Parameters<typeof walk>[2],
+  testInfo: TestInfo,
 ): Promise<string> {
   const matchId = await createMatch(host, { cells: 36, gates: 1 });
   await joinAsGuest(visitor, matchId);
@@ -78,8 +78,9 @@ test.describe("guest play", () => {
     page.on("console", (m) => {
       if (m.type() === "error") errors.push(m.text());
     });
+    page.on("pageerror", (e) => errors.push(e.message));
 
-    await page.goto("/en/matches");
+    await page.goto("/en/matches", { waitUntil: "networkidle" });
     await expect(page.locator('[data-sign-up-notice="matches"]')).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Create match" }),
@@ -131,16 +132,18 @@ test.describe("guest play", () => {
     await expect(page.locator("[data-guest-name]")).toHaveCount(0);
 
     await page.goto("/en/matches");
+    const yours = page
+      .locator("section")
+      .filter({ has: page.getByRole("heading", { name: "Your matches" }) });
     await expect(
-      page.getByRole("heading", { name: "Your matches" }),
-    ).toBeVisible();
-    await expect(
-      page.locator(`[data-match-row] a[href$="/matches/${matchId}"]`),
+      yours.locator(`[data-match-row] a[href$="/matches/${matchId}"]`),
     ).toBeVisible();
 
     await page.goto("/en/labyrinths");
-    await expect(page.getByText("Guest maze")).toBeVisible();
-    await expect(page.locator("[data-used-badge]")).toBeVisible();
+    const item = page
+      .locator("[data-maze-item]")
+      .filter({ hasText: "Guest maze" });
+    await expect(item.locator("[data-used-badge]")).toBeVisible();
   });
 
   test("a second join after a failed one does not sign in again", async ({
@@ -153,22 +156,30 @@ test.describe("guest play", () => {
     const filled = await createMatch(host, { cells: 36, gates: 0 });
     const open = await createMatch(other, { cells: 36, gates: 0 });
 
+    const signIns: string[] = [];
+    page.on("request", (r) => {
+      if (r.url().includes("/sign-in/anonymous")) signIns.push(r.url());
+    });
+
     // The visitor has the page open when a member takes the last seat.
     await page.goto(`/en/matches/${filled}/join`);
     const join = page.getByRole("button", { name: "Join as guest" });
     await expect(join).toBeVisible();
     await joinMatch(rival, filled);
 
+    // The batch stream answers 200 and carries the error in its body, and
+    // the body is gone once the page moves on, so read it on the way past.
+    let joinBody = "";
+    await page.route("**/match.join*", async (route) => {
+      const response = await route.fetch();
+      joinBody = await response.text();
+      await route.fulfill({ response, body: joinBody });
+    });
     await join.click();
-    // The failed join refreshes the preview, which now reads as closed; the
-    // inline error shows only until that lands.
-    await expect(
-      page.locator("[data-lobby-error], [data-match-closed]").first(),
-    ).toBeVisible();
+    await expect.poll(() => joinBody).toContain("errors.matchFull");
     await expect(page.locator("[data-guest-name]")).toHaveText(GUEST_NAME);
-    const name = await page.locator("[data-guest-name]").textContent();
 
     await joinAsGuest(page, open);
-    await expect(page.locator("[data-guest-name]")).toHaveText(name!);
+    expect(signIns).toHaveLength(1);
   });
 });
