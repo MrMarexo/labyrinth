@@ -1,11 +1,11 @@
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 
 import { createCaller } from "~/server/api/root";
 import { db } from "~/server/db";
-import { match, matchPlayer, maze, user } from "~/server/db/schema";
+import { match, matchMaze, matchPlayer, maze, user } from "~/server/db/schema";
 import { purgeIdleGuests } from "~/server/guest/purge";
-import { purgeDeletedMazes } from "~/server/maze/purge";
+import { purgeMatchMazes } from "~/server/match/purge";
 
 import {
   SOLVABLE_MAZE_CELL_COUNT,
@@ -15,6 +15,7 @@ import {
 import { guestSignedIn, signedIn } from "./players";
 
 type Caller = ReturnType<typeof createCaller>;
+type Draft = ReturnType<typeof solvableDraft>;
 
 const DAY = 24 * 60 * 60 * 1000;
 const settings = {
@@ -24,11 +25,11 @@ const settings = {
 
 /**
  * Purges until nothing is left to purge. The test database is shared and
- * never reset, so other suites' deleted mazes may fill the first batches.
+ * never reset, so other suites' old matches may fill the first batches.
  */
 async function purgeAll(at = new Date()) {
   for (;;) {
-    const { capped } = await purgeDeletedMazes(db, at);
+    const { capped } = await purgeMatchMazes(db, at);
     if (!capped) return;
   }
 }
@@ -38,29 +39,28 @@ async function player() {
   return { caller: createCaller(ctx), id: ctx.session!.user.id };
 }
 
-async function savedMaze(caller: Caller, name: string) {
+async function savedMaze(caller: Caller, name: string, data = solvableDraft()) {
   const created = await caller.maze.createConcept({
     name,
     ...settings,
     replace: true,
   });
-  await caller.maze.saveDraft({
-    id: created.id,
-    data: solvableDraft(),
-    expectedVersion: 0,
-  });
+  await caller.maze.saveDraft({ id: created.id, data, expectedVersion: 0 });
   return created.id;
 }
 
-/** `author` plays `mazeId` against a fresh rival; the match is running. */
-async function playWith(author: Caller, mazeId: string) {
+/**
+ * `author` plays `mazeId` against a fresh rival; the match is running. A
+ * later rival must draw something else: `author` has faced the first one's.
+ */
+async function playWith(author: Caller, mazeId: string, rivalDraft?: Draft) {
   const rival = await player();
   const created = await author.match.create(settings);
   await rival.caller.match.join({ matchId: created.id });
   await author.match.submitMaze({ matchId: created.id, mazeId });
   await rival.caller.match.submitMaze({
     matchId: created.id,
-    mazeId: await savedMaze(rival.caller, "Rival's"),
+    mazeId: await savedMaze(rival.caller, "Rival's", rivalDraft),
   });
   return { matchId: created.id, rival: rival.caller };
 }
@@ -79,90 +79,78 @@ async function exists(mazeId: string) {
   return rows.length === 1;
 }
 
-describe("purgeDeletedMazes", () => {
-  it("removes a deleted maze once its only match is past the window, and unlinks it", async () => {
+/** Whose copies of their mazes the match still holds. */
+async function copiesIn(matchId: string) {
+  const rows = await db
+    .select({ userId: matchMaze.userId })
+    .from(matchMaze)
+    .where(eq(matchMaze.matchId, matchId));
+  return rows.map((r) => r.userId).sort();
+}
+
+describe("purgeMatchMazes", () => {
+  it("drops a match's copies once it is past the window, and keeps its result", async () => {
     const author = await player();
     const mazeId = await savedMaze(author.caller, "Old");
     const { matchId, rival } = await playWith(author.caller, mazeId);
     await endAgo(rival, matchId, 31);
-    await author.caller.maze.remove({ id: mazeId });
 
     await purgeAll();
 
-    expect(await exists(mazeId)).toBe(false);
-    const [seat] = await db
-      .select({ mazeId: matchPlayer.mazeId })
-      .from(matchPlayer)
-      .where(
-        and(
-          eq(matchPlayer.matchId, matchId),
-          eq(matchPlayer.userId, author.id),
-        ),
-      );
-    expect(seat!.mazeId).toBeNull();
-
-    // The result survives, with the purged side's drawing gone.
+    expect(await copiesIn(matchId)).toEqual([]);
+    // The author's own labyrinth is theirs, whatever happens to the match.
+    expect(await exists(mazeId)).toBe(true);
     const result = await author.caller.run.result({ matchId });
     expect(result.outcome).toBe("won");
-    expect(result.mazes?.yours).toBeNull();
-    expect(result.mazes?.theirs).not.toBeNull();
+    expect(result.mazes).toEqual({ theirs: null, yours: null });
   });
 
-  it("keeps a deleted maze whose match ended inside the window", async () => {
+  it("keeps the copies of a match that ended inside the window", async () => {
     const author = await player();
     const mazeId = await savedMaze(author.caller, "Recent");
     const { matchId, rival } = await playWith(author.caller, mazeId);
     await endAgo(rival, matchId, 29);
+    // Deleting the labyrinth changes nothing for the match.
     await author.caller.maze.remove({ id: mazeId });
 
     await purgeAll();
 
-    expect(await exists(mazeId)).toBe(true);
+    expect(await copiesIn(matchId)).toHaveLength(2);
+    const result = await author.caller.run.result({ matchId });
+    expect(result.mazes?.yours).not.toBeNull();
   });
 
-  it("keeps a deleted maze a match is still being played on", async () => {
+  it("keeps the copies of a match still being played", async () => {
     const author = await player();
     const mazeId = await savedMaze(author.caller, "Live");
-    await playWith(author.caller, mazeId);
-    await author.caller.maze.remove({ id: mazeId });
+    const { matchId } = await playWith(author.caller, mazeId);
 
-    await purgeAll();
+    await purgeAll(new Date(Date.now() + 400 * DAY));
 
-    expect(await exists(mazeId)).toBe(true);
+    expect(await copiesIn(matchId)).toHaveLength(2);
   });
 
-  it("waits for the most recent of several matches that used the maze", async () => {
+  it("purges each match on its own clock, for one labyrinth used twice", async () => {
     const author = await player();
     const mazeId = await savedMaze(author.caller, "Reused");
     const first = await playWith(author.caller, mazeId);
     await endAgo(first.rival, first.matchId, 40);
-    const second = await playWith(author.caller, mazeId);
+    const second = await playWith(author.caller, mazeId, {
+      ...solvableDraft(),
+      treasure: { x: 0, y: 5 },
+    });
     await endAgo(second.rival, second.matchId, 5);
-    await author.caller.maze.remove({ id: mazeId });
 
     await purgeAll();
 
-    expect(await exists(mazeId)).toBe(true);
+    expect(await copiesIn(first.matchId)).toEqual([]);
+    expect(await copiesIn(second.matchId)).toHaveLength(2);
   });
 
-  it("never removes a maze nobody deleted, however old its match", async () => {
-    const author = await player();
-    const mazeId = await savedMaze(author.caller, "Kept");
-    const { matchId, rival } = await playWith(author.caller, mazeId);
-    await endAgo(rival, matchId, 400);
-
-    await purgeAll();
-
-    expect(await exists(mazeId)).toBe(true);
-  });
-});
-
-describe("purgeDeletedMazes for a guest's maze", () => {
-  it("removes it once the match ended 30 days ago and keeps both seats", async () => {
+  it("keeps both seats of a guest's match it purges", async () => {
     const member = await player();
     const guestCtx = await guestSignedIn();
     const guest = createCaller(guestCtx);
-    const guestId = guestCtx.session!.user.id;
     const created = await member.caller.match.create(settings);
     await guest.match.join({ matchId: created.id });
     await member.caller.match.submitMaze({
@@ -184,13 +172,12 @@ describe("purgeDeletedMazes for a guest's maze", () => {
 
     await purgeAll();
 
-    expect(await exists(concept.id)).toBe(false);
+    expect(await copiesIn(created.id)).toEqual([]);
     const seats = await db
-      .select({ userId: matchPlayer.userId, mazeId: matchPlayer.mazeId })
+      .select({ userId: matchPlayer.userId })
       .from(matchPlayer)
       .where(eq(matchPlayer.matchId, created.id));
     expect(seats).toHaveLength(2);
-    expect(seats.find((s) => s.userId === guestId)?.mazeId).toBeNull();
   });
 });
 

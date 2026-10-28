@@ -3,12 +3,12 @@ import { and, eq, inArray } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 
 import { CODE_LENGTH, HOURS_24_MS, HOURS_48_MS } from "~/match";
-import { emptyDraft } from "~/maze";
+import { draftToMaze, emptyDraft } from "~/maze";
 import { createCaller } from "~/server/api/root";
 import { createTRPCContext } from "~/server/api/trpc";
 import { auth } from "~/server/auth";
 import { db } from "~/server/db";
-import { match, matchPlayer, maze } from "~/server/db/schema";
+import { match, matchMaze, matchPlayer, maze } from "~/server/db/schema";
 
 import {
   SOLVABLE_MAZE_CELL_COUNT,
@@ -82,7 +82,7 @@ describe("match.create", () => {
       .where(eq(matchPlayer.matchId, created.id));
     expect(players).toHaveLength(1);
     expect(players[0]?.userId).toBe(ctx.session!.user.id);
-    expect(players[0]?.mazeId).toBeNull();
+    expect(players[0]?.submittedAt).toBeNull();
   });
 
   it("sets the row-1 deadline 24h out from creation", async () => {
@@ -382,33 +382,53 @@ describe("match.submitMaze", () => {
           eq(matchPlayer.userId, hostCtx.session!.user.id),
         ),
       );
-    expect(player?.mazeId).toBe(mazeId);
+    const [saved] = await db.select().from(maze).where(eq(maze.id, mazeId));
+    expect(player?.mazeHash).toBe(saved?.contentHash);
     expect(player?.submittedAt).not.toBeNull();
   });
 
-  it("marks the maze submitted, so the editor can no longer change it", async () => {
-    const host = createCaller(await signedIn());
+  it("plays a copy, leaving the labyrinth free to edit", async () => {
+    const hostCtx = await signedIn();
+    const host = createCaller(hostCtx);
     const created = await host.match.create(settings);
     await createCaller(await signedIn()).match.join({ matchId: created.id });
     const mazeId = await savedMaze(host);
 
     await host.match.submitMaze({ matchId: created.id, mazeId });
 
-    const [row] = await db.select().from(maze).where(eq(maze.id, mazeId));
-    expect(row?.status).toBe("submitted");
-    expect(row?.contentHash).not.toBeNull();
-    expect(row?.optimalMoves).not.toBeNull();
+    const copyOf = async () => {
+      const [copy] = await db
+        .select({ data: matchMaze.data })
+        .from(matchMaze)
+        .where(
+          and(
+            eq(matchMaze.matchId, created.id),
+            eq(matchMaze.userId, hostCtx.session!.user.id),
+          ),
+        );
+      return copy?.data;
+    };
+    const submitted = await copyOf();
+    expect(submitted).toEqual(draftToMaze(solvableDraft()));
 
-    expect(
-      await rejection(
-        host.maze.saveDraft({
-          id: mazeId,
-          data: solvableDraft(),
-          // The version it is at: only the status refuses this.
-          expectedVersion: 1,
-        }),
-      ),
-    ).toEqual({ code: "FORBIDDEN", message: "errors.mazeIsSubmitted" });
+    // Edited and saved back, as a player edits any labyrinth.
+    const concept = await host.maze.editAsConcept({ id: mazeId });
+    const opened = await host.maze.get({ id: concept.id });
+    const moved = { ...solvableDraft(), treasure: { x: 0, y: 5 } };
+    const { version } = await host.maze.saveDraft({
+      id: concept.id,
+      data: moved,
+      expectedVersion: opened.version,
+    });
+    await host.maze.saveConcept({ id: concept.id, expectedVersion: version });
+
+    const [row] = await db.select().from(maze).where(eq(maze.id, mazeId));
+    expect(row?.data).toEqual(moved);
+    expect(await copyOf()).toEqual(submitted);
+
+    // And deleted: the match keeps its copy all the same.
+    await host.maze.remove({ id: mazeId });
+    expect(await copyOf()).toEqual(submitted);
   });
 
   it("moves the deadline to row 3's 24h from the submission", async () => {
@@ -514,8 +534,8 @@ describe("match.submitMaze", () => {
     await host.match.submitMaze({ matchId: created.id, mazeId: concept.id });
 
     const [row] = await db.select().from(maze).where(eq(maze.id, concept.id));
-    expect(row).toMatchObject({ concept: false, status: "submitted" });
-    expect((await host.maze.list()).map((m) => m.state)).toEqual(["used"]);
+    expect(row).toMatchObject({ concept: false });
+    expect((await host.maze.list()).map((m) => m.state)).toEqual(["ready"]);
   });
 
   it("uses an edit of a ready labyrinth as that labyrinth, with the edit in it", async () => {
@@ -524,10 +544,7 @@ describe("match.submitMaze", () => {
     const created = await host.match.create(settings);
     await createCaller(await signedIn()).match.join({ matchId: created.id });
     const original = await savedMaze(host, "Original");
-    const concept = await host.maze.editAsConcept({
-      id: original,
-      copyName: "unused",
-    });
+    const concept = await host.maze.editAsConcept({ id: original });
     const opened = await host.maze.get({ id: concept.id });
     const moved = { ...solvableDraft(), treasure: { x: 0, y: 5 } };
     await host.maze.saveDraft({
@@ -539,14 +556,14 @@ describe("match.submitMaze", () => {
     await host.match.submitMaze({ matchId: created.id, mazeId: concept.id });
 
     const [row] = await db.select().from(maze).where(eq(maze.id, original));
-    expect(row).toMatchObject({ status: "submitted", data: moved });
+    expect(row).toMatchObject({ concept: false, data: moved });
     const [gone] = await db.select().from(maze).where(eq(maze.id, concept.id));
     expect(gone).toBeUndefined();
-    const [seat] = await db
-      .select()
-      .from(matchPlayer)
-      .where(eq(matchPlayer.userId, hostCtx.session!.user.id));
-    expect(seat?.mazeId).toBe(original);
+    const [copy] = await db
+      .select({ data: matchMaze.data })
+      .from(matchMaze)
+      .where(eq(matchMaze.userId, hostCtx.session!.user.id));
+    expect(copy?.data).toEqual(draftToMaze(moved));
   });
 
   it("refuses a maze that does not validate", async () => {
@@ -705,7 +722,7 @@ describe("match.submitMaze", () => {
     ).toEqual({ code: "CONFLICT", message: "errors.mazeAlreadyFaced" });
   });
 
-  it("treats an unchanged copy as the maze it was copied from", async () => {
+  it("treats a labyrinth reopened unchanged as the maze already faced", async () => {
     const host = createCaller(await signedIn());
     const rival = createCaller(await signedIn());
 
@@ -719,10 +736,7 @@ describe("match.submitMaze", () => {
     });
     await endMatch(first.id);
 
-    const copy = await host.maze.editAsConcept({
-      id: mazeId,
-      copyName: "Edit of Seen it",
-    });
+    const copy = await host.maze.editAsConcept({ id: mazeId });
     const second = await host.match.create(settings);
     await rival.match.join({ matchId: second.id });
 

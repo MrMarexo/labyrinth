@@ -31,7 +31,7 @@ const items: LibraryItem[] = [
     name: "gamma",
     cellCount: 36,
     gateCount: 2,
-    state: "used",
+    state: "ready",
     updatedAt: at(5),
   },
   {
@@ -57,11 +57,10 @@ describe("filterAndSort", () => {
   });
 
   it("filters by state", () => {
-    const only = (state: "draft" | "ready" | "used") =>
+    const only = (state: "draft" | "ready") =>
       ids(filterAndSort(items, { ...DEFAULT_LIBRARY_VIEW, state }, "en"));
     expect(only("draft")).toEqual(["a"]);
-    expect(only("ready")).toEqual(["d", "b"]);
-    expect(only("used")).toEqual(["c"]);
+    expect(only("ready")).toEqual(["c", "d", "b"]);
   });
 
   it("filters by squares and gates together", () => {

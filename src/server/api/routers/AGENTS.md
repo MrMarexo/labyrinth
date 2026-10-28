@@ -11,15 +11,18 @@ Root `AGENTS.md`, invariant 1.
 
 ## The sanctioned readers
 
-`run.move` reads the opponent's `maze.data` to apply the reducer, and returns
+These read a match's own copy of a maze, `matchMaze.data`, never the
+author's `maze` row.
+
+`run.move` reads the opponent's `matchMaze.data` to apply the reducer, and returns
 only a `RunnerDelta`. `run.result` returns both mazes, and only for a terminal
 match in which both players submitted. `run.replay` returns one maze: for `whose: "opponent"` the caller's own maze, which they drew, and for `whose: "mine"` the opponent's, only once the match is terminal and both submitted — the result screen's rule. Its gates are `mayWatchOpponent` and `mayReplayOwn` in `src/match/watch.ts`.
 
 Both are bounded in time (`src/match/retention.ts`): `run.replay` refuses
 once `replayExpired(match.endedAt)`, 30 days after the match ended, and
-`run.result` drops a drawing whose maze its author deleted once that window
-has closed (`drawingDeleted`), while still returning the scores. A purged
-maze leaves `match_player.mazeId` null, so neither may assume it is set.
+`run.result` drops both drawings then, while still returning the scores. The
+nightly purge deletes the `matchMaze` rows soon after, so neither may assume
+a row is there.
 
 Those are the only three. A new procedure
 that needs the maze is a design conversation, not an implementation detail.

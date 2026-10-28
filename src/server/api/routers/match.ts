@@ -42,6 +42,7 @@ import {
 import { lockAuthor, promoteConcept } from "~/server/maze/concept";
 import {
   match,
+  matchMaze,
   matchPlayer,
   matchRequest,
   maze,
@@ -155,8 +156,8 @@ async function waitingMatches(
  * other match. Rule 4 of §6: reuse is what makes the library worth having,
  * but not against someone who has already walked the maze — which requires
  * that match to have actually reached `running`. Compared by content, not
- * id, so an unchanged copy ("Edit of …") is the same maze it was copied
- * from.
+ * id, so a labyrinth edited since is a new maze, and one edited back to the
+ * same drawing is the same maze.
  *
  * That has to be read off the opponent's own `matchPlayer.submittedAt`, not
  * off `match.status`: in Phase 3 nobody can move or finish a run, so every
@@ -165,7 +166,7 @@ async function waitingMatches(
  * `finishedAt` stays permanently null. A `status`-based filter would
  * therefore un-face every maze on a one-day timer, the moment the sweep
  * closes the very match that exposed it. `submittedAt` has no such decay:
- * it is written once, in the same statement as `mazeId`, and nothing ever
+ * it is written once, in the same statement as `mazeHash`, and nothing ever
  * clears it — so it is still true a day, a week, or a year after the match
  * that set it has moved on to any status at all. A match still stuck in
  * `drawing` (including one the sweep later abandons there) never got this
@@ -193,11 +194,10 @@ async function mazesFacedBy(
     .filter((id) => id !== exceptMatchId);
   if (ids.length === 0) return [];
 
-  // A used maze always has its hash: it validated on its way in.
+  // Every submitted seat has its hash: the maze validated on its way in.
   const faced = await db
-    .select({ contentHash: maze.contentHash })
+    .select({ mazeHash: matchPlayer.mazeHash })
     .from(matchPlayer)
-    .innerJoin(maze, eq(maze.id, matchPlayer.mazeId))
     .where(
       and(
         inArray(matchPlayer.matchId, ids),
@@ -206,7 +206,7 @@ async function mazesFacedBy(
     );
 
   return faced
-    .map((f) => f.contentHash)
+    .map((f) => f.mazeHash)
     .filter((hash): hash is string => hash !== null);
 }
 
@@ -531,7 +531,6 @@ export const matchRouter = createTRPCRouter({
         // comes along either way: the picker offers a half-drawn one to
         // finish, never to use.
         or(isNotNull(maze.contentHash), eq(maze.concept, true)),
-        isNull(maze.deletedAt),
       ];
       if (faced.length > 0) {
         // A half-drawn concept has no hash, and is not a faced maze.
@@ -841,11 +840,10 @@ export const matchRouter = createTRPCRouter({
             and(
               eq(maze.id, input.mazeId),
               eq(maze.authorId, ctx.session.user.id),
-              isNull(maze.deletedAt),
             ),
           )
-          // Locked so a concurrent `maze.remove` waits for this submit and
-          // then sees the maze as used, rather than deleting it under us.
+          // Locked so a concurrent save into it waits: the match copies
+          // exactly the drawing validated here.
           .for("update");
         // Not yours and not there are the same answer, exactly as the maze
         // router already treats them.
@@ -866,9 +864,9 @@ export const matchRouter = createTRPCRouter({
           });
         }
 
-        // The server's verdict is the only one that counts (§4). A maze
-        // already marked submitted was validated on its way in, but
-        // re-running it costs one BFS and removes the assumption.
+        // The server's verdict is the only one that counts (§4). A saved
+        // maze was validated on its way in, but re-running it costs one BFS
+        // and removes the assumption.
         const validation = validateMaze(mazeRow.data, {
           cellCount: row.cellCount,
           gateCount: row.gateCount,
@@ -891,11 +889,10 @@ export const matchRouter = createTRPCRouter({
         }
 
         // A concept is saved on its way in, back into the labyrinth it was
-        // opened from if there is one, so the used labyrinth is in the
-        // author's library like any other.
-        let mazeId = mazeRow.id;
+        // opened from if there is one, so what was played is in the
+        // author's library like any other labyrinth.
         if (mazeRow.concept) {
-          mazeId = await promoteConcept(
+          await promoteConcept(
             tx,
             {
               ...mazeRow,
@@ -906,21 +903,18 @@ export const matchRouter = createTRPCRouter({
           );
         }
 
-        await tx
-          .update(maze)
-          .set({
-            status: "submitted",
-            contentHash: validation.contentHash,
-            optimalMoves: validation.optimalMoves,
-            // A guest's labyrinth is never kept: the purge removes it once
-            // no match can show it.
-            ...(ctx.session.user.isAnonymous ? { deletedAt: now } : {}),
-          })
-          .where(eq(maze.id, mazeId));
-
+        // The match plays its own copy, so the author stays free to edit or
+        // delete the labyrinth from here on.
+        await tx.insert(matchMaze).values({
+          matchId: row.id,
+          userId: ctx.session.user.id,
+          data: validation.maze,
+          createdAt: now,
+        });
+        const mazeHash = validation.contentHash;
         await tx
           .update(matchPlayer)
-          .set({ mazeId, submittedAt: now })
+          .set({ mazeHash, submittedAt: now })
           .where(
             and(
               eq(matchPlayer.matchId, row.id),
@@ -930,7 +924,7 @@ export const matchRouter = createTRPCRouter({
 
         const seated = players.map((p) =>
           p.userId === ctx.session.user.id
-            ? { ...p, mazeId, submittedAt: now }
+            ? { ...p, mazeHash, submittedAt: now }
             : p,
         );
         const bothIn =

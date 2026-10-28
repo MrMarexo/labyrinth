@@ -76,7 +76,8 @@ test.describe("/labyrinths", () => {
   test("lists the concept on top and filters the saved ones", async ({
     players,
   }) => {
-    // The host's "Host maze" (36 squares, 1 gate) becomes used in the match.
+    // The host's "Host maze" (36 squares, 1 gate), used in the match, is a
+    // labyrinth like any other.
     const { host } = await startRunningMatch(players, createMatch);
     await seedSaved(host, { name: "Wide", cellCount: 64 });
     await createConcept(host, { name: "Sketch", cellCount: 64, gateCount: 0 });
@@ -93,14 +94,8 @@ test.describe("/labyrinths", () => {
     const items = host.locator("[data-library] [data-maze-item]");
     await expect(items).toHaveCount(2);
 
-    await host.getByRole("radio", { name: "Used" }).click();
-    await expect(items).toHaveCount(1);
-    await expect(items).toContainText("Host maze");
-    await expect(items.locator("[data-used-badge]")).toBeVisible();
-
     await host.getByRole("radio", { name: "Ready" }).click();
-    await expect(items).toHaveCount(1);
-    await expect(items).toContainText("Wide");
+    await expect(items).toHaveCount(2);
 
     await host.getByRole("radio", { name: "Unfinished" }).click();
     await expect(
@@ -137,15 +132,14 @@ test.describe("/labyrinths", () => {
     await expect(page.locator("[data-maze-item]")).toContainText("Small");
   });
 
-  test("deletes a used labyrinth and frees its slot", async ({ players }) => {
+  test("deletes a labyrinth used in a match and frees its slot", async ({
+    players,
+  }) => {
     const { host } = await startRunningMatch(players, createMatch);
     await host.goto("/en/labyrinths");
     await expect(host.getByText("1 / 10 labyrinths")).toBeVisible();
 
     await host.getByRole("button", { name: "Delete Host maze" }).click();
-    await expect(
-      host.getByText("Past matches keep their results."),
-    ).toBeVisible();
     await host
       .getByRole("button", { name: "Confirm delete Host maze" })
       .click();
@@ -314,29 +308,24 @@ test.describe("concepts", () => {
     await expect(page.getByText("1 / 10 labyrinths")).toBeVisible();
   });
 
-  test("edits a used labyrinth as a copy called Edit of …", async ({
+  test("edits a labyrinth used in a running match in place", async ({
     players,
   }) => {
     const { host } = await startRunningMatch(players, createMatch);
     await host.goto("/en/labyrinths");
     await host.getByRole("link", { name: "Host maze" }).click();
-    await expect(host.locator("[data-maze-readonly]")).toContainText(
-      "Editing makes a copy you can change.",
-    );
 
-    await host.getByRole("button", { name: "Edit a copy" }).click();
+    await host.getByRole("button", { name: "Edit", exact: true }).click();
     await expect(host.locator("svg[data-board]")).toBeVisible();
     await expect(
-      host.getByRole("heading", { name: "Edit of Host maze", level: 1 }),
+      host.getByRole("heading", { name: "Host maze", level: 1 }),
     ).toBeVisible();
     await host.locator("[data-save-concept]").click();
 
     await expect(host).toHaveURL(/\/en\/labyrinths$/);
     const library = host.locator("[data-library] [data-maze-item]");
-    await expect(library).toHaveCount(2);
-    await expect(library.filter({ hasText: "Edit of Host maze" })).toHaveCount(
-      1,
-    );
+    await expect(library).toHaveCount(1);
+    await expect(library).toContainText("Host maze");
   });
 
   test("the lobby offers an unfinished concept to finish, and asks before drawing a new one", async ({

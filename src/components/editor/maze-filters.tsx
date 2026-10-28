@@ -10,7 +10,6 @@ const STATE_LABELS = {
   all: "filterAll",
   draft: "filterDrafts",
   ready: "filterReady",
-  used: "filterUsed",
 } as const satisfies Record<LibraryView["state"], string>;
 
 const SORT_LABELS = {

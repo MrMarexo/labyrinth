@@ -8,12 +8,12 @@ import { db } from "~/server/db";
 import { linkGuest } from "~/server/guest/link";
 import {
   match,
+  matchMaze,
   matchPlayer,
   matchRequest,
   maze,
   user,
 } from "~/server/db/schema";
-import { purgeDeletedMazes } from "~/server/maze/purge";
 
 import {
   GATED_MAZE_CELL_COUNT,
@@ -22,7 +22,6 @@ import {
   gatedMazeDraft,
 } from "../fixtures/maze";
 import { guestSignedIn, signedIn } from "./players";
-import { sweepAll } from "./support";
 
 const settings = {
   cellCount: GATED_MAZE_CELL_COUNT,
@@ -30,7 +29,6 @@ const settings = {
 } as const;
 
 const PASSWORD = "correct-horse-battery";
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 type Caller = ReturnType<typeof createCaller>;
 
@@ -128,7 +126,7 @@ describe("linking a guest to an account", () => {
     });
   });
 
-  it("sign-up keeps a submitted maze", async () => {
+  it("sign-up keeps a submitted maze in the account's library", async () => {
     const { member, guest, guestCtx, matchId } = await guestInMembersMatch();
     await submitGated(member, matchId);
     const mazeId = await submitGated(guest, matchId);
@@ -139,22 +137,17 @@ describe("linking a guest to an account", () => {
 
     const [row] = await db.select().from(maze).where(eq(maze.id, mazeId));
     expect(row?.authorId).toBe(accountId);
-    expect(row?.deletedAt).toBeNull();
     const listed = (await account.maze.list()).find((m) => m.id === mazeId);
-    expect(listed?.state).toBe("used");
+    expect(listed?.state).toBe("ready");
 
-    await sweepAll(db, new Date(Date.now() + 30 * DAY_MS));
-    const [ended] = await db
-      .select({ endedAt: match.endedAt })
-      .from(match)
-      .where(eq(match.id, matchId));
-    expect(ended?.endedAt).not.toBeNull();
-    await purgeDeletedMazes(
-      db,
-      new Date(ended!.endedAt!.getTime() + 31 * DAY_MS),
-    );
-    const [kept] = await db.select().from(maze).where(eq(maze.id, mazeId));
-    expect(kept?.deletedAt).toBeNull();
+    // The match's copy moved with the seat.
+    const [copy] = await db
+      .select({ userId: matchMaze.userId })
+      .from(matchMaze)
+      .where(
+        and(eq(matchMaze.matchId, matchId), eq(matchMaze.userId, accountId)),
+      );
+    expect(copy).toBeDefined();
   });
 
   it("sign-up moves a pending request", async () => {

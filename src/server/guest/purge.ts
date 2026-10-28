@@ -3,7 +3,7 @@ import { and, eq, inArray, lte, notExists } from "drizzle-orm";
 import type { db as Database } from "~/server/db";
 import { matchPlayer, user } from "~/server/db/schema";
 
-// One statement per batch, like the maze purge.
+// One statement per batch, like the match mazes' purge.
 const PURGE_BATCH_LIMIT = 100;
 
 // How long a guest who never took a seat is kept. It shares its number with

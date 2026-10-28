@@ -31,10 +31,11 @@ const settings = {
   gateCount: GATED_MAZE_GATE_COUNT,
 } as const;
 
+/** Submits the gated seed; returns the labyrinth it is saved as. */
 async function submitGated(
   caller: ReturnType<typeof createCaller>,
   matchId: string,
-) {
+): Promise<string> {
   const created = await caller.maze.createConcept({
     name: "Gated",
     ...settings,
@@ -46,6 +47,7 @@ async function submitGated(
     expectedVersion: 0,
   });
   await caller.match.submitMaze({ matchId, mazeId: created.id });
+  return created.id;
 }
 
 /**
@@ -60,8 +62,8 @@ export async function runningMatch() {
 
   const created = await host.match.create(settings);
   await guest.match.join({ matchId: created.id });
-  await submitGated(host, created.id);
-  await submitGated(guest, created.id);
+  const hostMazeId = await submitGated(host, created.id);
+  const guestMazeId = await submitGated(guest, created.id);
 
   return {
     host,
@@ -71,5 +73,7 @@ export async function runningMatch() {
     hostCookie: hostCtx.cookie,
     guestCookie: guestCtx.cookie,
     matchId: created.id,
+    hostMazeId,
+    guestMazeId,
   };
 }

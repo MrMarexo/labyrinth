@@ -32,7 +32,7 @@ export async function seatOpponent(
     {
       matchId: row.id,
       userId,
-      mazeId: null,
+      mazeHash: null,
       joinedAt: now,
       submittedAt: null,
       forfeitedAt: null,

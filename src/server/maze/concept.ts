@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, count, eq, isNull, sql } from "drizzle-orm";
+import { and, count, eq, sql } from "drizzle-orm";
 
 import { IssueCause } from "~/lib/issues";
 import { MAZE_LIMIT } from "~/maze";
@@ -62,9 +62,8 @@ export async function dropConcept(
 
 /**
  * Makes a valid concept a saved labyrinth and returns the saved one's id. A
- * concept opened from a ready labyrinth is written back into it; when that
- * one has since been used or deleted, the concept is saved on its own
- * instead. `checkLimit` refuses a new labyrinth beyond `MAZE_LIMIT`; using a
+ * concept opened from a labyrinth is written back into it; when that one
+ * has since been deleted, the concept is saved on its own instead. `checkLimit` refuses a new labyrinth beyond `MAZE_LIMIT`; using a
  * concept in a match skips it, as a match must never be blocked by the
  * library. Call under `lockAuthor`, after validating the concept.
  */
@@ -94,8 +93,6 @@ export async function promoteConcept(
           eq(maze.id, concept.sourceId),
           eq(maze.authorId, concept.authorId),
           eq(maze.concept, false),
-          eq(maze.status, "draft"),
-          isNull(maze.deletedAt),
         ),
       )
       .returning({ id: maze.id });
@@ -109,13 +106,7 @@ export async function promoteConcept(
     const [kept] = await tx
       .select({ n: count() })
       .from(maze)
-      .where(
-        and(
-          eq(maze.authorId, concept.authorId),
-          eq(maze.concept, false),
-          isNull(maze.deletedAt),
-        ),
-      );
+      .where(and(eq(maze.authorId, concept.authorId), eq(maze.concept, false)));
     if ((kept?.n ?? 0) >= MAZE_LIMIT) {
       throw new TRPCError({
         code: "FORBIDDEN",

@@ -57,7 +57,9 @@ test.describe("match lifecycle", () => {
     await expect(host.locator("[data-run-view]")).toBeVisible();
   });
 
-  test("a submitted labyrinth opens read-only", async ({ players }) => {
+  test("a submitted labyrinth opens like any saved one, with Edit", async ({
+    players,
+  }) => {
     const host = await players({ name: "One way", ...SIZE });
     const guest = await players({ name: "Theirs", ...SIZE });
 
@@ -73,9 +75,8 @@ test.describe("match lifecycle", () => {
       "true",
     );
 
-    // Any save attempt at all would mean the editor was mounted. The
-    // server's own refusal (`errors.mazeIsSubmitted`) is covered by the
-    // match router's integration tests.
+    // Any save attempt at all would mean the editor was mounted: a saved
+    // labyrinth changes only through Edit, never in place.
     const saves: string[] = [];
     host.on("request", (r) => {
       if (r.url().includes("maze.saveDraft")) saves.push(r.url());
@@ -90,9 +91,9 @@ test.describe("match lifecycle", () => {
       view.getByRole("heading", { name: "One way", level: 1 }),
     ).toBeVisible();
     await expect(view).toContainText("36 squares, 0 gates");
-    await expect(view).toContainText(
-      "This labyrinth has been used in a match, so it can't be changed. Editing makes a copy you can change.",
-    );
+    await expect(
+      view.getByRole("button", { name: "Edit", exact: true }),
+    ).toBeVisible();
     expect(await view.locator("[data-outline]").count()).toBeGreaterThan(0);
     await expect(host.locator("svg[data-board]")).toHaveCount(0);
     await expect(host.getByRole("radio", { name: "Erase square" })).toHaveCount(

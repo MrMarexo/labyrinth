@@ -11,7 +11,6 @@ import {
 } from "~/components/editor/maze-library";
 
 import { MazeTile, mazeTileClass } from "~/components/maze-tile";
-import { PixelIcon } from "~/components/pixel-icons";
 import { resolveErrorKey } from "~/lib/resolve-error-key";
 import { Link } from "~/components/link";
 import { api } from "~/trpc/react";
@@ -96,12 +95,6 @@ export function MazeList() {
             <span className="text-muted">{t("conceptHint")}</span>
           </span>
         )}
-        {item.state === "used" && (
-          <span data-used-badge className="text-muted flex items-center gap-1">
-            <PixelIcon name="lock" className="size-5" />
-            {t("usedBadge")}
-          </span>
-        )}
         <span className="text-muted">
           {t("summary", {
             squares: item.cellCount,
@@ -109,9 +102,6 @@ export function MazeList() {
           })}
         </span>
 
-        {confirmingId === item.id && item.state === "used" && (
-          <p className="text-muted">{t("deleteUsedHint")}</p>
-        )}
         {confirmingId === item.id ? (
           <span className="flex flex-wrap items-center gap-2">
             <button

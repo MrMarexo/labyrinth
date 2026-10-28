@@ -93,7 +93,6 @@ describe("maze.createConcept", () => {
     const [row] = await db.select().from(maze).where(eq(maze.id, created.id));
     expect(row?.authorId).toBe(ctx.session!.user.id);
     expect(row?.concept).toBe(true);
-    expect(row?.status).toBe("draft");
     expect(row?.contentHash).toBeNull();
     expect(row?.data).toEqual(emptyDraft());
   });
@@ -305,32 +304,6 @@ describe("maze.saveDraft", () => {
     ).resolves.toEqual({ code: "FORBIDDEN", message: "errors.mazeIsSaved" });
     expect((await rowOf(saved.id))?.data).toEqual(emptyDraft());
   });
-
-  it("still refuses a submitted maze as submitted, whatever the version", async () => {
-    const caller = createCaller(await signedIn());
-    const created = await caller.maze.createConcept(settings);
-    await db
-      .update(maze)
-      .set({ status: "submitted" })
-      .where(eq(maze.id, created.id));
-
-    for (const expectedVersion of [0, 7]) {
-      await expect(
-        rejection(
-          caller.maze.saveDraft({
-            id: created.id,
-            data: emptyDraft(),
-            expectedVersion,
-          }),
-        ),
-      ).resolves.toEqual({
-        code: "FORBIDDEN",
-        message: "errors.mazeIsSubmitted",
-      });
-    }
-    const [row] = await db.select().from(maze).where(eq(maze.id, created.id));
-    expect(row?.version).toBe(0);
-  });
 });
 
 describe("maze.list", () => {
@@ -371,7 +344,7 @@ describe("maze.get", () => {
     expect(fetched.data).toEqual(emptyDraft());
   });
 
-  it("projects only what the editor and the read-only view need — status, but no authorId or derived metrics", async () => {
+  it("projects only what the editor and the read-only view need — no authorId or derived metrics", async () => {
     const caller = createCaller(await signedIn());
     const created = await caller.maze.createConcept(settings);
     const fetched = await caller.maze.get({ id: created.id });
@@ -384,23 +357,12 @@ describe("maze.get", () => {
         "id",
         "name",
         "sourceId",
-        "status",
         "version",
       ].sort(),
     );
     expect(fetched).not.toHaveProperty("authorId");
     expect(fetched).not.toHaveProperty("contentHash");
     expect(fetched).not.toHaveProperty("optimalMoves");
-    expect(fetched.status).toBe("draft");
-
-    // The page decides read-only from this: a used labyrinth says so.
-    await db
-      .update(maze)
-      .set({ status: "submitted" })
-      .where(eq(maze.id, created.id));
-    expect((await caller.maze.get({ id: created.id })).status).toBe(
-      "submitted",
-    );
   });
 
   it("refuses someone else's maze, indistinguishably from a missing one", async () => {
@@ -474,44 +436,6 @@ describe("maze.remove", () => {
       message: "errors.notSignedIn",
     });
   });
-
-  it("hides a used labyrinth from its author but keeps the row", async () => {
-    const caller = createCaller(await signedIn());
-    const created = await caller.maze.createConcept(settings);
-    await db
-      .update(maze)
-      .set({ status: "submitted" })
-      .where(eq(maze.id, created.id));
-
-    expect(await caller.maze.remove({ id: created.id })).toEqual({
-      id: created.id,
-    });
-
-    expect((await caller.maze.list()).map((m) => m.id)).not.toContain(
-      created.id,
-    );
-    const notYourMaze = { code: "FORBIDDEN", message: "errors.notYourMaze" };
-    await expect(
-      rejection(caller.maze.get({ id: created.id })),
-    ).resolves.toEqual(notYourMaze);
-    await expect(
-      rejection(caller.maze.remove({ id: created.id })),
-    ).resolves.toEqual(notYourMaze);
-
-    const [row] = await db.select().from(maze).where(eq(maze.id, created.id));
-    expect(row?.deletedAt).toBeInstanceOf(Date);
-  });
-
-  it("frees a slot when a used labyrinth is deleted", async () => {
-    const ctx = await signedIn();
-    const caller = createCaller(ctx);
-    for (let i = 0; i < MAZE_LIMIT - 1; i++) {
-      await savedRow(ctx.session!.user.id);
-    }
-    const used = await savedRow(ctx.session!.user.id, { status: "submitted" });
-    await caller.maze.remove({ id: used.id });
-    await expect(savedReady(caller)).resolves.toHaveProperty("id");
-  });
 });
 
 /** A match in `drawing`: `host` made it at `settings`' size, a guest joined. */
@@ -535,7 +459,6 @@ describe("maze.conceptForMatch", () => {
     const [row] = await db.select().from(maze).where(eq(maze.id, id));
     expect(row?.authorId).toBe(hostId);
     expect(row?.concept).toBe(true);
-    expect(row?.status).toBe("draft");
     expect(row?.name).toBe("New");
     expect(row?.cellCount).toBe(settings.cellCount);
     expect(row?.gateCount).toBe(settings.gateCount);
@@ -685,22 +608,6 @@ describe("maze.discardIfEmpty", () => {
     expect(await rowOf(saved.id)).toBeDefined();
   });
 
-  it("keeps a submitted maze, even an empty one", async () => {
-    const caller = createCaller(await signedIn());
-    const created = await caller.maze.createConcept(settings);
-    // An empty maze can never really be submitted; set directly so the
-    // status is the only thing that keeps it.
-    await db
-      .update(maze)
-      .set({ status: "submitted" })
-      .where(eq(maze.id, created.id));
-
-    await caller.maze.discardIfEmpty({ id: created.id });
-
-    const [row] = await db.select().from(maze).where(eq(maze.id, created.id));
-    expect(row).toBeDefined();
-  });
-
   it("keeps someone else's empty draft, and is a quiet no-op for them and for a missing id", async () => {
     const owner = createCaller(await signedIn());
     const created = await owner.maze.createConcept(settings);
@@ -757,11 +664,10 @@ describe("the labyrinth limit", () => {
     expect((await rowOf(concept.id))?.concept).toBe(true);
   });
 
-  it("counts used labyrinths but not the concept", async () => {
+  it("counts saved labyrinths but not the concept", async () => {
     const ctx = await signedIn();
     const caller = createCaller(ctx);
-    await fill(ctx.session!.user.id, MAZE_LIMIT - 2);
-    await savedRow(ctx.session!.user.id, { status: "submitted" });
+    await fill(ctx.session!.user.id, MAZE_LIMIT - 1);
     await caller.maze.createConcept(settings);
 
     await expect(savedReady(caller)).resolves.toHaveProperty("id");
@@ -852,10 +758,7 @@ describe("maze.editAsConcept", () => {
     const saved = await savedReady(caller, "Original");
     const before = await rowOf(saved.id);
 
-    const concept = await caller.maze.editAsConcept({
-      id: saved.id,
-      copyName: "Edit of Original",
-    });
+    const concept = await caller.maze.editAsConcept({ id: saved.id });
     const opened = await caller.maze.get({ id: concept.id });
     expect(opened).toMatchObject({
       concept: true,
@@ -883,62 +786,14 @@ describe("maze.editAsConcept", () => {
     expect((await caller.maze.list()).map((m) => m.id)).toEqual([saved.id]);
   });
 
-  it("copies a used labyrinth into a concept under the copy's name", async () => {
-    const ctx = await signedIn();
-    const caller = createCaller(ctx);
-    const used = await savedRow(ctx.session!.user.id, {
-      name: "Old",
-      status: "submitted",
-      data: solvableDraft(),
-      // Set as on any used labyrinth: it validated on its way in.
-      contentHash: "hash",
-      optimalMoves: SOLVABLE_MAZE_OPTIMAL_MOVES,
-      ...solvable,
-    });
-
-    const concept = await caller.maze.editAsConcept({
-      id: used.id,
-      copyName: "Edit of Old",
-    });
-    const opened = await caller.maze.get({ id: concept.id });
-    expect(opened).toMatchObject({
-      concept: true,
-      sourceId: used.id,
-      name: "Edit of Old",
-      status: "draft",
-    });
-
-    const saved = await caller.maze.saveConcept({
-      id: concept.id,
-      expectedVersion: opened.version,
-    });
-    expect(saved.id).toBe(concept.id);
-    expect((await rowOf(used.id))?.status).toBe("submitted");
-    expect((await caller.maze.list()).map((m) => m.state).sort()).toEqual([
-      "ready",
-      "used",
-    ]);
-  });
-
   it("returns the concept already editing that labyrinth without asking", async () => {
-    const ctx = await signedIn();
-    const caller = createCaller(ctx);
-    const ready = await savedReady(caller);
-    const used = await savedRow(ctx.session!.user.id, {
-      status: "submitted",
-      contentHash: "hash",
-    });
+    const caller = createCaller(await signedIn());
+    const { id } = await savedReady(caller);
 
-    for (const { id } of [ready, used]) {
-      const first = await caller.maze.editAsConcept({
-        id,
-        copyName: "x",
-        replace: true,
-      });
-      await paint(caller, first.id);
-      const again = await caller.maze.editAsConcept({ id, copyName: "x" });
-      expect(again.id).toBe(first.id);
-    }
+    const first = await caller.maze.editAsConcept({ id });
+    await paint(caller, first.id);
+    const again = await caller.maze.editAsConcept({ id });
+    expect(again.id).toBe(first.id);
   });
 
   it("asks before replacing a different concept", async () => {
@@ -948,15 +803,11 @@ describe("maze.editAsConcept", () => {
     await paint(caller, other.id);
 
     await expect(
-      rejection(caller.maze.editAsConcept({ id: saved.id, copyName: "x" })),
+      rejection(caller.maze.editAsConcept({ id: saved.id })),
     ).resolves.toEqual({ code: "CONFLICT", message: "errors.conceptExists" });
     expect(await rowOf(other.id)).toBeDefined();
 
-    await caller.maze.editAsConcept({
-      id: saved.id,
-      copyName: "x",
-      replace: true,
-    });
+    await caller.maze.editAsConcept({ id: saved.id, replace: true });
     expect(await rowOf(other.id)).toBeUndefined();
   });
 
@@ -965,31 +816,23 @@ describe("maze.editAsConcept", () => {
     const ctx = await signedIn();
     const caller = createCaller(ctx);
     const theirs = await savedReady(owner);
-    const deleted = await savedRow(ctx.session!.user.id, {
-      status: "submitted",
-      deletedAt: new Date(),
-    });
+    const deleted = await savedRow(ctx.session!.user.id);
+    await caller.maze.remove({ id: deleted.id });
     const concept = await caller.maze.createConcept(settings);
 
     for (const id of [theirs.id, deleted.id, concept.id]) {
       await expect(
-        rejection(caller.maze.editAsConcept({ id, copyName: "x" })),
+        rejection(caller.maze.editAsConcept({ id })),
       ).resolves.toEqual({ code: "FORBIDDEN", message: "errors.notYourMaze" });
     }
   });
 
-  it("saves as a new labyrinth when the original was used in the meantime", async () => {
+  it("saves as a new labyrinth when the original was deleted in the meantime", async () => {
     const caller = createCaller(await signedIn());
     const saved = await savedReady(caller, "Original");
-    const concept = await caller.maze.editAsConcept({
-      id: saved.id,
-      copyName: "x",
-    });
+    const concept = await caller.maze.editAsConcept({ id: saved.id });
     const opened = await caller.maze.get({ id: concept.id });
-    await db
-      .update(maze)
-      .set({ status: "submitted" })
-      .where(eq(maze.id, saved.id));
+    await caller.maze.remove({ id: saved.id });
 
     const result = await caller.maze.saveConcept({
       id: concept.id,
@@ -1001,20 +844,18 @@ describe("maze.editAsConcept", () => {
 });
 
 describe("maze.list states", () => {
-  it("labels each labyrinth concept, draft, ready or used", async () => {
+  it("labels each labyrinth concept, draft or ready", async () => {
     const ctx = await signedIn();
     const caller = createCaller(ctx);
     const userId = ctx.session!.user.id;
     const draft = await savedRow(userId, { name: "D" });
     const ready = await savedReady(caller, "R");
-    const used = await savedRow(userId, { name: "U", status: "submitted" });
     const concept = await caller.maze.createConcept({ ...settings, name: "C" });
 
     const byId = new Map((await caller.maze.list()).map((m) => [m.id, m]));
     expect(byId.get(concept.id)?.state).toBe("concept");
     expect(byId.get(draft.id)?.state).toBe("draft");
     expect(byId.get(ready.id)?.state).toBe("ready");
-    expect(byId.get(used.id)?.state).toBe("used");
     expect(byId.get(ready.id)).not.toHaveProperty("contentHash");
   });
 });

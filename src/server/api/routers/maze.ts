@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import {
@@ -59,22 +59,14 @@ function assertOwned<T>(row: T | undefined): T {
   return row;
 }
 
-/**
- * The ownership filter every read and write shares. A deleted maze is no
- * longer the author's to open, edit or delete again, so it fails this too.
- */
+/** The ownership filter every read and write shares. */
 function ownedBy(id: string, userId: string) {
-  return and(
-    eq(maze.id, id),
-    eq(maze.authorId, userId),
-    isNull(maze.deletedAt),
-  );
+  return and(eq(maze.id, id), eq(maze.authorId, userId));
 }
 
 /** A concept with no painted squares: nothing in it is worth keeping. */
 const isEmptyConcept = and(
   eq(maze.concept, true),
-  eq(maze.status, "draft"),
   sql`jsonb_array_length(${maze.data} -> 'cells') = 0`,
 );
 
@@ -86,7 +78,6 @@ export const mazeRouter = createTRPCRouter({
         name: maze.name,
         cellCount: maze.cellCount,
         gateCount: maze.gateCount,
-        status: maze.status,
         concept: maze.concept,
         contentHash: maze.contentHash,
         updatedAt: maze.updatedAt,
@@ -95,9 +86,7 @@ export const mazeRouter = createTRPCRouter({
         data: maze.data,
       })
       .from(maze)
-      .where(
-        and(eq(maze.authorId, ctx.session.user.id), isNull(maze.deletedAt)),
-      )
+      .where(eq(maze.authorId, ctx.session.user.id))
       // The concept first: it is what the author is working on.
       .orderBy(desc(maze.concept), desc(maze.updatedAt))
       .then((rows) =>
@@ -105,11 +94,7 @@ export const mazeRouter = createTRPCRouter({
           const parsed = draftMazeSchema.safeParse(data);
           return {
             ...row,
-            state: mazeState({
-              concept: row.concept,
-              status: row.status,
-              contentHash,
-            }),
+            state: mazeState({ concept: row.concept, contentHash }),
             preview: parsed.success ? parsed.data : null,
           };
         }),
@@ -125,7 +110,6 @@ export const mazeRouter = createTRPCRouter({
           name: maze.name,
           cellCount: maze.cellCount,
           gateCount: maze.gateCount,
-          status: maze.status,
           concept: maze.concept,
           sourceId: maze.sourceId,
           version: maze.version,
@@ -202,19 +186,12 @@ export const mazeRouter = createTRPCRouter({
     }),
 
   /**
-   * Opens a saved labyrinth for editing, as the author's concept: a ready
-   * one is saved back into itself, a used one is never changed again, so
-   * it is copied under `copyName` instead. The concept already editing this
-   * labyrinth is handed back as it is.
+   * Opens a saved labyrinth for editing, as the author's concept, which is
+   * saved back into it. The concept already editing this labyrinth is
+   * handed back as it is.
    */
   editAsConcept: memberProcedure
-    .input(
-      z.object({
-        id: z.string(),
-        copyName: settingsInput.shape.name,
-        replace: replaceInput,
-      }),
-    )
+    .input(z.object({ id: z.string(), replace: replaceInput }))
     .mutation(({ ctx, input }) => {
       const authorId = ctx.session.user.id;
       return ctx.db.transaction(async (tx) => {
@@ -229,20 +206,17 @@ export const mazeRouter = createTRPCRouter({
         if (existing?.sourceId === source.id) return { id: existing.id };
         await dropConcept(tx, existing, input.replace);
 
-        const used = source.status === "submitted";
         const [row] = await tx
           .insert(maze)
           .values({
             authorId,
-            name: used ? input.copyName : source.name,
+            name: source.name,
             cellCount: source.cellCount,
             gateCount: source.gateCount,
             data: source.data,
             contentHash: source.contentHash,
             optimalMoves: source.optimalMoves,
             concept: true,
-            // Kept for a used one too, so its copy is recognised above;
-            // `promoteConcept` never writes back into a used labyrinth.
             sourceId: source.id,
           })
           .returning({ id: maze.id });
@@ -322,12 +296,6 @@ export const mazeRouter = createTRPCRouter({
         .where(ownedBy(input.id, ctx.session.user.id));
       const row = assertOwned(found);
 
-      if (row.status === "submitted") {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "errors.mazeIsSubmitted",
-        });
-      }
       if (!row.concept) {
         throw new TRPCError({
           code: "FORBIDDEN",
@@ -343,9 +311,9 @@ export const mazeRouter = createTRPCRouter({
           })
         : null;
 
-      // One conditional statement: still the caller's, still a concept and
-      // a draft (a `saveConcept` or `submitMaze` since the read above is
-      // caught here too), and still at the version this editor last saw.
+      // One conditional statement: still the caller's, still a concept (a
+      // `saveConcept` or `submitMaze` since the read above is caught here
+      // too), and still at the version this editor last saw.
       const [updated] = await ctx.db
         .update(maze)
         .set({
@@ -358,7 +326,6 @@ export const mazeRouter = createTRPCRouter({
           and(
             ownedBy(input.id, ctx.session.user.id),
             eq(maze.concept, true),
-            eq(maze.status, "draft"),
             eq(maze.version, input.expectedVersion),
           ),
         )
@@ -366,16 +333,10 @@ export const mazeRouter = createTRPCRouter({
 
       if (!updated) {
         const [found] = await ctx.db
-          .select({ status: maze.status, concept: maze.concept })
+          .select({ concept: maze.concept })
           .from(maze)
           .where(ownedBy(input.id, ctx.session.user.id));
         const now = assertOwned(found);
-        if (now.status === "submitted") {
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            message: "errors.mazeIsSubmitted",
-          });
-        }
         if (!now.concept) {
           throw new TRPCError({
             code: "FORBIDDEN",
@@ -402,28 +363,18 @@ export const mazeRouter = createTRPCRouter({
       };
     }),
 
+  /**
+   * Deletes the labyrinth for good. Matches it was used in keep their own
+   * copies (`matchMaze`), so nothing else is touched.
+   */
   remove: memberProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      const mine = ownedBy(input.id, ctx.session.user.id);
-      // A draft goes for good. The status is part of the statement, not a
-      // prior read: a `submitMaze` landing in between must not let a maze a
-      // match now uses be deleted (the foreign key would only null the link).
-      const deleted = await ctx.db
+      const [deleted] = await ctx.db
         .delete(maze)
-        .where(and(mine, eq(maze.status, "draft")))
+        .where(ownedBy(input.id, ctx.session.user.id))
         .returning({ id: maze.id });
-      if (deleted[0]) return { id: input.id };
-
-      // A used maze is only hidden: matches that used it keep reading it
-      // until their replay window closes, then the nightly purge removes it.
-      const hidden = await ctx.db
-        .update(maze)
-        .set({ deletedAt: new Date() })
-        .where(and(mine, eq(maze.status, "submitted")))
-        .returning({ id: maze.id });
-      assertOwned(hidden[0]);
-      return { id: input.id };
+      return assertOwned(deleted);
     }),
 });
 

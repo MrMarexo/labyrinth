@@ -182,7 +182,7 @@ test.describe("guest play", () => {
     const item = page
       .locator("[data-maze-item]")
       .filter({ hasText: GUEST_MAZE });
-    await expect(item.locator("[data-used-badge]")).toBeVisible();
+    await expect(item).toBeVisible();
   });
 
   test("a second join after a failed one does not sign in again", async ({

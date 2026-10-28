@@ -162,7 +162,7 @@ test.describe("the replay's markers", () => {
 test.describe("an old match", () => {
   test.describe.configure({ timeout: 90_000 });
 
-  test("keeps its result, drops the replay, and marks a deleted labyrinth", async ({
+  test("keeps its result, and drops the replay and both drawings", async ({
     players,
   }) => {
     const { host, guest } = await startRunningMatch(players, createMatch);
@@ -171,14 +171,6 @@ test.describe("an old match", () => {
     await expect(host.locator("[data-match-result]")).toBeVisible(PUSH);
     const resultUrl = host.url();
     const matchId = resultUrl.split("/").at(-1)!;
-
-    // The host deletes the labyrinth they used.
-    await host.goto("/en/labyrinths");
-    await host.getByRole("button", { name: "Delete Host maze" }).click();
-    await host
-      .getByRole("button", { name: "Confirm delete Host maze" })
-      .click();
-    await expect(host.locator("[data-maze-item]")).toHaveCount(0);
 
     // A month and a day pass.
     const aged = await host.evaluate(async (id) => {
@@ -195,9 +187,11 @@ test.describe("an old match", () => {
     const result = host.locator("[data-match-result]");
     await expect(result).toHaveAttribute("data-outcome", "won");
     await expect(host.locator("[data-replay-link]")).toHaveCount(0);
-    await expect(host.locator('[data-result-maze="theirs"]')).toBeVisible();
-    await expect(host.locator('[data-result-maze="yours"]')).toHaveCount(0);
-    await expect(host.getByText("This labyrinth was deleted.")).toBeVisible();
+    await expect(host.locator("[data-result-maze]")).toHaveCount(0);
+    await expect(host.locator("[data-result-maze-expired]")).toHaveCount(2);
+    await expect(
+      host.getByText("This labyrinth is no longer available."),
+    ).toHaveCount(2);
 
     await host.goto(`${resultUrl}/watch?run=mine`);
     await expect(host.locator("[data-watch-error]")).toContainText(

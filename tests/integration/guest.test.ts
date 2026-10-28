@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { createCaller } from "~/server/api/root";
 import { createTRPCContext } from "~/server/api/trpc";
 import { db } from "~/server/db";
-import { matchPlayer, maze } from "~/server/db/schema";
+import { matchMaze, maze } from "~/server/db/schema";
 
 import {
   GATED_MAZE_CELL_COUNT,
@@ -64,8 +64,7 @@ describe("guest identity", () => {
       () => guest.match.create(settings),
       () => guest.maze.list(),
       () => guest.maze.createConcept(concept),
-      () =>
-        guest.maze.editAsConcept({ id: "x", copyName: "Copy", replace: true }),
+      () => guest.maze.editAsConcept({ id: "x", replace: true }),
       () => guest.maze.saveConcept({ id: "x", expectedVersion: 0 }),
       () => guest.maze.remove({ id: "x" }),
       () => guest.profile.get(),
@@ -147,7 +146,7 @@ describe("guest names", () => {
 });
 
 describe("what a guest leaves behind", () => {
-  it("a guest's submitted maze is marked deleted", async () => {
+  it("a guest's match plays its own copies, the guest's labyrinth deleted or not", async () => {
     const member = createCaller(await signedIn());
     const guestCtx = await guestSignedIn();
     const guest = createCaller(guestCtx);
@@ -173,22 +172,13 @@ describe("what a guest leaves behind", () => {
     await submit(member);
     await submit(guest);
 
-    const seats = await db
-      .select({
-        userId: matchPlayer.userId,
-        submittedAt: matchPlayer.submittedAt,
-        deletedAt: maze.deletedAt,
-      })
-      .from(matchPlayer)
-      .innerJoin(maze, eq(maze.id, matchPlayer.mazeId))
-      .where(eq(matchPlayer.matchId, created.id));
-    const guestSeat = seats.find((s) => s.userId === guestCtx.session!.user.id);
-    const memberSeat = seats.find(
-      (s) => s.userId !== guestCtx.session!.user.id,
-    );
-    expect(guestSeat?.deletedAt).not.toBeNull();
-    expect(guestSeat?.deletedAt).toEqual(guestSeat?.submittedAt);
-    expect(memberSeat?.deletedAt).toBeNull();
+    const copies = await db
+      .select({ userId: matchMaze.userId })
+      .from(matchMaze)
+      .where(eq(matchMaze.matchId, created.id));
+    expect(copies).toHaveLength(2);
+    // A guest has no library to manage; their labyrinths go with the guest.
+    await db.delete(maze).where(eq(maze.authorId, guestCtx.session!.user.id));
 
     for (const caller of [member, guest]) {
       for (const [i, dir] of GATED_MAZE_ROUTE.entries()) {

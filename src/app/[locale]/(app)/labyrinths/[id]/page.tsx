@@ -43,18 +43,16 @@ export default async function EditorPage({
           cellCount={row.cellCount}
           gateCount={row.gateCount}
           maze={draftToMaze(parsed.data)}
-          used={row.status === "submitted"}
         />
       </main>
     );
   }
 
-  // The labyrinth this concept saves back into. Gone or used since, the
-  // concept saves on its own.
+  // The labyrinth this concept saves back into. Deleted since, the concept
+  // saves on its own.
   const source = row.sourceId
     ? await api.maze.get({ id: row.sourceId }).catch(() => null)
     : null;
-  const sourceName = source?.status === "draft" ? source.name : null;
 
   // Opened from a match's lobby: offer to use the maze there, but only if
   // that could succeed. A match the caller is not in reads the same as one
@@ -81,7 +79,7 @@ export default async function EditorPage({
         cellCount={row.cellCount}
         gateCount={row.gateCount}
         forMatch={forMatch}
-        savesInto={sourceName !== null}
+        savesInto={source !== null}
       />
     </main>
   );

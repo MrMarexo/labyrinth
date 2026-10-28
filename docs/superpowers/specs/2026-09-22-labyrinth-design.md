@@ -267,18 +267,22 @@ user            id, email citext unique, passwordHash, displayName, locale, crea
 
 maze            id, authorId, name, cellCount, gateCount,
                 data jsonb, contentHash, optimalMoves,
-                status (draft | submitted), createdAt, updatedAt
+                concept, sourceId, version, createdAt, updatedAt
 
 match           id, code unique, cellCount, gateCount,
                 access (open | locked), status, createdById, createdAt,
                 lastActivityAt, deadlineAt,
                 winnerId nullable, endReason nullable
 
-match_player    matchId, userId, mazeId,          -- the maze THEY drew
+match_player    matchId, userId, mazeHash,        -- hash of the maze THEY drew
                 joinedAt, submittedAt, forfeitedAt nullable,
                 runState jsonb, startedAt, lastMoveAt, finishedAt,
                 gaveUpAt nullable
                 primary key (matchId, userId)
+
+match_maze      matchId, userId, data jsonb,      -- copy of the maze THEY drew
+                createdAt
+                primary key (matchId, userId) -> match_player
 
 move            id, matchId, runnerId, seq, dir, outcome,
                 delta jsonb, createdAt
@@ -311,26 +315,23 @@ first in the list. `match.code` is now only a label
 (the editor names a draft after it, lists tell matches apart by it); nothing
 joins by it. See the [match lobby spec](2026-10-23-match-lobby-design.md).
 
-The maze a player *solves* is the opponent's `match_player.mazeId`, never their
-own. That join is the only place the mapping exists.
+The maze a player *solves* is the opponent's `match_maze` row, never their
+own.
 
-A maze becomes **immutable once submitted** — it is referenced by finished
-matches and by their replays, so editing it would rewrite history.
+**A match and a labyrinth are separate things.** Submitting copies the maze
+into `match_maze`; the match plays, shows and replays that copy and never
+reads the author's `maze` row again. The labyrinth stays its author's to edit
+or delete at any time, with no effect on any match, finished or running.
 
-A submitted maze may be **reused as-is** in a later match whose `cellCount` and
-`gateCount` match, which is what makes the "my labyrinths" library worth having.
-Reuse against an opponent who has already solved that maze is rejected.
+A labyrinth may be **reused** in a later match whose `cellCount` and
+`gateCount` match, which is what makes the "my labyrinths" library worth
+having. Reuse against an opponent who has already walked the same drawing is
+rejected, compared by `match_player.mazeHash`, which is kept for good.
 
-There is **no edit and no duplicate-to-edit.** Picking an old maze for a new
-match means playing it exactly as drawn. Wanting something different means
-drawing a new one from scratch. Drafts, which have never been submitted, remain
-freely editable.
-
-A player keeps **at most 10 labyrinths**, in every state. A used maze can be
-deleted: `maze.deletedAt` hides it from its author at once, and the nightly
-cron purges the row once every match that used it ended at least 30 days ago
-(`match.endedAt`); `match_player.maze_id` is `ON DELETE SET NULL` for that.
-See `2026-10-23-labyrinth-library-design.md`.
+A player keeps **at most 10 labyrinths**. Deleting one removes it at once.
+A match's copies are purged by the nightly cron 30 days after the match ended
+(`match.endedAt`, `REPLAY_RETENTION_DAYS`); the scores and the move log stay,
+the drawings and replays go.
 
 `deadlineAt` is recomputed on every phase transition and every move, following
 §9.1 — it is a single column rather than six rules scattered across the code,

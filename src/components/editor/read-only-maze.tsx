@@ -18,8 +18,6 @@ export type ReadOnlyMazeProps = {
   gateCount: number;
   /** Null for a saved labyrinth that never validated. */
   maze: Maze | null;
-  /** Used in a match: editing it makes a copy. */
-  used: boolean;
 };
 
 /**
@@ -33,7 +31,6 @@ export function ReadOnlyMaze({
   cellCount,
   gateCount,
   maze,
-  used,
 }: ReadOnlyMazeProps) {
   const t = useTranslations("labyrinths");
 
@@ -45,8 +42,7 @@ export function ReadOnlyMaze({
           {t("summary", { squares: cellCount, gates: gateCount })}
         </p>
       </div>
-      {used && <p>{t("readOnly")}</p>}
-      <EditMaze id={id} name={name} used={used} />
+      <EditMaze id={id} />
       {maze ? (
         <svg
           role="img"
@@ -71,15 +67,7 @@ export function ReadOnlyMaze({
  * would delete a different concept. The server hands back the concept
  * already editing this labyrinth without asking.
  */
-function EditMaze({
-  id,
-  name,
-  used,
-}: {
-  id: string;
-  name: string;
-  used: boolean;
-}) {
+function EditMaze({ id }: { id: string }) {
   const t = useTranslations("labyrinths");
   const te = useTranslations();
   const router = useRouter();
@@ -99,16 +87,10 @@ function EditMaze({
         type="button"
         data-edit-maze
         disabled={busy}
-        onClick={() =>
-          edit.mutate({
-            id,
-            // At most 80 characters, like any name.
-            copyName: t("editOfName", { name }).slice(0, 80),
-          })
-        }
+        onClick={() => edit.mutate({ id })}
         className="bg-accent text-on-accent pixel px-3 py-2 text-sm disabled:opacity-50"
       >
-        {busy ? t("editing") : used ? t("editCopy") : t("edit")}
+        {busy ? t("editing") : t("edit")}
       </button>
       {error && (
         <p role="alert" data-edit-error className="text-danger text-sm">

@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   check,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -16,12 +17,12 @@ import { END_REASONS, MATCH_ACCESS, MATCH_STATUSES } from "~/match";
 import {
   DIRECTIONS,
   SERVER_OUTCOMES,
+  type Maze,
   type RunnerDelta,
   type StoredRun,
 } from "~/maze";
 
 import { user } from "./auth";
-import { maze } from "./maze";
 
 /**
  * Spec §6. `deadlineAt` is recomputed on every phase transition rather than
@@ -116,7 +117,8 @@ export const matchRequest = pgTable(
 );
 
 /**
- * Spec §6. `mazeId` is null until that player submits.
+ * Spec §6. The maze a player submitted is in `matchMaze`; "has submitted"
+ * is `submittedAt`.
  *
  * The run columns are Phase 4's. There is no `runStatus`: not started,
  * running, finished and gave up are `startedAt`, `finishedAt` and `gaveUpAt`
@@ -137,12 +139,12 @@ export const matchPlayer = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
-    // Null until that player submits, and again once the purge removes a
-    // deleted maze whose replay window has closed. "Has submitted" is
-    // `submittedAt`, never `mazeId`.
-    mazeId: text("maze_id").references(() => maze.id, {
-      onDelete: "set null",
-    }),
+    /**
+     * The `contentHash` of the maze this player submitted, kept for good:
+     * it is how §6's "never against someone who already walked it" outlives
+     * the drawing itself (`matchMaze`), which is purged.
+     */
+    mazeHash: text("maze_hash"),
     joinedAt: timestamp("joined_at").notNull().defaultNow(),
     submittedAt: timestamp("submitted_at"),
     forfeitedAt: timestamp("forfeited_at"),
@@ -161,6 +163,35 @@ export const matchPlayer = pgTable(
       "match_player_finished_or_gave_up",
       sql`${table.finishedAt} IS NULL OR ${table.gaveUpAt} IS NULL`,
     ),
+  ],
+);
+
+/**
+ * The maze a player submitted to a match, copied at that moment: the match
+ * plays, shows and replays this copy, never the author's labyrinth, which
+ * stays theirs to edit or delete. Kept until the replay window closes
+ * (`REPLAY_RETENTION_DAYS` after the match ends), then purged; `data` is
+ * secret like `maze.data` (AGENTS.md invariant 1).
+ *
+ * Keyed by the seat, and cascading with it: linking a guest moves the seat
+ * to the account, and its maze with it.
+ */
+export const matchMaze = pgTable(
+  "match_maze",
+  {
+    matchId: text("match_id").notNull(),
+    userId: text("user_id").notNull(),
+    data: jsonb("data").$type<Maze>().notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.matchId, table.userId] }),
+    foreignKey({
+      columns: [table.matchId, table.userId],
+      foreignColumns: [matchPlayer.matchId, matchPlayer.userId],
+    })
+      .onDelete("cascade")
+      .onUpdate("cascade"),
   ],
 );
 
