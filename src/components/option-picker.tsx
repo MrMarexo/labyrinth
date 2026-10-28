@@ -5,8 +5,9 @@ import { useId, type ReactNode } from "react";
 import { RadioButtons } from "~/components/radio-buttons";
 
 /**
- * A labelled row of text buttons acting as one radio group — the maze size
- * and gate count pickers on the New labyrinth and New match forms.
+ * A labelled row of text buttons acting as one radio group. The app has no
+ * native selects: every choice among a few options is one of these — maze
+ * size and gates on the new forms, the labyrinth filters, theme and language.
  */
 export function OptionPicker<T extends number | string>({
   label,

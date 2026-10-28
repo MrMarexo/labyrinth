@@ -90,8 +90,8 @@ export function SiteMenu({ signedIn }: { signedIn: boolean }) {
             </Link>
           </>
         )}
-        <LocaleSwitcher showLabel />
-        <ThemeToggle showLabel />
+        <LocaleSwitcher />
+        <ThemeToggle />
         {signedIn && (
           <>
             <hr className="border-border" />

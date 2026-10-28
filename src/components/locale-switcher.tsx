@@ -3,12 +3,12 @@
 import { useLocale, useTranslations } from "next-intl";
 import { useTransition } from "react";
 
+import { OptionPicker } from "~/components/option-picker";
 import { usePathname, useRouter } from "~/i18n/navigation";
-import { locales, type Locale } from "~/i18n/routing";
+import { locales } from "~/i18n/routing";
 import { api } from "~/trpc/react";
 
-/** `showLabel` prints the label beside the control, as the settings menu does. */
-export function LocaleSwitcher({ showLabel = false }: { showLabel?: boolean }) {
+export function LocaleSwitcher() {
   const t = useTranslations("locale");
   const locale = useLocale();
   const router = useRouter();
@@ -17,34 +17,25 @@ export function LocaleSwitcher({ showLabel = false }: { showLabel?: boolean }) {
   const setLocale = api.profile.setLocale.useMutation();
 
   return (
-    <label className="flex items-center justify-between gap-3 text-sm">
-      <span className={showLabel ? undefined : "sr-only"}>{t("label")}</span>
-      <select
-        aria-label={t("label")}
-        className="border-border-strong bg-bg rounded border px-2 py-1"
-        disabled={pending}
-        value={locale}
-        onChange={(event) => {
-          const next = event.target.value as Locale;
-          // Fired unconditionally. Gating on a client useSession() would cost
-          // a session request on every page and silently drop the preference
-          // when the language is switched before that fetch resolves; a
-          // signed-out visitor just gets UNAUTHORIZED, which is not an error
-          // worth showing.
-          void setLocale.mutateAsync({ locale: next }).catch(() => {
-            // A failed preference save must not block the language change.
-          });
-          startTransition(() => {
-            router.replace(pathname, { locale: next });
-          });
-        }}
-      >
-        {locales.map((code) => (
-          <option key={code} value={code}>
-            {t(code)}
-          </option>
-        ))}
-      </select>
-    </label>
+    <OptionPicker
+      label={t("label")}
+      options={locales}
+      value={locale}
+      onChange={(next) => {
+        if (pending || next === locale) return;
+        // Fired unconditionally. Gating on a client useSession() would cost
+        // a session request on every page and silently drop the preference
+        // when the language is switched before that fetch resolves; a
+        // signed-out visitor just gets UNAUTHORIZED, which is not an error
+        // worth showing.
+        void setLocale.mutateAsync({ locale: next }).catch(() => {
+          // A failed preference save must not block the language change.
+        });
+        startTransition(() => {
+          router.replace(pathname, { locale: next });
+        });
+      }}
+      renderOption={(code) => t(code)}
+    />
   );
 }

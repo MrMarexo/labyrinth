@@ -19,7 +19,7 @@ test.describe("protected area", () => {
     await page.getByRole("button", { name: "Sign up" }).click();
     // The session cookie lands asynchronously; wait for it before navigating,
     // or /en/play races the sign-up and the (app) layout redirects to
-    // sign-in, which also has an <h1> and a Language combobox, so a generic
+    // sign-in, which also has an <h1> and a Language picker, so a generic
     // assertion below would pass on the wrong page.
     await expectSignedIn(page);
 
@@ -29,7 +29,10 @@ test.describe("protected area", () => {
     ).toBeVisible();
 
     await openMenu(page);
-    await page.getByRole("combobox", { name: "Language" }).selectOption("sk");
+    await page
+      .getByRole("radiogroup", { name: "Language" })
+      .getByRole("radio", { name: "Slovenčina" })
+      .click();
     await expect(page).toHaveURL(/\/sk\/play$/);
     await expect(
       page.getByRole("heading", { level: 1, name: "Vaše hry" }),
@@ -111,7 +114,10 @@ test.describe("language preference", () => {
     await expectSignedIn(page);
 
     await openMenu(page);
-    await page.getByRole("combobox", { name: "Language" }).selectOption("sk");
+    await page
+      .getByRole("radiogroup", { name: "Language" })
+      .getByRole("radio", { name: "Slovenčina" })
+      .click();
     await expect(page).toHaveURL(/\/sk$/);
 
     await signOut(page, "Odhlásiť sa");

@@ -149,7 +149,10 @@ test.describe("gate colours", () => {
     });
 
     await openMenu(page);
-    await page.getByRole("combobox", { name: "Theme" }).selectOption("dark");
+    await page
+      .getByRole("radiogroup", { name: "Theme" })
+      .getByRole("radio", { name: "Dark" })
+      .click();
     await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
     // The resolution mechanism doesn't differ by theme, but both themes are
     // screenshotted below, so both get the real assertion too.

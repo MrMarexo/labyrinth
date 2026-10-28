@@ -3,6 +3,8 @@
 import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 
+import { OptionPicker } from "~/components/option-picker";
+
 type Choice = "system" | "light" | "dark";
 
 function apply(choice: Choice) {
@@ -19,8 +21,9 @@ function apply(choice: Choice) {
   }
 }
 
-/** `showLabel` prints the label beside the control, as the settings menu does. */
-export function ThemeToggle({ showLabel = false }: { showLabel?: boolean }) {
+const CHOICES: readonly Choice[] = ["system", "light", "dark"];
+
+export function ThemeToggle() {
   const t = useTranslations("theme");
   const [choice, setChoice] = useState<Choice>("system");
 
@@ -34,22 +37,15 @@ export function ThemeToggle({ showLabel = false }: { showLabel?: boolean }) {
   }, []);
 
   return (
-    <label className="flex items-center justify-between gap-3 text-sm">
-      <span className={showLabel ? undefined : "sr-only"}>{t("label")}</span>
-      <select
-        aria-label={t("label")}
-        className="border-border-strong bg-bg rounded border px-2 py-1"
-        value={choice}
-        onChange={(event) => {
-          const next = event.target.value as Choice;
-          setChoice(next);
-          apply(next);
-        }}
-      >
-        <option value="system">{t("system")}</option>
-        <option value="light">{t("light")}</option>
-        <option value="dark">{t("dark")}</option>
-      </select>
-    </label>
+    <OptionPicker
+      label={t("label")}
+      options={CHOICES}
+      value={choice}
+      onChange={(next) => {
+        setChoice(next);
+        apply(next);
+      }}
+      renderOption={(option) => t(option)}
+    />
   );
 }
