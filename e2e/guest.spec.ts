@@ -1,21 +1,18 @@
 import { expect, type Page, type TestInfo } from "@playwright/test";
 
-import { GATED_MAZE_ROUTE } from "~/lib/open-maze";
-
 import { PASSWORD, uniqueEmail } from "./support/auth";
+import { cell, drag, panToCorner } from "./support/board";
 import { expectSignedIn } from "./support/menu";
-import {
-  createMatch,
-  joinAsGuest,
-  joinMatch,
-  seedMaze,
-  test,
-} from "./support/match";
+import { createMatch, joinAsGuest, joinMatch, test } from "./support/match";
 import { closeFinishPopup, walk } from "./support/run";
 
-const GATED = { cellCount: 36, gateCount: 1, layout: "gated" } as const;
 const OPEN = { cellCount: 36, gateCount: 0 } as const;
 const GUEST_NAME = /^Guest \d{4}$/;
+const GUEST_MAZE = /Labyrinth for match /;
+/** Through the host's seeded open 6×6: down the west side, along the south. */
+const OPEN_ROUTE = ["S", "S", "S", "S", "S", "E", "E", "E", "E", "E"] as const;
+/** Through the guest's drawn 12×3 strip, start to treasure. */
+const STRIP_ROUTE = ["E", "E", "E", "S", "S"] as const;
 
 // Sign-ups, two submissions, two runs and a poll do not fit in 30s.
 test.describe.configure({ timeout: 120_000 });
@@ -30,27 +27,67 @@ async function submitFirstMaze(page: Page): Promise<void> {
   ).toBeAttached();
 }
 
+/**
+ * A guest has no library, so they draw their own labyrinth from the match:
+ * the editor must open for them as for a member, with no sign-up notice.
+ */
+async function drawAndUseAsGuest(
+  visitor: Page,
+  matchId: string,
+): Promise<void> {
+  const matchUrl = visitor.url();
+  await visitor.reload();
+  await visitor.getByRole("button", { name: "Draw a new one" }).click();
+  await expect(visitor).toHaveURL(
+    new RegExp(`/en/labyrinths/[^/?]+\\?match=${matchId}$`),
+  );
+  const use = visitor.locator("[data-use-in-match]");
+  await expect(use).toBeVisible();
+  await expect(visitor.locator("[data-sign-up-notice]")).toHaveCount(0);
+
+  await panToCorner(visitor);
+  // 36 squares, a start and a treasure: a valid 0-gate maze.
+  for (const y of [0, 1, 2]) {
+    await drag(visitor, cell(visitor, 0, y), cell(visitor, 11, y));
+  }
+  await expect(visitor.locator("[data-budget]")).toHaveText("36 / 36 squares");
+  await visitor.getByRole("radio", { name: "Start", exact: true }).click();
+  await cell(visitor, 0, 0).click();
+  await visitor.getByRole("radio", { name: "Treasure", exact: true }).click();
+  await cell(visitor, 3, 2).click();
+  await expect(visitor.locator("[data-save-state]")).toHaveAttribute(
+    "data-save-state",
+    "saved",
+  );
+
+  await expect(use).toBeEnabled();
+  await use.click();
+  await expect(visitor).toHaveURL(matchUrl);
+  await expect(visitor.locator("[data-you-submitted]")).toHaveAttribute(
+    "data-you-submitted",
+    "true",
+  );
+}
+
 /** A member hosts, `visitor` joins as a guest, both submit and run to the result. */
 async function playAsGuest(
   host: Page,
   visitor: Page,
   testInfo: TestInfo,
 ): Promise<string> {
-  const matchId = await createMatch(host, { cells: 36, gates: 1 });
+  const matchId = await createMatch(host, { cells: 36, gates: 0 });
   await joinAsGuest(visitor, matchId);
   await expect(visitor.locator("[data-guest-name]")).toHaveText(GUEST_NAME);
 
-  await seedMaze(visitor, { name: "Guest maze", ...GATED });
-  await visitor.goto(`/en/matches/${matchId}`);
-  for (const page of [host, visitor]) await submitFirstMaze(page);
+  await drawAndUseAsGuest(visitor, matchId);
+  await submitFirstMaze(host);
 
-  await host.reload();
   await expect(host.locator("[data-run-view]")).toBeVisible();
+  await visitor.reload();
   await expect(visitor.locator("[data-run-view]")).toBeVisible();
 
-  const route = [...GATED_MAZE_ROUTE];
-  await walk(host, route, testInfo);
-  await walk(visitor, ["N", ...route], testInfo);
+  await walk(host, STRIP_ROUTE, testInfo);
+  await walk(visitor, OPEN_ROUTE, testInfo);
   return matchId;
 }
 
@@ -59,7 +96,7 @@ test.describe("guest play", () => {
     players,
     page,
   }, testInfo) => {
-    const host = await players({ name: "Host maze", ...GATED });
+    const host = await players({ name: "Host maze", ...OPEN });
     await playAsGuest(host, page, testInfo);
 
     for (const side of [page, host]) {
@@ -113,7 +150,7 @@ test.describe("guest play", () => {
     players,
     page,
   }, testInfo) => {
-    const host = await players({ name: "Host maze", ...GATED });
+    const host = await players({ name: "Host maze", ...OPEN });
     const matchId = await playAsGuest(host, page, testInfo);
     await expect(page.locator("[data-match-result]")).toBeVisible({
       timeout: 30_000,
@@ -129,7 +166,9 @@ test.describe("guest play", () => {
     await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
     await page.getByRole("button", { name: "Sign up" }).click();
     await expectSignedIn(page);
+    await expect(page).toHaveURL(new RegExp(`/en/matches/${matchId}$`));
     await expect(page.locator("[data-guest-name]")).toHaveCount(0);
+    await expect(page.locator("[data-match-result]")).toBeVisible();
 
     await page.goto("/en/matches");
     const yours = page
@@ -142,7 +181,7 @@ test.describe("guest play", () => {
     await page.goto("/en/labyrinths");
     const item = page
       .locator("[data-maze-item]")
-      .filter({ hasText: "Guest maze" });
+      .filter({ hasText: GUEST_MAZE });
     await expect(item.locator("[data-used-badge]")).toBeVisible();
   });
 
