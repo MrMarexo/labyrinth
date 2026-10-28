@@ -20,8 +20,6 @@ export type ResultMazeProps = {
  */
 export function ResultMaze({ maze, path, label, which }: ResultMazeProps) {
   const last = path.at(-1);
-  // A finished run ends on the treasure: fade it so the runner reads on top.
-  const onTreasure = last?.x === maze.treasure.x && last.y === maze.treasure.y;
 
   return (
     <figure data-result-maze={which} className="space-y-2">
@@ -32,7 +30,7 @@ export function ResultMaze({ maze, path, label, which }: ResultMazeProps) {
         viewBox={mazeViewBox(maze.cells, CELL_PX)}
         className="border-border-strong h-auto w-full max-w-[560px] rounded border"
       >
-        <MazeDrawing maze={maze} dimTreasure={onTreasure} />
+        <MazeDrawing maze={maze} runnerAt={last} />
 
         <polyline
           data-path

@@ -123,6 +123,42 @@ test.describe("watching and replay", () => {
   });
 });
 
+test.describe("the replay's markers", () => {
+  test.describe.configure({ timeout: 90_000 });
+
+  test("the start or treasure fades whenever the runner stands on it", async ({
+    players,
+  }, testInfo) => {
+    const { host, guest } = await startRunningMatch(players, createMatch);
+    await walk(host, [...GATED_MAZE_ROUTE], testInfo);
+    await closeFinishPopup(host);
+    await walk(guest, [...GATED_MAZE_ROUTE], testInfo);
+    await expect(host.locator("[data-match-result]")).toBeVisible(PUSH);
+
+    await host.locator('a[data-replay-link="mine"]').click();
+    const view = host.locator("[data-watch-view]");
+    await expect(view).toHaveAttribute("data-live", "false");
+    const maze = host.locator("[data-watch-maze-view]");
+    const start = maze.locator("[data-maze-start]");
+    const treasure = maze.locator("[data-maze-treasure]");
+
+    await host.getByLabel("Timeline").fill("0");
+    await expect(view).toHaveAttribute("data-watch-step", "0");
+    await expect(start).toHaveCSS("opacity", "0.4");
+    await expect(treasure).toHaveCSS("opacity", "1");
+
+    await host.getByLabel("Timeline").fill("3");
+    await expect(view).toHaveAttribute("data-watch-step", "3");
+    await expect(start).toHaveCSS("opacity", "1");
+    await expect(treasure).toHaveCSS("opacity", "1");
+
+    await host.getByLabel("Timeline").fill("11");
+    await expect(view).toHaveAttribute("data-watch-step", "11");
+    await expect(start).toHaveCSS("opacity", "1");
+    await expect(treasure).toHaveCSS("opacity", "0.4");
+  });
+});
+
 test.describe("an old match", () => {
   test.describe.configure({ timeout: 90_000 });
 
