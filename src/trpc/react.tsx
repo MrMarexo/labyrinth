@@ -1,7 +1,7 @@
 "use client";
 
 import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
-import { httpBatchStreamLink, loggerLink } from "@trpc/client";
+import { httpBatchStreamLink, loggerLink, TRPCClientError } from "@trpc/client";
 import { createTRPCReact } from "@trpc/react-query";
 import { type inferRouterInputs, type inferRouterOutputs } from "@trpc/server";
 import { useState } from "react";
@@ -38,6 +38,19 @@ export type RouterInputs = inferRouterInputs<AppRouter>;
  */
 export type RouterOutputs = inferRouterOutputs<AppRouter>;
 
+/**
+ * A 4xx answer: a refusal the page handles itself — a concept to replace, a
+ * validation message, a match that moved on — rather than a failure.
+ */
+function refused(op: { direction: "up" | "down"; result?: unknown }): boolean {
+  if (op.direction !== "down" || !(op.result instanceof TRPCClientError)) {
+    return false;
+  }
+  const status = (op.result.data as { httpStatus?: number } | undefined)
+    ?.httpStatus;
+  return status !== undefined && status >= 400 && status < 500;
+}
+
 export function TRPCReactProvider(props: { children: React.ReactNode }) {
   const queryClient = getQueryClient();
 
@@ -46,8 +59,16 @@ export function TRPCReactProvider(props: { children: React.ReactNode }) {
       links: [
         loggerLink({
           enabled: (op) =>
-            process.env.NODE_ENV === "development" ||
-            (op.direction === "down" && op.result instanceof Error),
+            !refused(op) &&
+            (process.env.NODE_ENV === "development" ||
+              (op.direction === "down" && op.result instanceof Error)),
+        }),
+        // A refusal is not a failure: it goes to the console as a warning,
+        // which the Next dev overlay does not show as an error.
+        loggerLink({
+          enabled: (op) =>
+            process.env.NODE_ENV === "development" && refused(op),
+          console: { log: console.log, error: console.warn },
         }),
         httpBatchStreamLink({
           transformer: SuperJSON,

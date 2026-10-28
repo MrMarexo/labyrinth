@@ -87,6 +87,17 @@ test.describe("/labyrinths", () => {
     await expect(concept.locator("[data-concept-badge]")).toContainText(
       "Concept",
     );
+    await expect(concept).not.toContainText("until you save it");
+    // Counts as the paint and gate tool icons; the words only for a reader.
+    const summary = concept.locator("[data-maze-summary]");
+    await expect(summary.locator(".pixel-icon")).toHaveCount(2);
+    await expect(summary.locator(".sr-only")).toHaveText(/squares, .* gates?/);
+    // Delete is an icon button, named for assistive tech.
+    await expect(
+      concept
+        .getByRole("button", { name: "Delete Sketch" })
+        .locator(".pixel-icon-trash"),
+    ).toBeVisible();
     // Not counted: only saved labyrinths are.
     await expect(host.getByText("2 / 10 labyrinths")).toBeVisible();
 
@@ -225,6 +236,16 @@ test.describe("concepts", () => {
       "saved",
     );
     await page.goto("/en/labyrinths");
+    // The refusal is expected and answered by the dialog: it must not be
+    // logged as an error, which the dev overlay would show as a crash.
+    const logged: string[] = [];
+    page.on("console", (message) => {
+      if (
+        message.type() === "error" &&
+        message.text().includes("maze.createConcept")
+      )
+        logged.push(message.text());
+    });
 
     await createFromForm(page, "Other");
     const dialog = page.locator("dialog[data-replace-concept]");
@@ -247,6 +268,7 @@ test.describe("concepts", () => {
     await page.goto("/en/labyrinths");
     await expect(page.locator("[data-concept]")).toContainText("Other");
     await expect(page.getByText("Keep me")).toHaveCount(0);
+    expect(logged).toEqual([]);
   });
 
   test("the editor fits a desktop screen without scrolling", async ({

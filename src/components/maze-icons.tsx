@@ -17,7 +17,7 @@ export type IconProps = Omit<SVGProps<SVGGElement>, "x" | "y"> & {
 };
 
 /** A glyph's box inside its square: `scale` of it, centred. */
-function glyphBox(x: number, y: number, size: number, scale = 0.7) {
+function glyphBox(x: number, y: number, size: number, scale = 0.6) {
   const inset = (1 - scale) / 2;
   return {
     x: (x + inset) * size,
