@@ -70,7 +70,7 @@ export function SiteMenu({ signedIn }: { signedIn: boolean }) {
         aria-label={t("menu")}
         data-menu-panel
         hidden={!open}
-        className="bg-bg border-border-strong absolute top-full right-0 z-20 mt-2 w-max min-w-48 space-y-3 border-2 p-3 shadow-[4px_4px_0_var(--border-strong)]"
+        className="bg-bg border-border-strong absolute top-full right-0 z-20 mt-2 w-max max-w-[calc(100vw-2rem)] min-w-48 space-y-3 border-2 p-3 shadow-[4px_4px_0_var(--border-strong)]"
       >
         {signedIn && (
           <>

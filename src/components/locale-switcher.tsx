@@ -21,8 +21,9 @@ export function LocaleSwitcher() {
       label={t("label")}
       options={locales}
       value={locale}
+      disabled={pending}
       onChange={(next) => {
-        if (pending || next === locale) return;
+        if (next === locale) return;
         // Fired unconditionally. Gating on a client useSession() would cost
         // a session request on every page and silently drop the preference
         // when the language is switched before that fetch resolves; a

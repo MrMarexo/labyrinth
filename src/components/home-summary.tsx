@@ -128,12 +128,12 @@ function StatCard({
 }) {
   return (
     <section className="border-border space-y-3 rounded border p-4">
-      <h2 className="text-xl font-semibold">{heading}</h2>
-      <dl className="grid grid-cols-3 gap-2">
+      <h2 className="text-xl">{heading}</h2>
+      <dl className="grid grid-cols-[repeat(auto-fit,minmax(5.5rem,1fr))] gap-x-4 gap-y-3">
         {stats.map((s) => (
           <div key={s.key} data-stat={s.key}>
             <dt className="text-muted text-sm">{s.label}</dt>
-            <dd className="text-2xl font-semibold tabular-nums">{s.value}</dd>
+            <dd className="text-2xl tabular-nums">{s.value}</dd>
           </div>
         ))}
       </dl>

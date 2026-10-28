@@ -90,7 +90,9 @@ const GATE_RING = 6;
  * A gate on the edge from (x1, y1) to (x2, y2): the edge in the gate's
  * colour, broken in the middle by a ring, the same keyhole the palette's gate
  * tool shows. The colour and any dash are set on the `<g>` and inherited, so
- * a hook or test reads them from the root.
+ * a hook or test reads them from the root. The ring is pixel art, so it can't
+ * inherit those: it is drawn dotted when the gate is dashed, and its pixels
+ * are half the line's width, so a thicker gate has a thicker ring.
  */
 export function GateSegment({
   x1,
@@ -115,6 +117,8 @@ export function GateSegment({
   // Unit vector along the edge, to stop each half at the ring.
   const ux = (x2 - x1) / length;
   const uy = (y2 - y1) / length;
+  // The ring map is 6 pixels across.
+  const ring = (strokeWidth / 2) * 6;
   return (
     <g
       {...rest}
@@ -137,11 +141,11 @@ export function GateSegment({
         strokeWidth={strokeWidth}
       />
       <PixelIcon
-        name="ring"
-        x={cx - GATE_RING - 1}
-        y={cy - GATE_RING - 1}
-        width={(GATE_RING + 1) * 2}
-        height={(GATE_RING + 1) * 2}
+        name={rest.strokeDasharray === undefined ? "ring" : "ring-dotted"}
+        x={cx - ring / 2}
+        y={cy - ring / 2}
+        width={ring}
+        height={ring}
         style={{ color: gateColour(gate) }}
       />
     </g>

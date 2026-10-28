@@ -221,7 +221,7 @@ function WatchPlayer({
       className="space-y-4"
     >
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-3xl font-bold">
+        <h1 className="text-3xl">
           {whose === "opponent"
             ? t("opponentTitle", { name: data.runnerName })
             : t("mineTitle", { name: data.authorName })}
@@ -229,7 +229,7 @@ function WatchPlayer({
         {state.live && (
           <span
             data-live-badge
-            className="border-danger text-danger border px-2 py-0.5 text-xs font-medium uppercase"
+            className="border-danger text-danger border px-2 py-0.5 text-xs uppercase"
           >
             {t("live")}
           </span>
@@ -252,7 +252,7 @@ function WatchPlayer({
           aria-label={t("runnerView")}
           className="space-y-2"
         >
-          <h2 className="text-sm font-medium">{t("runnerView")}</h2>
+          <h2 className="text-sm">{t("runnerView")}</h2>
           <RunBoard
             map={frame.map}
             at={frame.at}

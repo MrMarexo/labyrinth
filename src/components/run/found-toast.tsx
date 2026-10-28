@@ -40,7 +40,7 @@ export function FoundToast({ found }: { found: Found | null }) {
       className="bg-bg border-border-strong motion-safe:animate-found-toast pointer-events-none absolute top-3 left-1/2 flex -translate-x-1/2 items-center gap-2 border-2 px-3 py-1.5 text-sm shadow-[4px_4px_0_var(--border-strong)]"
     >
       {shown.kind === "key" ? (
-        <PixelIcon name="key" className="size-4" style={{ color: colour }} />
+        <PixelIcon name="key" className="size-5" style={{ color: colour }} />
       ) : (
         <span
           aria-hidden="true"

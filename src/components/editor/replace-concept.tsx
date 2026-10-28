@@ -69,7 +69,7 @@ function ReplaceConcept({
       onClose={onKeep}
       className="bg-bg text-fg border-border-strong backdrop:bg-fg/40 m-auto w-[min(24rem,calc(100vw-2rem))] space-y-4 rounded border p-6"
     >
-      <h2 id={titleId} className="text-xl font-bold">
+      <h2 id={titleId} className="text-xl">
         {t("replaceTitle")}
       </h2>
       <p>{name ? t("replaceBody", { name }) : t("replaceBodyUnnamed")}</p>

@@ -55,10 +55,10 @@ export function CurrentMatch() {
       className="border-accent flex flex-col gap-3 rounded border-2 p-4 sm:flex-row sm:items-center sm:justify-between"
     >
       <div className="space-y-1">
-        <h2 id="current-match-heading" className="text-xl font-semibold">
+        <h2 id="current-match-heading" className="text-xl">
           {t("currentHeading")}
         </h2>
-        <p className="text-sm font-medium">{t(STATUS_KEY[active.status])}</p>
+        <p className="text-sm">{t(STATUS_KEY[active.status])}</p>
         <p className="text-muted text-sm">
           {t("sizeAndGates", {
             cells: active.cellCount,
@@ -89,7 +89,7 @@ export function MatchList() {
 
   return (
     <section className="space-y-3">
-      <h2 className="text-xl font-semibold">{t("yoursHeading")}</h2>
+      <h2 className="text-xl">{t("yoursHeading")}</h2>
       {!data || data.length === 0 ? (
         <p className="text-muted text-sm">{t("empty")}</p>
       ) : (
@@ -113,7 +113,7 @@ function MatchRows({ matches }: { matches: RouterOutputs["match"]["list"] }) {
           className="flex flex-col gap-1 py-3 sm:flex-row sm:items-center sm:justify-between"
         >
           <div className="space-y-1">
-            <p className="text-sm font-medium">{t(STATUS_KEY[m.status])}</p>
+            <p className="text-sm">{t(STATUS_KEY[m.status])}</p>
             <p className="text-muted text-sm">
               {t("sizeAndGates", { cells: m.cellCount, gates: m.gateCount })}
             </p>

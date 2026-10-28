@@ -40,7 +40,7 @@ export function ReadOnlyMaze({
   return (
     <div data-maze-readonly className="space-y-4">
       <div className="space-y-1">
-        <h1 className="text-2xl font-bold">{name}</h1>
+        <h1 className="text-2xl">{name}</h1>
         <p className="text-muted text-sm">
           {t("summary", { squares: cellCount, gates: gateCount })}
         </p>

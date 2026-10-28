@@ -41,7 +41,7 @@ export function JoinRequests({ matchId }: { matchId: string }) {
 
   return (
     <section className="space-y-2">
-      <h2 className="text-xl font-semibold">{t("requestsHeading")}</h2>
+      <h2 className="text-xl">{t("requestsHeading")}</h2>
       {!data || data.length === 0 ? (
         <p className="text-muted text-sm">{t("noRequests")}</p>
       ) : (
@@ -53,7 +53,7 @@ export function JoinRequests({ matchId }: { matchId: string }) {
               className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between"
             >
               <div className="space-y-1">
-                <p className="text-sm font-medium">{r.name}</p>
+                <p className="text-sm">{r.name}</p>
                 <p className="text-muted text-sm">
                   {t("askedAgo", {
                     when: ago(r.createdAt),

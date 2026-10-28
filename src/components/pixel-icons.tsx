@@ -1,266 +1,44 @@
 import type { SVGProps } from "react";
 
-/**
- * Pixel-art glyphs, drawn as maps: one string per row, `#` a filled pixel,
- * `+` a faint one, anything else empty. Every pixel is a `<rect>` in
- * `currentColor`, rendered with crisp edges, so a glyph takes its colour from
- * the text around it like a font would.
- */
-const MAPS = {
-  start: [
-    "..######..",
-    ".########.",
-    ".##....##.",
-    ".##....##.",
-    ".##....##.",
-    ".##..#.##.",
-    ".##....##.",
-    ".##....##.",
-    ".##....##.",
-    "##########",
-  ],
-  treasure: [
-    "..........",
-    ".########.",
-    "##########",
-    "##########",
-    "..........",
-    "####..####",
-    "###....###",
-    "####..####",
-    "##########",
-    "..........",
-  ],
-  key: [
-    "..........",
-    "..........",
-    ".###......",
-    "#...#.....",
-    "#...######",
-    "#...#..#.#",
-    ".###...#.#",
-    "..........",
-    "..........",
-    "..........",
-  ],
-  runner: [
-    "....##....",
-    "...####...",
-    "....##....",
-    ".########.",
-    "#..####..#",
-    "...####...",
-    "...#..#...",
-    "..##..##..",
-    "..#....#..",
-    ".##....##.",
-  ],
-  menu: [
-    "..........",
-    "##########",
-    "##########",
-    "..........",
-    "##########",
-    "##########",
-    "..........",
-    "##########",
-    "##########",
-    "..........",
-  ],
-  lock: [
-    "...####...",
-    "..##..##..",
-    "..#....#..",
-    "..#....#..",
-    ".########.",
-    ".###..###.",
-    ".###..###.",
-    ".########.",
-    ".########.",
-    "..........",
-  ],
-  check: [
-    "..........",
-    ".........#",
-    "........##",
-    ".......##.",
-    "#.....##..",
-    "##...##...",
-    ".##.##....",
-    "..###.....",
-    "...#......",
-    "..........",
-  ],
-  undo: [
-    "..#.......",
-    ".##.......",
-    "########..",
-    ".##.....#.",
-    "..#......#",
-    ".........#",
-    ".........#",
-    "........#.",
-    "..######..",
-    "..........",
-  ],
-  move: [
-    "....##....",
-    "...####...",
-    "....##....",
-    ".#..##..#.",
-    "##########",
-    "##########",
-    ".#..##..#.",
-    "....##....",
-    "...####...",
-    "....##....",
-  ],
-  eraser: [
-    "..........",
-    "..........",
-    "##########",
-    "#....#####",
-    "#....#####",
-    "#....#####",
-    "##########",
-    "..........",
-    "..........",
-    "..........",
-  ],
-  paint: [
-    "##########",
-    "#........#",
-    "#...##...#",
-    "#...##...#",
-    "#.######.#",
-    "#.######.#",
-    "#...##...#",
-    "#...##...#",
-    "#........#",
-    "##########",
-  ],
-  "erase-cell": [
-    "##########",
-    "#........#",
-    "#........#",
-    "#........#",
-    "#.######.#",
-    "#.######.#",
-    "#........#",
-    "#........#",
-    "#........#",
-    "##########",
-  ],
-  wall: [
-    "....##....",
-    "++++##++++",
-    "+...##...+",
-    "+...##...+",
-    "+...##...+",
-    "+...##...+",
-    "+...##...+",
-    "+...##...+",
-    "++++##++++",
-    "....##....",
-  ],
-  gate: [
-    "....##....",
-    "++++##++++",
-    "+...##...+",
-    "+..####..+",
-    "+..#..#..+",
-    "+..#..#..+",
-    "+..####..+",
-    "+...##...+",
-    "++++##++++",
-    "....##....",
-  ],
-  "brush-1": [
-    "..........",
-    "..........",
-    "..........",
-    "...####...",
-    "...#..#...",
-    "...#..#...",
-    "...####...",
-    "..........",
-    "..........",
-    "..........",
-  ],
-  "brush-2": [
-    "####..####",
-    "#..#..#..#",
-    "#..#..#..#",
-    "####..####",
-    "..........",
-    "..........",
-    "####..####",
-    "#..#..#..#",
-    "#..#..#..#",
-    "####..####",
-  ],
-  eye: [
-    "..........",
-    "..........",
-    "...####...",
-    ".##....##.",
-    "#...##...#",
-    "#..####..#",
-    ".##.##.##.",
-    "...####...",
-    "..........",
-    "..........",
-  ],
-  "eye-off": [
-    "#.........",
-    ".#........",
-    "..#####...",
-    ".##.#..##.",
-    "#...##...#",
-    "#..####..#",
-    ".##.##.##.",
-    "...####.#.",
-    ".........#",
-    "..........",
-  ],
-  dot: [
-    "...####...",
-    ".########.",
-    ".########.",
-    "##########",
-    "##########",
-    "##########",
-    "##########",
-    ".########.",
-    ".########.",
-    "...####...",
-  ],
-  ring: [".####.", "##..##", "#....#", "#....#", "##..##", ".####."],
-} satisfies Record<string, string[]>;
+import {
+  PIXEL_MAPS,
+  runsPath,
+  type PixelIconName,
+} from "~/components/pixel-maps";
 
-/** Redo is undo, mirrored. */
-const ALL_MAPS: Record<PixelIconName, string[]> = {
-  ...MAPS,
-  redo: MAPS.undo.map((row) => [...row].reverse().join("")),
-};
+export type { PixelIconName };
 
-export type PixelIconName = keyof typeof MAPS | "redo";
+type Glyph = { width: number; height: number; solid: string; faint: string };
+
+const GLYPHS = Object.fromEntries(
+  Object.entries(PIXEL_MAPS).map(([name, map]) => [
+    name,
+    {
+      width: map[0]!.length,
+      height: map.length,
+      solid: runsPath(map, "#"),
+      faint: runsPath(map, "+"),
+    },
+  ]),
+) as Record<PixelIconName, Glyph>;
 
 /**
  * One glyph, hidden from the accessibility tree: whatever carries it — a
  * button's label, a board square's — says what it means. `pixel-icon` and
  * `pixel-icon-<name>` are the hooks a test finds it by. Inside an SVG it
  * nests as an `<svg>` of its own, placed with `x`, `y`, `width` and `height`.
+ * At a fixed size, give it a whole multiple of its grid (10px or 20px for
+ * the 10-pixel glyphs), or some pixels draw a screen pixel wider than others.
  */
 export function PixelIcon({
   name,
   className,
   ...rest
 }: SVGProps<SVGSVGElement> & { name: PixelIconName }) {
-  const map = ALL_MAPS[name];
+  const glyph = GLYPHS[name];
   return (
     <svg
-      viewBox={`0 0 ${map[0]!.length} ${map.length}`}
+      viewBox={`0 0 ${glyph.width} ${glyph.height}`}
       shapeRendering="crispEdges"
       fill="currentColor"
       stroke="none"
@@ -268,20 +46,8 @@ export function PixelIcon({
       {...rest}
       className={`pixel-icon pixel-icon-${name}${className ? ` ${className}` : ""}`}
     >
-      {map.flatMap((row, y) =>
-        [...row].map((pixel, x) =>
-          pixel === "#" || pixel === "+" ? (
-            <rect
-              key={`${x}-${y}`}
-              x={x}
-              y={y}
-              width={1}
-              height={1}
-              opacity={pixel === "+" ? 0.4 : undefined}
-            />
-          ) : null,
-        ),
-      )}
+      <path d={glyph.solid} />
+      {glyph.faint && <path d={glyph.faint} opacity={0.4} />}
     </svg>
   );
 }

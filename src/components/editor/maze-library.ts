@@ -13,7 +13,8 @@ export type LibrarySort = "edited" | "name" | "size";
 
 /** What /labyrinths is narrowed to and ordered by. */
 export type LibraryView = {
-  state: MazeState | "all";
+  /** A concept is always shown, so it is never a filter of its own. */
+  state: Exclude<MazeState, "concept"> | "all";
   squares: number | "any";
   gates: number | "any";
   sort: LibrarySort;

@@ -16,8 +16,8 @@ export const GATE_HUES: readonly number[] = Array.from(
 /**
  * Gate colours reuse the `--gate-base` token's lightness and chroma — so they
  * stay correct in both themes — rotated to a per-gate hue. That token exists
- * for this alone: the accent is achromatic (white or black), and rotating the
- * hue of a colour with no chroma would turn every gate grey. `GATE_HUES`
+ * for this alone: the accent is ink or cream, with almost no chroma, and
+ * rotating the hue of a near-grey colour would turn every gate grey. `GATE_HUES`
  * alone is what keeps adjacent gates distinct.
  */
 export function gateColour(gate: number): string {

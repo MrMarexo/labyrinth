@@ -23,7 +23,7 @@ export function ResultMaze({ maze, path, label, which }: ResultMazeProps) {
 
   return (
     <figure data-result-maze={which} className="space-y-2">
-      <figcaption className="text-sm font-medium">{label}</figcaption>
+      <figcaption className="text-sm">{label}</figcaption>
       <svg
         role="img"
         aria-label={label}

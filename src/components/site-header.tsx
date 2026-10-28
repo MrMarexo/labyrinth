@@ -11,7 +11,7 @@ export async function SiteHeader() {
 
   return (
     <header className="border-border flex items-center justify-between border-b px-4 py-3">
-      <Link href="/" className="font-semibold">
+      <Link href="/" className="tracking-wider uppercase">
         {t("app.name")}
       </Link>
       <div className="flex items-center gap-3">

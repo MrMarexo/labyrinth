@@ -93,7 +93,7 @@ export function MazePicker({ match, selected, onSelect }: MazePickerProps) {
 
   return (
     <div className="space-y-2">
-      <h2 id="maze-picker-heading" className="text-sm font-medium">
+      <h2 id="maze-picker-heading" className="text-sm">
         {t("pickHeading")}
       </h2>
       <div

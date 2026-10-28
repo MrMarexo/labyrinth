@@ -80,9 +80,7 @@ export function JoinPreview({
 
   return (
     <div className="space-y-3">
-      <p className="font-medium">
-        {t("byCreator", { name: data.creatorName })}
-      </p>
+      <p>{t("byCreator", { name: data.creatorName })}</p>
       <p className="text-muted text-sm">
         {tm("sizeAndGates", { cells: data.cellCount, gates: data.gateCount })}
       </p>

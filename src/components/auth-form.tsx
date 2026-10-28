@@ -191,7 +191,7 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
       noValidate
       className="mx-auto max-w-sm space-y-4 p-8"
     >
-      <h1 className="text-2xl font-bold">
+      <h1 className="text-2xl">
         {mode === "sign-up" ? t("signUpTitle") : t("signInTitle")}
       </h1>
 

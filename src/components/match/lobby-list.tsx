@@ -16,7 +16,7 @@ export function LockedBadge() {
   const t = useTranslations("lobby");
   return (
     <span data-locked className="text-muted flex items-center gap-1 text-sm">
-      <PixelIcon name="lock" className="size-3.5" />
+      <PixelIcon name="lock" className="size-5" />
       {t("locked")}
     </span>
   );
@@ -88,7 +88,7 @@ export function LobbyList() {
 
   return (
     <section className="space-y-3">
-      <h2 className="text-xl font-semibold">{t("heading")}</h2>
+      <h2 className="text-xl">{t("heading")}</h2>
       <LobbyBlockedNote />
       {!data || data.matches.length === 0 ? (
         <p data-lobby-empty className="text-muted text-sm">
@@ -103,7 +103,7 @@ export function LobbyList() {
               className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between"
             >
               <div className="space-y-1">
-                <p className="text-sm font-medium">{m.creatorName}</p>
+                <p className="text-sm">{m.creatorName}</p>
                 <p className="text-muted text-sm">
                   {tm("sizeAndGates", {
                     cells: m.cellCount,

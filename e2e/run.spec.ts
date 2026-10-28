@@ -26,8 +26,6 @@ test.describe("the run", () => {
     await expect(
       host.locator("[data-runner-at] svg.pixel-icon-runner"),
     ).not.toHaveCount(0);
-    // (The person glyph draws its own head as a circle, so look only for a
-    // disc directly under the runner group.)
     await expect(host.locator("[data-runner-at] > circle")).toHaveCount(0);
 
     const route = [...GATED_MAZE_ROUTE];

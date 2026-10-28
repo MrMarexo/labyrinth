@@ -8,7 +8,7 @@ export default function HomePage() {
   return (
     <main className="mx-auto max-w-3xl space-y-6 p-8">
       <div>
-        <h1 className="text-3xl font-bold">{t("name")}</h1>
+        <h1 className="text-3xl">{t("name")}</h1>
         <p className="mt-2">{t("tagline")}</p>
       </div>
       <HomeSummary />

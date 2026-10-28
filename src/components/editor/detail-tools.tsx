@@ -253,7 +253,7 @@ function NumberPicker({
             {placed.has(n) && (
               <PixelIcon
                 name="check"
-                className="absolute top-0.5 right-0.5 size-3"
+                className="absolute top-0.5 right-0.5 size-2.5"
               />
             )}
           </button>

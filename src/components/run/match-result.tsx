@@ -87,15 +87,13 @@ export function MatchResult({ matchId }: { matchId: string }) {
       className="space-y-6"
     >
       <div className="space-y-2">
-        <h2 className="text-3xl font-bold">{t(outcome)}</h2>
+        <h2 className="text-3xl">{t(outcome)}</h2>
         <p>{reasonText}</p>
         {decidedByText && <p data-decided-by={decidedBy}>{decidedByText}</p>}
       </div>
 
       <table className="text-left">
-        <caption className="mb-2 text-left font-medium">
-          {t("scoreHeading")}
-        </caption>
+        <caption className="mb-2 text-left">{t("scoreHeading")}</caption>
         <thead>
           <tr>
             <td />
@@ -114,11 +112,17 @@ export function MatchResult({ matchId }: { matchId: string }) {
               <th scope="row" className="pr-6">
                 {label}
               </th>
-              <td
-                data-penalties={score.penalties}
-                className={`pr-6 ${decidedBy === "penalties" ? "font-bold" : ""}`}
-              >
-                {score.penalties}
+              <td data-penalties={score.penalties} className="pr-6">
+                {/* VT323 has one weight: the deciding score is inverted. */}
+                <span
+                  className={
+                    decidedBy === "penalties"
+                      ? "bg-accent text-on-accent px-1"
+                      : undefined
+                  }
+                >
+                  {score.penalties}
+                </span>
               </td>
               <td className="pr-6">{score.moves}</td>
               <td>
@@ -142,7 +146,7 @@ export function MatchResult({ matchId }: { matchId: string }) {
             />
           ) : (
             <figure data-result-maze-deleted="theirs" className="space-y-2">
-              <figcaption className="text-sm font-medium">
+              <figcaption className="text-sm">
                 {t("theirMaze", { name })}
               </figcaption>
               <p className="text-muted text-sm">{t("mazeDeleted")}</p>
@@ -157,7 +161,7 @@ export function MatchResult({ matchId }: { matchId: string }) {
             />
           ) : (
             <figure data-result-maze-deleted="yours" className="space-y-2">
-              <figcaption className="text-sm font-medium">
+              <figcaption className="text-sm">
                 {t("yourMaze", { name })}
               </figcaption>
               <p className="text-muted text-sm">{t("mazeDeleted")}</p>

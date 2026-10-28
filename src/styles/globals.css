@@ -71,7 +71,7 @@
 }
 
 :root {
-  /* Native select popups and scrollbars follow the theme. */
+  /* Native scrollbars and form controls follow the theme. */
   color-scheme: light;
 
   /* Light: warm ink on cream paper. */
@@ -169,20 +169,17 @@ h2 {
   button:not(:disabled),
   [role="button"]:not([aria-disabled="true"]),
   [role="radio"]:not([aria-disabled="true"]),
-  summary,
-  select:not(:disabled) {
+  summary {
     cursor: pointer;
   }
 
-  button:disabled,
-  select:disabled {
+  button:disabled {
     cursor: not-allowed;
   }
 
   /* Radios as pixels: a square box, filled with an inset square when
-     checked. Radios hidden behind a styled label opt out with
-     `appearance-none`. */
-  input[type="radio"]:not(.appearance-none) {
+     checked. */
+  input[type="radio"] {
     appearance: none;
     flex-shrink: 0;
     width: 1rem;
@@ -192,13 +189,13 @@ h2 {
     cursor: pointer;
   }
 
-  input[type="radio"]:not(.appearance-none):checked {
+  input[type="radio"]:checked {
     border-color: var(--fg);
     background-color: var(--fg);
     box-shadow: inset 0 0 0 2px var(--bg);
   }
 
-  input[type="radio"]:not(.appearance-none):focus-visible {
+  input[type="radio"]:focus-visible {
     outline: 2px dashed var(--fg);
     outline-offset: 2px;
   }
@@ -230,8 +227,7 @@ h2 {
 
   @media (prefers-reduced-motion: no-preference) {
     button,
-    a,
-    select {
+    a {
       transition-property: color, background-color, border-color, opacity;
       transition-duration: 150ms;
       transition-timing-function: ease-out;
