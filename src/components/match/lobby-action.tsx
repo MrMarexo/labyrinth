@@ -1,9 +1,13 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { useState } from "react";
 
+import { Link } from "~/components/link";
 import { useActiveMatch } from "~/components/match/match-list";
-import { useRouter } from "~/i18n/navigation";
+import { useViewer } from "~/components/viewer";
+import { usePathname, useRouter } from "~/i18n/navigation";
+import { signIn } from "~/lib/auth-client";
 import { resolveErrorKey } from "~/lib/resolve-error-key";
 import type { MatchAccess } from "~/match";
 import { api, type RouterOutputs } from "~/trpc/react";
@@ -27,6 +31,10 @@ export function LobbyBlockedNote() {
  * The one button a waiting match offers someone else: Join an open match,
  * or Request / Withdraw / Declined for a locked one. Shared by the lobby row
  * and the join page, so `data-request-state` reads the same on both.
+ *
+ * A visitor's Join or Request first makes them a guest. Someone who already
+ * is one, including after a guest sign-in whose join then failed, goes
+ * straight to the mutation: a second anonymous sign-in is refused.
  */
 export function LobbyAction({
   matchId,
@@ -40,8 +48,15 @@ export function LobbyAction({
   const t = useTranslations("lobby");
   const tm = useTranslations("matches");
   const te = useTranslations();
+  const tg = useTranslations("guest");
+  const tn = useTranslations("nav");
   const router = useRouter();
+  const pathname = usePathname();
   const utils = api.useUtils();
+  const { viewer } = useViewer();
+  const visitor = viewer?.kind === "visitor";
+  const [signingIn, setSigningIn] = useState(false);
+  const [signInFailed, setSignInFailed] = useState(false);
   // In a match already: joining and asking are refused (one at a time), so
   // they are not offered. Withdrawing a request still is.
   const { active } = useActiveMatch();
@@ -65,10 +80,45 @@ export function LobbyAction({
     onSettled: refresh,
   });
 
+  // The cache, not this render's `viewer`: another row's button may have
+  // made the caller a guest a moment ago. It is set before the refetch, so
+  // there is no window in which a guest reads as a visitor.
+  const asGuest = async (mutate: () => void) => {
+    setSignInFailed(false);
+    const current = await utils.viewer.get.fetch();
+    if (current.kind === "visitor") {
+      setSigningIn(true);
+      const { data, error } = await signIn.anonymous();
+      setSigningIn(false);
+      // Already a guest after all (signed in from another tab since the
+      // cache was filled): carry on as one.
+      const already =
+        error?.code === "ANONYMOUS_USERS_CANNOT_SIGN_IN_AGAIN_ANONYMOUSLY";
+      if (!already && (error ?? !data)) {
+        setSignInFailed(true);
+        return;
+      }
+      if (data) {
+        utils.viewer.get.setData(undefined, {
+          kind: "guest",
+          number: data.user.name,
+        });
+      }
+      void utils.viewer.get.invalidate();
+      // Read as a visitor: `you` and the request state are the guest's now.
+      refresh();
+      // The header and the server-rendered page still show a visitor.
+      router.refresh();
+    }
+    mutate();
+  };
+
   const failed = [join, requestJoin, withdraw].find((m) => m.isError);
-  const error = failed?.error
-    ? resolveErrorKey(te, failed.error, "errors.unknown")
-    : null;
+  const error = signInFailed
+    ? { key: "errors.unknown" }
+    : failed?.error
+      ? resolveErrorKey(te, failed.error, "errors.unknown")
+      : null;
 
   let action;
   if (access === "open") {
@@ -76,11 +126,15 @@ export function LobbyAction({
       <button
         type="button"
         data-request-state="open"
-        disabled={blocked || join.isPending}
-        onClick={() => join.mutate({ matchId })}
+        disabled={blocked || signingIn || join.isPending}
+        onClick={() => void asGuest(() => join.mutate({ matchId }))}
         className="bg-accent text-on-accent rounded px-3 py-2 text-sm disabled:opacity-50"
       >
-        {join.isPending ? tm("joining") : tm("join")}
+        {signingIn || join.isPending
+          ? tm("joining")
+          : visitor
+            ? tg("joinAsGuest")
+            : tm("join")}
       </button>
     );
   } else if (request === "pending") {
@@ -114,18 +168,34 @@ export function LobbyAction({
       <button
         type="button"
         data-request-state="none"
-        disabled={blocked || requestJoin.isPending}
-        onClick={() => requestJoin.mutate({ matchId })}
+        disabled={blocked || signingIn || requestJoin.isPending}
+        onClick={() => void asGuest(() => requestJoin.mutate({ matchId }))}
         className="bg-accent text-on-accent rounded px-3 py-2 text-sm disabled:opacity-50"
       >
-        {requestJoin.isPending ? t("requesting") : t("requestJoin")}
+        {signingIn || requestJoin.isPending
+          ? t("requesting")
+          : visitor
+            ? tg("requestAsGuest")
+            : t("requestJoin")}
       </button>
     );
   }
 
   return (
     <div className="space-y-1">
-      {action}
+      {visitor ? (
+        <div className="flex items-center gap-3">
+          {action}
+          <Link
+            href={{ pathname: "/sign-in", query: { next: pathname } }}
+            className="text-sm"
+          >
+            {tn("signIn")}
+          </Link>
+        </div>
+      ) : (
+        action
+      )}
       {error && (
         <p role="alert" data-lobby-error className="text-danger text-sm">
           {te(error.key as never, error.params as never)}

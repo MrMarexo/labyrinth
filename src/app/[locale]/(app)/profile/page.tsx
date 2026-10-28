@@ -1,9 +1,17 @@
-import { useTranslations } from "next-intl";
+import { getLocale, getTranslations } from "next-intl/server";
 
 import { NameForm, PasswordForm } from "~/components/profile/profile-forms";
+import { redirect } from "~/i18n/navigation";
+import { api } from "~/trpc/server";
 
-export default function ProfilePage() {
-  const t = useTranslations("profile");
+export default async function ProfilePage() {
+  // A guest has no profile to edit; signing up gives them one.
+  const viewer = await api.viewer.get();
+  if (viewer.kind === "guest") {
+    redirect({ href: "/sign-up", locale: await getLocale() });
+  }
+
+  const t = await getTranslations("profile");
 
   return (
     <main className="mx-auto max-w-xl space-y-8 p-8">

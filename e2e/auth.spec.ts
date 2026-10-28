@@ -23,7 +23,9 @@ test.describe("authentication", () => {
     await expectSignedIn(page);
 
     await signOut(page);
-    await expect(page.getByRole("link", { name: "Sign in" })).toBeVisible();
+    await expect(
+      page.getByRole("banner").getByRole("link", { name: "Sign in" }),
+    ).toBeVisible();
 
     await page.goto("/en/sign-in");
     await page.getByLabel("Email").fill(email);
@@ -100,7 +102,9 @@ test.describe("authentication", () => {
     // Wait for the sign-out to land. The (auth) layout now bounces a
     // signed-in visitor to the home page, so navigating while the session
     // cookie is still alive never reaches the form.
-    await expect(page.getByRole("link", { name: "Sign in" })).toBeVisible();
+    await expect(
+      page.getByRole("banner").getByRole("link", { name: "Sign in" }),
+    ).toBeVisible();
 
     await page.goto("/sk/sign-in");
     await page.getByLabel("E-mail").fill(email);

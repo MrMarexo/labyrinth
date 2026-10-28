@@ -18,19 +18,15 @@ export default async function JoinPage({
   const { locale, id } = await params;
   if (!hasLocale(locales, locale)) notFound();
 
+  // A visitor sees the preview too: joining makes them a guest.
   const session = await getSession(await headers());
-
-  if (!session) {
-    return redirect({
-      href: { pathname: "/sign-in", query: { next: `/matches/${id}/join` } },
-      locale,
-    });
-  }
 
   // Checked before `preview`, which is NOT_FOUND once the match has left the
   // lobby: a participant, in any status, belongs on the match itself.
-  const found = await api.match.get({ id }).catch(() => null);
-  if (found) return redirect({ href: `/matches/${id}`, locale });
+  if (session) {
+    const found = await api.match.get({ id }).catch(() => null);
+    if (found) return redirect({ href: `/matches/${id}`, locale });
+  }
 
   const preview = await api.match.preview({ matchId: id }).catch((error) => {
     if (error instanceof TRPCError && error.code === "NOT_FOUND") return null;
@@ -45,7 +41,7 @@ export default async function JoinPage({
       {preview ? (
         <JoinPreview
           matchId={id}
-          userId={session.user.id}
+          userId={session?.user.id ?? null}
           initialData={preview}
         />
       ) : (

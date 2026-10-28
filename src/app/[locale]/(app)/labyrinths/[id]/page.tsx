@@ -3,6 +3,7 @@ import { getTranslations } from "next-intl/server";
 
 import { MazeEditor } from "~/components/editor/maze-editor";
 import { ReadOnlyMaze } from "~/components/editor/read-only-maze";
+import { SignUpNotice } from "~/components/sign-up-notice";
 import { mayUseInMatch } from "~/match";
 import { draftMazeSchema, draftToMaze } from "~/maze";
 import { api } from "~/trpc/server";
@@ -20,6 +21,16 @@ export default async function EditorPage({
 
   const row = await api.maze.get({ id }).catch(() => null);
   if (!row) notFound();
+
+  // A guest has no library: only the concept they are drawing for their
+  // match, opened from it, is theirs to see.
+  const guest = (await api.viewer.get()).kind === "guest";
+  const guestNotice = (
+    <main className="mx-auto max-w-3xl p-8">
+      <SignUpNotice kind="labyrinths" />
+    </main>
+  );
+  if (guest && !row.concept) return guestNotice;
 
   const parsed = draftMazeSchema.safeParse(row.data);
   if (!parsed.success) notFound();
@@ -58,6 +69,7 @@ export default async function EditorPage({
     match && mayUseInMatch(match, row)
       ? { id: match.id, code: match.code }
       : null;
+  if (guest && !forMatch) return guestNotice;
 
   return (
     // Wide, unlike the other pages: the board grows to fill the screen.

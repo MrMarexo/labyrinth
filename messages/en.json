@@ -24,7 +24,8 @@
     "saved": "Saved",
     "savedOf": "{count} / {limit}",
     "ready": "Ready",
-    "unfinished": "Unfinished"
+    "unfinished": "Unfinished",
+    "findMatch": "Find a match"
   },
   "profile": {
     "title": "Profile",
@@ -116,6 +117,11 @@
   },
   "players": {
     "guestName": "Guest {number}"
+  },
+  "guest": {
+    "notice": "You need an account to create matches and labyrinths.",
+    "joinAsGuest": "Join as guest",
+    "requestAsGuest": "Request as guest"
   },
   "play": {
     "title": "Your games",

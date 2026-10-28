@@ -61,11 +61,19 @@ test.describe("the home page", () => {
     await expect(host).toHaveURL(new RegExp(`/en/matches/${matchId}$`));
   });
 
-  test("an anonymous visitor sees no summary", async ({ page }) => {
+  test("an anonymous visitor sees no summary, only ways in", async ({
+    page,
+  }) => {
     await page.goto("/en");
     await expect(
       page.getByRole("heading", { name: "Labyrinth" }),
     ).toBeVisible();
     await expect(page.locator("[data-home-summary]")).toHaveCount(0);
+    const welcome = page.locator("[data-home-welcome]");
+    await expect(welcome.getByRole("link", { name: "Sign up" })).toBeVisible();
+    await expect(welcome.getByRole("link", { name: "Sign in" })).toBeVisible();
+    await expect(
+      welcome.getByRole("link", { name: "Find a match" }),
+    ).toBeVisible();
   });
 });

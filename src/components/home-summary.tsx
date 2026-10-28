@@ -4,27 +4,16 @@ import { useTranslations } from "next-intl";
 
 import { CurrentMatch } from "~/components/match/match-list";
 import { Link as LocaleLink } from "~/i18n/navigation";
-import { useSession } from "~/lib/auth-client";
 import { MAZE_LIMIT, savedCount } from "~/maze";
 import { api } from "~/trpc/react";
 
 /**
- * The signed-in home page: the match that holds the player, if any, ways to
+ * A member's home page: the match that holds the player, if any, ways to
  * start something new, and a count of what they have. The counts come from
  * the same queries the matches and labyrinths pages use, so moving on to
- * either costs no extra request.
- *
- * Nothing for a visitor who is not signed in. The session is read here
- * rather than by the page, which goes through the client like any other
- * page (AGENTS.md invariant 11); only the home page pays for the request.
+ * either costs no extra request. The page renders it for members only.
  */
 export function HomeSummary() {
-  const { data: session, isPending } = useSession();
-  if (isPending || !session) return null;
-  return <Summary />;
-}
-
-function Summary() {
   const t = useTranslations("home");
 
   return (

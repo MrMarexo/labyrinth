@@ -9,6 +9,22 @@ test.describe("protected area", () => {
     await expect(page).toHaveURL(/\/en\/sign-in$/);
   });
 
+  test("shows a visitor the matches and labyrinths pages, with a sign-up notice", async ({
+    page,
+  }) => {
+    await page.goto("/en/matches");
+    await expect(page).toHaveURL(/\/en\/matches$/);
+    await expect(page.locator('[data-sign-up-notice="matches"]')).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Lobby" })).toBeVisible();
+
+    await page.goto("/en/labyrinths");
+    await expect(page).toHaveURL(/\/en\/labyrinths$/);
+    const notice = page.locator('[data-sign-up-notice="labyrinths"]');
+    await expect(notice).toBeVisible();
+    await notice.getByRole("link", { name: "Sign up" }).click();
+    await expect(page).toHaveURL(/\/en\/sign-up\?next=%2Flabyrinths$/);
+  });
+
   test("lets a signed-in person in, and remembers their language", async ({
     page,
   }) => {
@@ -84,7 +100,7 @@ test.describe("language preference", () => {
 
     await signOut(page, "Odhlásiť sa");
     await expect(
-      page.getByRole("link", { name: "Prihlásiť sa" }),
+      page.getByRole("banner").getByRole("link", { name: "Prihlásiť sa" }),
     ).toBeVisible();
 
     await context.clearCookies();
@@ -116,7 +132,7 @@ test.describe("language preference", () => {
 
     await signOut(page, "Odhlásiť sa");
     await expect(
-      page.getByRole("link", { name: "Prihlásiť sa" }),
+      page.getByRole("banner").getByRole("link", { name: "Prihlásiť sa" }),
     ).toBeVisible();
 
     // Clear every cookie, including NEXT_LOCALE, so the only way the

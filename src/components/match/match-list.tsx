@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 
 import { CancelMatch } from "~/components/match/cancel-match";
 import { Link } from "~/components/link";
+import { useViewer } from "~/components/viewer";
 import { Link as LocaleLink } from "~/i18n/navigation";
 import type { MatchStatus } from "~/match";
 import { api, type RouterOutputs } from "~/trpc/react";
@@ -29,10 +30,14 @@ const STATUS_KEY = {
  * whenever a page using this mounts — a run that ended while the player was
  * elsewhere must not keep blocking them — and a deadline that has passed
  * since is checked here.
+ *
+ * A visitor has no session and so no matches: the list is not asked for.
  */
 export function useActiveMatch() {
+  const { viewer } = useViewer();
   const { data, isPending } = api.match.list.useQuery(undefined, {
     refetchOnMount: "always",
+    enabled: viewer !== undefined && viewer.kind !== "visitor",
   });
   const active =
     data?.find((m) => m.active && m.deadlineAt.getTime() > Date.now()) ?? null;

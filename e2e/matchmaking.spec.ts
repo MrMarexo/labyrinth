@@ -233,7 +233,7 @@ test.describe("a locked match", () => {
 });
 
 test.describe("the share link", () => {
-  test("signed out, it goes through sign-in and lands back on the join page", async ({
+  test("signed out, it shows the preview, and sign-in lands back on it", async ({
     players,
     browser,
     baseURL,
@@ -253,6 +253,13 @@ test.describe("the share link", () => {
     try {
       const page = await context.newPage();
       await page.goto(`/en/matches/${matchId}/join`);
+      await expect(
+        page.getByRole("button", { name: "Request as guest" }),
+      ).toBeVisible();
+      await page
+        .getByRole("main")
+        .getByRole("link", { name: "Sign in", exact: true })
+        .click();
       await expect(page).toHaveURL(/\/en\/sign-in\?next=/);
       expect(decodeURIComponent(new URL(page.url()).search)).toContain(
         `next=/matches/${matchId}/join`,

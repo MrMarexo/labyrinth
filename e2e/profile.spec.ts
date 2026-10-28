@@ -113,7 +113,9 @@ test.describe("the profile page", () => {
     );
 
     await signOut(profile);
-    await expect(profile.getByRole("link", { name: "Sign in" })).toBeVisible();
+    await expect(
+      profile.getByRole("banner").getByRole("link", { name: "Sign in" }),
+    ).toBeVisible();
     // The header outlives the navigation; the menu must not stay open.
     await expect(profile.locator("[data-menu-panel]")).toBeHidden();
     await profile.goto("/en/sign-in");

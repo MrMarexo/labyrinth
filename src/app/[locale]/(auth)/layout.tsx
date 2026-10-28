@@ -18,10 +18,11 @@ export default async function AuthLayout({
   if (!hasLocale(locales, locale)) notFound();
 
   // The mirror of the (app) guard: someone already signed in has no business
-  // on the sign-in or sign-up form.
+  // on the sign-in or sign-up form. A guest does: signing up or in is how
+  // they keep their game.
   const session = await getSession(await headers());
 
-  if (session) redirect({ href: "/", locale });
+  if (session && !session.user.isAnonymous) redirect({ href: "/", locale });
 
   return <>{children}</>;
 }

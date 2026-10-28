@@ -35,7 +35,10 @@ export function useTimeAgo(): (date: Date) => string {
     format.relativeTime(date, Math.max(now.getTime(), date.getTime()));
 }
 
-/** Everyone else's waiting matches, kept live by the lobby channel. */
+/**
+ * Everyone else's waiting matches, kept live by the lobby channel, or for a
+ * visitor by the poll.
+ */
 export function LobbyList() {
   const t = useTranslations("lobby");
   const playerName = usePlayerName();
@@ -73,7 +76,9 @@ export function LobbyList() {
     if (seated) router.push(`/matches/${seated.id}`);
   };
 
-  useChannel(lobbyChannel(), {
+  // `you` is set only with a session; a visitor may not subscribe
+  // (`canSubscribe`) and is kept current by the poll alone.
+  useChannel(data?.you ? lobbyChannel() : null, {
     onEvent: (event) => {
       if (event === EVENTS.changed) refreshLobby();
     },

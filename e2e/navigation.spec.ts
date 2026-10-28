@@ -28,11 +28,12 @@ test.describe("navigation", () => {
     await context.close();
   });
 
-  test("an anonymous visitor sees no link into the match lifecycle", async ({
+  test("an anonymous visitor reaches the lobby from the home page, but not the labyrinths", async ({
     page,
   }) => {
     await page.goto("/en");
-    await expect(page.getByRole("link", { name: "Matches" })).toHaveCount(0);
     await expect(page.getByRole("link", { name: "Labyrinths" })).toHaveCount(0);
+    await page.getByRole("link", { name: "Find a match" }).click();
+    await expect(page).toHaveURL(/\/en\/matches$/);
   });
 });

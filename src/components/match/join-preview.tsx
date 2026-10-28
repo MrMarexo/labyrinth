@@ -27,7 +27,8 @@ export function MatchClosed() {
 /**
  * The join page's body: one waiting match and its action button. Watches the
  * caller's user channel so an accepted request takes them straight into the
- * match.
+ * match. A visitor has no channel and nothing to be seated in: the poll
+ * only refreshes the preview.
  */
 export function JoinPreview({
   matchId,
@@ -35,7 +36,7 @@ export function JoinPreview({
   initialData,
 }: {
   matchId: string;
-  userId: string;
+  userId: string | null;
   initialData: RouterOutputs["match"]["preview"];
 }) {
   const t = useTranslations("lobby");
@@ -53,6 +54,10 @@ export function JoinPreview({
   // preview is refreshed after, so a match that closed for someone else
   // shows as closed.
   const check = async () => {
+    if (!userId) {
+      void utils.match.preview.invalidate({ matchId });
+      return;
+    }
     const seated = await utils.match.get
       .fetch({ id: matchId }, { staleTime: 0 })
       .then(() => true)
@@ -61,7 +66,7 @@ export function JoinPreview({
     else void utils.match.preview.invalidate({ matchId });
   };
 
-  useChannel(userChannel(userId), {
+  useChannel(userId ? userChannel(userId) : null, {
     onEvent: (event) => {
       if (event === EVENTS.changed) void check();
     },
