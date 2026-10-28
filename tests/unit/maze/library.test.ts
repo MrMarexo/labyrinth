@@ -6,28 +6,16 @@ describe("mazeState", () => {
   const saved = { concept: false };
 
   it("calls a saved draft that does not validate a draft", () => {
-    expect(mazeState({ ...saved, status: "draft", contentHash: null })).toBe(
-      "draft",
-    );
+    expect(mazeState({ ...saved, contentHash: null })).toBe("draft");
   });
 
   it("calls a saved draft that validates ready", () => {
-    expect(mazeState({ ...saved, status: "draft", contentHash: "h" })).toBe(
-      "ready",
-    );
-  });
-
-  it("calls a submitted maze used", () => {
-    expect(mazeState({ ...saved, status: "submitted", contentHash: "h" })).toBe(
-      "used",
-    );
+    expect(mazeState({ ...saved, contentHash: "h" })).toBe("ready");
   });
 
   it("calls the labyrinth in progress a concept, valid or not", () => {
     for (const contentHash of [null, "h"]) {
-      expect(mazeState({ concept: true, status: "draft", contentHash })).toBe(
-        "concept",
-      );
+      expect(mazeState({ concept: true, contentHash })).toBe("concept");
     }
   });
 });
@@ -40,7 +28,7 @@ describe("MAZE_LIMIT", () => {
 
 describe("savedCount", () => {
   it("counts every saved state but not the concept", () => {
-    const states = ["concept", "draft", "ready", "used"] as const;
+    const states = ["concept", "draft", "ready", "ready"] as const;
     expect(savedCount(states.map((state) => ({ state })))).toBe(3);
   });
 });

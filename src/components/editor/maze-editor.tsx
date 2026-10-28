@@ -163,12 +163,8 @@ export function MazeEditor({
   useEffect(() => {
     const latest = fresh.data;
     if (!latest) return;
-    if (latest.status === "submitted") {
-      setLocked(true);
-      setSaveError({ key: "errors.mazeIsSubmitted" });
-      return;
-    }
-    // Saved from another tab since this page was rendered.
+    // Saved, or used in a match, from another tab since this page was
+    // rendered.
     if (!latest.concept) {
       setLocked(true);
       setSaveError({ key: "errors.mazeIsSaved" });
@@ -220,15 +216,10 @@ export function MazeEditor({
     const onError = (error: Parameters<typeof resolveErrorKey>[1]) => {
       if (!mountedRef.current) return;
       const resolved = resolveErrorKey(t, error, "editor.saveFailed");
-      // A maze can only reach this state once Phase 3 adds submission —
-      // nothing in this phase ever sets a maze's status to "submitted" —
-      // but the rule ("mazes are never edited once finished") has to
-      // hold the day that becomes reachable, not the day someone
-      // remembers to add a check for it.
-      // Neither is fixed by sending again: a used maze is final, and a
-      // stale copy would overwrite whatever the other copy saved.
+      // Neither is fixed by sending again: a saved labyrinth changes only
+      // through a concept, and a stale copy would overwrite whatever the
+      // other copy saved.
       if (
-        resolved.key === "errors.mazeIsSubmitted" ||
         resolved.key === "errors.mazeIsSaved" ||
         resolved.key === "errors.draftChangedElsewhere"
       ) {

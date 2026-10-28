@@ -149,11 +149,11 @@ export function MatchResult({ matchId }: { matchId: string }) {
               label={t("theirMaze", { name })}
             />
           ) : (
-            <figure data-result-maze-deleted="theirs" className="space-y-2">
+            <figure data-result-maze-expired="theirs" className="space-y-2">
               <figcaption className="text-sm">
                 {t("theirMaze", { name })}
               </figcaption>
-              <p className="text-muted text-sm">{t("mazeDeleted")}</p>
+              <p className="text-muted text-sm">{t("mazeExpired")}</p>
             </figure>
           )}
           {mazes.yours ? (
@@ -164,11 +164,11 @@ export function MatchResult({ matchId }: { matchId: string }) {
               label={t("yourMaze", { name })}
             />
           ) : (
-            <figure data-result-maze-deleted="yours" className="space-y-2">
+            <figure data-result-maze-expired="yours" className="space-y-2">
               <figcaption className="text-sm">
                 {t("yourMaze", { name })}
               </figcaption>
-              <p className="text-muted text-sm">{t("mazeDeleted")}</p>
+              <p className="text-muted text-sm">{t("mazeExpired")}</p>
             </figure>
           )}
         </div>

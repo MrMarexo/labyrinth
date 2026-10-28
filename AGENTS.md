@@ -43,7 +43,9 @@ tests/integration/ Vitest, real database
 These are not style preferences. Breaking one is a bug, and most of them fail
 quietly rather than loudly.
 
-1. **No procedure reachable by a runner may select `maze.data`.** The maze is
+1. **No procedure reachable by a runner may select `maze.data`** or a
+   match's copy of it, `matchMaze.data`, outside the sanctioned readers in
+   `src/server/api/routers/AGENTS.md`. The maze is
    secret; a runner learning it ends the game. Author-facing and runner-facing
    reads are separate procedures with separate return types.
    `match.eligibleMazes` returns `data` only for the caller's own mazes, for

@@ -84,7 +84,6 @@
     },
     "notYourMaze": "That labyrinth is not yours.",
     "mazeLimitReached": "You have reached the limit of labyrinths you can keep. Delete one to make room.",
-    "mazeIsSubmitted": "This labyrinth has been submitted and can no longer be changed.",
     "runNotUnlocked": "The runs have not unlocked yet.",
     "runAlreadyFinished": "Your run is already over.",
     "matchOver": "This match is over.",
@@ -144,7 +143,6 @@
     "confirmDeleteShort": "Confirm",
     "deleteCancel": "Cancel",
     "deleting": "Deleting…",
-    "readOnly": "This labyrinth has been used in a match, so it can't be changed. Editing makes a copy you can change.",
     "backToList": "Back to your labyrinths",
     "count": "{count} / {limit} labyrinths",
     "atLimit": "You have {limit} labyrinths, the most you can keep. You can still draw, but delete one before saving another.",
@@ -152,7 +150,6 @@
     "filterAll": "All",
     "filterDrafts": "Unfinished",
     "filterReady": "Ready",
-    "filterUsed": "Used",
     "filterAny": "Any",
     "filterSquaresName": "Filter by squares",
     "filterGatesName": "Filter by gates",
@@ -161,13 +158,9 @@
     "sortName": "Name",
     "sortSize": "Size",
     "noMatches": "No labyrinths match these filters.",
-    "usedBadge": "Used",
-    "deleteUsedHint": "Past matches keep their results.",
     "conceptBadge": "Concept",
     "edit": "Edit",
-    "editCopy": "Edit a copy",
-    "editing": "Opening…",
-    "editOfName": "Edit of {name}"
+    "editing": "Opening…"
   },
   "matches": {
     "title": "Matches",
@@ -376,7 +369,7 @@
     "finishClose": "Close"
   },
   "result": {
-    "mazeDeleted": "This labyrinth was deleted.",
+    "mazeExpired": "This labyrinth is no longer available.",
     "won": "You won.",
     "lost": "You lost.",
     "none": "Nobody won.",

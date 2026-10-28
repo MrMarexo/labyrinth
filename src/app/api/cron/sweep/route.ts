@@ -1,8 +1,8 @@
 import { env } from "~/env";
 import { db } from "~/server/db";
 import { purgeIdleGuests } from "~/server/guest/purge";
+import { purgeMatchMazes } from "~/server/match/purge";
 import { sweepExpiredMatches } from "~/server/match/sweep";
-import { purgeDeletedMazes } from "~/server/maze/purge";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +25,7 @@ export async function GET(request: Request) {
 
   const now = new Date();
   const result = await sweepExpiredMatches(db, now);
-  const purge = await purgeDeletedMazes(db, now);
+  const purge = await purgeMatchMazes(db, now);
   const guests = await purgeIdleGuests(db, now);
   return Response.json({ ...result, purge, guests });
 }

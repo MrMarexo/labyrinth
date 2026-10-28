@@ -5,7 +5,6 @@ import { z } from "zod";
 import {
   deadlineFor,
   decidingField,
-  drawingDeleted,
   elapsedMs,
   isTerminal,
   mayReplayOwn,
@@ -28,7 +27,7 @@ import {
   type Point,
 } from "~/maze";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { match, matchPlayer, maze, move, user } from "~/server/db/schema";
+import { match, matchMaze, matchPlayer, move, user } from "~/server/db/schema";
 import {
   lockedForMove,
   notYours,
@@ -69,28 +68,33 @@ export function assertRunOpen(row: MatchRow, now: Date) {
 }
 
 /**
- * Parsed mazes by id, for `run.move`. A submitted maze can be neither saved
- * nor removed (`maze.saveDraft`, `maze.remove`), and a run only ever solves
- * a submitted one, so an entry can never go stale. Server memory only; the
- * cap keeps a long-lived process from growing without bound.
+ * Parsed mazes by seat, for `run.move`. A match's copy of a maze is never
+ * changed, only purged long after its runs are over, so an entry can never
+ * go stale. Server memory only; the cap keeps a long-lived process from
+ * growing without bound.
  */
 const solvingCache = new Map<string, Maze>();
 const SOLVING_CACHE_MAX = 500;
 
 /**
  * The maze this runner is solving: the opponent's. **This reads
- * `maze.data` on a runner-reachable path** — the one sanctioned place
+ * `matchMaze.data` on a runner-reachable path** — the one sanctioned place
  * besides `run.result` (see `routers/AGENTS.md`). What it returns must never
  * leave the server; `run.move` hands it only to the reducer.
  */
 async function mazeToSolve(tx: DbClient, opponent: PlayerRow): Promise<Maze> {
-  const id = opponent.mazeId!;
+  const id = `${opponent.matchId}:${opponent.userId}`;
   const cached = solvingCache.get(id);
   if (cached) return cached;
   const [row] = await tx
-    .select({ data: maze.data })
-    .from(maze)
-    .where(eq(maze.id, id));
+    .select({ data: matchMaze.data })
+    .from(matchMaze)
+    .where(
+      and(
+        eq(matchMaze.matchId, opponent.matchId),
+        eq(matchMaze.userId, opponent.userId),
+      ),
+    );
   const parsed = mazeSchema.parse(row!.data);
   if (solvingCache.size >= SOLVING_CACHE_MAX) {
     solvingCache.delete(solvingCache.keys().next().value!);
@@ -388,28 +392,20 @@ export const runRouter = createTRPCRouter({
                 : ("treasure" as const)
               : ("timeout" as const);
 
-      // Each drawing stands alone: `null` is a maze its author deleted whose
-      // replay window has closed (or that the purge already removed).
+      // Each drawing stands alone: `null` once the replay window has closed,
+      // whether or not the purge has removed the match's copy yet.
       type Drawing = { maze: Maze; path: Point[] };
       let mazes: { theirs: Drawing | null; yours: Drawing | null } | null =
         null;
       const now = new Date();
 
       if (them && you.submittedAt !== null && them.submittedAt !== null) {
-        const ids = [you.mazeId, them.mazeId].filter(
-          (id): id is string => id !== null,
-        );
-        const mazeRows =
-          ids.length === 0
-            ? []
-            : await ctx.db
-                .select({
-                  id: maze.id,
-                  data: maze.data,
-                  deletedAt: maze.deletedAt,
-                })
-                .from(maze)
-                .where(inArray(maze.id, ids));
+        const mazeRows = replayExpired(row.endedAt, now)
+          ? []
+          : await ctx.db
+              .select({ userId: matchMaze.userId, data: matchMaze.data })
+              .from(matchMaze)
+              .where(eq(matchMaze.matchId, row.id));
         const log = await ctx.db
           .select({ runnerId: move.runnerId, delta: move.delta })
           .from(move)
@@ -419,11 +415,11 @@ export const runRouter = createTRPCRouter({
         // Deltas are start-relative (see RunnerDelta); the result draws on
         // the full maze, so translate back by its start cell.
         const drawing = (
-          mazeId: string | null,
+          authorId: string,
           runnerId: string,
         ): Drawing | null => {
-          const found = mazeRows.find((m) => m.id === mazeId) ?? null;
-          if (!found || drawingDeleted(found, row.endedAt, now)) return null;
+          const found = mazeRows.find((m) => m.userId === authorId);
+          if (!found) return null;
           const m = mazeSchema.parse(found.data);
           const path = pathFrom(
             log.filter((l) => l.runnerId === runnerId).map((l) => l.delta),
@@ -432,8 +428,8 @@ export const runRouter = createTRPCRouter({
         };
 
         mazes = {
-          theirs: drawing(them.mazeId, me),
-          yours: drawing(you.mazeId, them.userId),
+          theirs: drawing(them.userId, me),
+          yours: drawing(me, them.userId),
         };
       }
 
@@ -495,9 +491,14 @@ export const runRouter = createTRPCRouter({
 
       const [[mazeRow], log, nameOf] = await Promise.all([
         ctx.db
-          .select({ data: maze.data })
-          .from(maze)
-          .where(eq(maze.id, author.mazeId!)),
+          .select({ data: matchMaze.data })
+          .from(matchMaze)
+          .where(
+            and(
+              eq(matchMaze.matchId, row.id),
+              eq(matchMaze.userId, author.userId),
+            ),
+          ),
         ctx.db
           .select({ seq: move.seq, delta: move.delta })
           .from(move)
@@ -513,8 +514,12 @@ export const runRouter = createTRPCRouter({
         runner.finishedAt === null &&
         runner.gaveUpAt === null;
 
+      // Gone only once the window above has closed, but the purge and this
+      // read do not share a clock.
+      if (!mazeRow) refuse("errors.replayExpired");
+
       return {
-        maze: mazeSchema.parse(mazeRow!.data),
+        maze: mazeSchema.parse(mazeRow.data),
         moves: log,
         live,
         channel: live ? runChannel(row.id, runner.userId) : null,

@@ -14,9 +14,9 @@ import {
 import { user } from "./auth";
 
 /**
- * Spec §6. `data` holds a DraftMaze while `status` is "draft" and a Maze once
- * submitted — the same column, because a draft becomes the maze rather than
- * being copied into one.
+ * Spec §6. A player's own labyrinth, theirs to edit or delete at any time:
+ * a match plays its own copy (`matchMaze`), never this row. `data` is a
+ * DraftMaze.
  *
  * `contentHash` and `optimalMoves` are null until the maze validates: they are
  * derived by the solver and a half-drawn maze has neither.
@@ -42,15 +42,6 @@ export const maze = pgTable(
      * instead of silently overwriting newer squares.
      */
     version: integer("version").notNull().default(0),
-    status: text("status", { enum: ["draft", "submitted"] })
-      .notNull()
-      .default("draft"),
-    /**
-     * Set when the author deletes a used maze. It vanishes from everything
-     * the author sees, but matches that used it keep reading it until their
-     * replay window closes; then the nightly purge removes the row.
-     */
-    deletedAt: timestamp("deleted_at"),
     /**
      * The author's one labyrinth in progress. Autosaved while it is drawn,
      * but not in their library: it does not count toward the limit, and it
@@ -60,7 +51,7 @@ export const maze = pgTable(
     concept: boolean("concept").notNull().default(false),
     /**
      * For a concept opened from a saved labyrinth: that labyrinth, which its
-     * save writes back into while it is still unused. Null for a new one.
+     * save writes back into. Null for a new one.
      */
     sourceId: text("source_id").references((): AnyPgColumn => maze.id, {
       onDelete: "set null",

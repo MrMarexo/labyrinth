@@ -340,17 +340,28 @@ describe("run.move", () => {
   });
 });
 
-describe("a labyrinth deleted mid-match", () => {
-  it("still carries the run that walks it", async () => {
-    const { host, guest, guestId, matchId } = await runningMatch();
-    const [mine] = await db
-      .select({ mazeId: matchPlayer.mazeId })
-      .from(matchPlayer)
-      .where(
-        and(eq(matchPlayer.matchId, matchId), eq(matchPlayer.userId, guestId)),
-      );
+describe("a labyrinth changed mid-match", () => {
+  it("still carries the run that walks it when deleted", async () => {
+    const { host, guest, guestMazeId, matchId } = await runningMatch();
     // The guest deletes the labyrinth the host is solving, mid-run.
-    await guest.maze.remove({ id: mine!.mazeId! });
+    await guest.maze.remove({ id: guestMazeId });
+
+    await walk(host, matchId, GATED_MAZE_ROUTE);
+    expect((await host.run.get({ matchId })).finished).toBe(true);
+  });
+
+  it("still plays the maze as submitted when edited", async () => {
+    const { host, guest, guestMazeId, matchId } = await runningMatch();
+    // The guest redraws the labyrinth the host is solving, mid-run: every
+    // square but the start gone, so the old route would hit the void.
+    const concept = await guest.maze.editAsConcept({ id: guestMazeId });
+    const opened = await guest.maze.get({ id: concept.id });
+    const start = opened.data.start!;
+    await guest.maze.saveDraft({
+      id: concept.id,
+      data: { ...opened.data, cells: [start] },
+      expectedVersion: opened.version,
+    });
 
     await walk(host, matchId, GATED_MAZE_ROUTE);
     expect((await host.run.get({ matchId })).finished).toBe(true);

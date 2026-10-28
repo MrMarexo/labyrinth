@@ -1,13 +1,4 @@
-import {
-  and,
-  asc,
-  eq,
-  inArray,
-  notExists,
-  notInArray,
-  or,
-  sql,
-} from "drizzle-orm";
+import { and, asc, eq, inArray, notExists, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import type { db as Database } from "~/server/db";
@@ -28,8 +19,8 @@ const accountRequest = alias(matchRequest, "account_request");
  * signed up or signed in as, in one transaction.
  *
  * A match the account already sits in cannot take a second seat, so it stays
- * with the guest, along with the mazes it uses, and `keepGuest` says the
- * guest row must survive to hold it. `changedMatchIds` names the matches
+ * with the guest, and `keepGuest` says the guest row must survive to hold
+ * it. A seat's maze (`matchMaze`) moves with the seat. `changedMatchIds` names the matches
  * whose seats or requests moved, for the caller to publish once this commits.
  */
 export async function linkGuest(
@@ -43,7 +34,6 @@ export async function linkGuest(
     const seats = await tx
       .select({
         matchId: matchPlayer.matchId,
-        mazeId: matchPlayer.mazeId,
         submittedAt: matchPlayer.submittedAt,
       })
       .from(matchPlayer)
@@ -152,23 +142,11 @@ export async function linkGuest(
       }
     }
 
-    // A guest's submitted maze was marked deleted for the purge; in the
-    // account's library it is a used labyrinth like any other.
-    const keptMazes = seats
-      .filter((s) => colliding.has(s.matchId) && s.mazeId !== null)
-      .map((s) => s.mazeId!);
+    // Every labyrinth goes: a match the guest keeps plays its own copy.
     await tx
       .update(maze)
-      .set({
-        authorId: accountId,
-        deletedAt: sql`CASE WHEN ${maze.status} = 'submitted' THEN NULL ELSE ${maze.deletedAt} END`,
-      })
-      .where(
-        and(
-          eq(maze.authorId, guestId),
-          keptMazes.length > 0 ? notInArray(maze.id, keptMazes) : undefined,
-        ),
-      );
+      .set({ authorId: accountId })
+      .where(eq(maze.authorId, guestId));
 
     return {
       keepGuest: colliding.size > 0,

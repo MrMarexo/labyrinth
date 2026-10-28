@@ -84,7 +84,6 @@
     },
     "notYourMaze": "Toto bludisko nie je vaše.",
     "mazeLimitReached": "Dosiahli ste limit bludísk, ktoré môžete mať. Ak chcete vytvoriť nové, jedno zmažte.",
-    "mazeIsSubmitted": "Toto bludisko je odoslané a už sa nedá meniť.",
     "runNotUnlocked": "Behy ešte nie sú odomknuté.",
     "runAlreadyFinished": "Váš beh sa už skončil.",
     "matchOver": "Tento zápas sa skončil.",
@@ -144,7 +143,6 @@
     "confirmDeleteShort": "Potvrdiť",
     "deleteCancel": "Zrušiť",
     "deleting": "Maže sa…",
-    "readOnly": "Toto bludisko už bolo použité v zápase, preto ho nemožno meniť. Úpravou vznikne kópia, ktorú meniť môžete.",
     "backToList": "Späť na vaše bludiská",
     "count": "{count} / {limit} bludísk",
     "atLimit": "Máte {limit} bludísk, viac ich mať nemôžete. Kresliť môžete aj naďalej, ale pred uložením ďalšieho jedno zmažte.",
@@ -152,7 +150,6 @@
     "filterAll": "Všetky",
     "filterDrafts": "Nedokončené",
     "filterReady": "Pripravené",
-    "filterUsed": "Použité",
     "filterAny": "Ľubovoľný",
     "filterSquaresName": "Filtrovať podľa políčok",
     "filterGatesName": "Filtrovať podľa brán",
@@ -161,13 +158,9 @@
     "sortName": "Názov",
     "sortSize": "Veľkosť",
     "noMatches": "Týmto filtrom nezodpovedá žiadne bludisko.",
-    "usedBadge": "Použité",
-    "deleteUsedHint": "Odohrané zápasy si svoje výsledky ponechajú.",
     "conceptBadge": "Koncept",
     "edit": "Upraviť",
-    "editCopy": "Upraviť kópiu",
-    "editing": "Otvára sa…",
-    "editOfName": "Úprava {name}"
+    "editing": "Otvára sa…"
   },
   "matches": {
     "title": "Zápasy",
@@ -376,7 +369,7 @@
     "finishClose": "Zavrieť"
   },
   "result": {
-    "mazeDeleted": "Toto bludisko bolo zmazané.",
+    "mazeExpired": "Toto bludisko už nie je k dispozícii.",
     "won": "Vyhrali ste.",
     "lost": "Prehrali ste.",
     "none": "Nikto nevyhral.",

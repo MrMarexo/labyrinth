@@ -94,12 +94,6 @@ export function MazeList() {
         {item.state === "concept" && (
           <span data-concept-badge>{t("conceptBadge")}</span>
         )}
-        {item.state === "used" && (
-          <span data-used-badge className="text-muted flex items-center gap-1">
-            <PixelIcon name="lock" className="size-5" />
-            {t("usedBadge")}
-          </span>
-        )}
         <span data-maze-summary className="text-muted flex items-center gap-3">
           <span className="sr-only">
             {t("summary", {
@@ -118,9 +112,6 @@ export function MazeList() {
           </span>
         </span>
 
-        {confirmingId === item.id && item.state === "used" && (
-          <p className="text-muted">{t("deleteUsedHint")}</p>
-        )}
         {confirmingId === item.id ? (
           <span className="flex flex-wrap items-center gap-2">
             <button
