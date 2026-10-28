@@ -12,6 +12,7 @@ import {
 
 import { MazeTile, mazeTileClass } from "~/components/maze-tile";
 import { PixelIcon } from "~/components/pixel-icons";
+import { iconButtonClass, Tooltip } from "~/components/tooltip";
 import { resolveErrorKey } from "~/lib/resolve-error-key";
 import { Link } from "~/components/link";
 import { api } from "~/trpc/react";
@@ -91,10 +92,7 @@ export function MazeList() {
           )}
         />
         {item.state === "concept" && (
-          <span data-concept-badge className="flex flex-col">
-            <span>{t("conceptBadge")}</span>
-            <span className="text-muted">{t("conceptHint")}</span>
-          </span>
+          <span data-concept-badge>{t("conceptBadge")}</span>
         )}
         {item.state === "used" && (
           <span data-used-badge className="text-muted flex items-center gap-1">
@@ -102,11 +100,22 @@ export function MazeList() {
             {t("usedBadge")}
           </span>
         )}
-        <span className="text-muted">
-          {t("summary", {
-            squares: item.cellCount,
-            gates: item.gateCount,
-          })}
+        <span data-maze-summary className="text-muted flex items-center gap-3">
+          <span className="sr-only">
+            {t("summary", {
+              squares: item.cellCount,
+              gates: item.gateCount,
+            })}
+          </span>
+          {/* A square and the gate tool's icon. */}
+          <span aria-hidden="true" className="flex items-center gap-1">
+            <PixelIcon name="square" className="size-5" />
+            {item.cellCount}
+          </span>
+          <span aria-hidden="true" className="flex items-center gap-1">
+            <PixelIcon name="gate" className="size-5" />
+            {item.gateCount}
+          </span>
         </span>
 
         {confirmingId === item.id && item.state === "used" && (
@@ -137,9 +146,10 @@ export function MazeList() {
             type="button"
             aria-label={t("delete", { name: item.name })}
             onClick={() => setConfirmingId(item.id)}
-            className="text-danger self-start underline"
+            className={`${iconButtonClass(false)} self-start`}
           >
-            {t("deleteShort")}
+            <PixelIcon name="trash" className="size-5" />
+            <Tooltip label={t("deleteShort")} />
           </button>
         )}
 
