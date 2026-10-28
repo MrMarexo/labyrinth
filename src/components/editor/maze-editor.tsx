@@ -535,7 +535,7 @@ export function MazeEditor({
   }
 
   return (
-    <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-center lg:gap-8">
+    <div className="flex flex-col gap-6 lg:min-h-0 lg:flex-1 lg:flex-row lg:items-start lg:justify-center lg:gap-8">
       <Board
         draft={state.draft}
         frame={loads}
@@ -554,7 +554,7 @@ export function MazeEditor({
         onStrokeEnd={onStrokeEnd}
       />
 
-      <aside className="space-y-4 lg:w-80 lg:shrink-0 lg:space-y-6">
+      <aside className="space-y-4 lg:max-h-full lg:w-80 lg:shrink-0 lg:space-y-6 lg:overflow-y-auto">
         <ShapeTools
           tool={tool}
           onTool={selectTool}
@@ -588,7 +588,7 @@ export function MazeEditor({
               <button
                 type="button"
                 onClick={() => maybeSend()}
-                className="border-border-strong rounded border px-2 py-1 text-xs"
+                className="border-border-strong pixel border px-2 py-1 text-xs"
               >
                 {t("editor.retry")}
               </button>
@@ -597,7 +597,7 @@ export function MazeEditor({
               <button
                 type="button"
                 onClick={() => window.location.reload()}
-                className="border-border-strong rounded border px-2 py-1 text-xs"
+                className="border-border-strong pixel border px-2 py-1 text-xs"
               >
                 {t("editor.reload")}
               </button>

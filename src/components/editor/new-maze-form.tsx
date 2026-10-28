@@ -52,7 +52,7 @@ export function NewMazeForm() {
           <button
             type="button"
             onClick={() => setOpen(true)}
-            className="bg-accent text-on-accent rounded px-3 py-2 text-sm disabled:opacity-50"
+            className="bg-accent text-on-accent pixel px-3 py-2 text-sm disabled:opacity-50"
           >
             {t("new")}
           </button>
@@ -65,7 +65,7 @@ export function NewMazeForm() {
 
   return (
     <form
-      className="border-border-strong space-y-3 rounded border p-4"
+      className="border-border-strong pixel space-y-3 border p-4"
       onSubmit={(event) => {
         event.preventDefault();
         const data = new FormData(event.currentTarget);
@@ -83,7 +83,7 @@ export function NewMazeForm() {
           name="name"
           required
           maxLength={80}
-          className="border-border-strong bg-bg w-full rounded border px-3 py-2"
+          className="border-border-strong bg-bg pixel w-full border px-3 py-2"
         />
       </label>
 
@@ -113,7 +113,7 @@ export function NewMazeForm() {
       <button
         type="submit"
         disabled={create.isPending || create.isSuccess}
-        className="bg-accent text-on-accent rounded px-3 py-2 text-sm disabled:opacity-50"
+        className="bg-accent text-on-accent pixel px-3 py-2 text-sm disabled:opacity-50"
       >
         {t("create")}
       </button>

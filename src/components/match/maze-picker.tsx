@@ -45,7 +45,7 @@ export function MazePicker({ match, selected, onSelect }: MazePickerProps) {
           }}
           prefetch={false}
           data-continue-concept
-          className="border-border-strong rounded border px-3 py-2 text-sm"
+          className="border-border-strong pixel border px-3 py-2 text-sm"
         >
           {t("continueConcept", { name: unfinished.name })}
         </Link>
@@ -184,7 +184,7 @@ function DrawNew({ match }: { match: MazePickerProps["match"] }) {
             name: t("newMazeName", { code: match.code }),
           });
         }}
-        className="border-border-strong rounded border px-3 py-2 text-sm disabled:opacity-50"
+        className="border-border-strong pixel border px-3 py-2 text-sm disabled:opacity-50"
       >
         {busy ? t("creatingNew") : t("drawNew")}
       </button>

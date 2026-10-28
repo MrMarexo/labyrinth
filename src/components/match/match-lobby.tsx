@@ -144,7 +144,7 @@ export function MatchLobby({ matchId, initialData }: MatchLobbyProps) {
             <button
               type="button"
               onClick={() => setConfirming(true)}
-              className="bg-accent text-on-accent rounded px-3 py-2 text-sm"
+              className="bg-accent text-on-accent pixel px-3 py-2 text-sm"
             >
               {t("submit")}
             </button>

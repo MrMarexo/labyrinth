@@ -323,7 +323,7 @@ export function RunView({
                   type="button"
                   aria-label={t(label as "moveN")}
                   onClick={() => enqueue(dir)}
-                  className={`${area} border-border-strong min-h-11 min-w-11 rounded border text-lg`}
+                  className={`${area} border-border-strong pixel min-h-11 min-w-11 border text-lg`}
                 >
                   <span aria-hidden="true">{arrow}</span>
                 </button>
@@ -338,7 +338,7 @@ export function RunView({
                     type="button"
                     disabled={giveUp.isPending}
                     onClick={() => giveUp.mutate({ matchId })}
-                    className="bg-accent text-on-accent rounded px-3 py-2 text-sm disabled:opacity-50"
+                    className="bg-accent text-on-accent pixel px-3 py-2 text-sm disabled:opacity-50"
                   >
                     {giveUp.isPending ? t("givingUp") : t("giveUpYes")}
                   </button>
@@ -346,7 +346,7 @@ export function RunView({
                     type="button"
                     disabled={giveUp.isPending}
                     onClick={() => setConfirming(false)}
-                    className="border-border-strong rounded border px-3 py-2 text-sm disabled:opacity-50"
+                    className="border-border-strong pixel border px-3 py-2 text-sm disabled:opacity-50"
                   >
                     {t("giveUpNo")}
                   </button>
@@ -356,7 +356,7 @@ export function RunView({
               <button
                 type="button"
                 onClick={() => setConfirming(true)}
-                className="border-border-strong rounded border px-3 py-2 text-sm"
+                className="border-border-strong pixel border px-3 py-2 text-sm"
               >
                 {t("giveUp")}
               </button>

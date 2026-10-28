@@ -134,7 +134,7 @@ export function LobbyAction({
         data-request-state="open"
         disabled={blocked || signingIn || join.isPending}
         onClick={() => void asGuest(() => join.mutate({ matchId }))}
-        className="bg-accent text-on-accent rounded px-3 py-2 text-sm disabled:opacity-50"
+        className="bg-accent text-on-accent pixel px-3 py-2 text-sm disabled:opacity-50"
       >
         {signingIn || join.isPending
           ? tm("joining")
@@ -152,7 +152,7 @@ export function LobbyAction({
           data-request-state="pending"
           disabled={withdraw.isPending}
           onClick={() => withdraw.mutate({ matchId })}
-          className="border-border-strong rounded border px-3 py-2 text-sm disabled:opacity-50"
+          className="border-border-strong pixel border px-3 py-2 text-sm disabled:opacity-50"
         >
           {withdraw.isPending ? t("withdrawing") : t("withdraw")}
         </button>
@@ -164,7 +164,7 @@ export function LobbyAction({
         type="button"
         data-request-state="declined"
         disabled
-        className="border-border-strong text-muted rounded border px-3 py-2 text-sm"
+        className="border-border-strong text-muted pixel border px-3 py-2 text-sm"
       >
         {t("declined")}
       </button>
@@ -176,7 +176,7 @@ export function LobbyAction({
         data-request-state="none"
         disabled={blocked || signingIn || requestJoin.isPending}
         onClick={() => void asGuest(() => requestJoin.mutate({ matchId }))}
-        className="bg-accent text-on-accent rounded px-3 py-2 text-sm disabled:opacity-50"
+        className="bg-accent text-on-accent pixel px-3 py-2 text-sm disabled:opacity-50"
       >
         {signingIn || requestJoin.isPending
           ? t("requesting")

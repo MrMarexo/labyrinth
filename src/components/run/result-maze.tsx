@@ -28,7 +28,7 @@ export function ResultMaze({ maze, path, label, which }: ResultMazeProps) {
         role="img"
         aria-label={label}
         viewBox={mazeViewBox(maze.cells, CELL_PX)}
-        className="border-border-strong h-auto w-full max-w-[560px] rounded border"
+        className="border-border-strong pixel h-auto w-full max-w-[560px] border"
       >
         <MazeDrawing maze={maze} runnerAt={last} />
 

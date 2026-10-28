@@ -57,7 +57,7 @@ export function CurrentMatch() {
     <section
       data-current-match={active.id}
       aria-labelledby="current-match-heading"
-      className="border-accent flex flex-col gap-3 rounded border-2 p-4 sm:flex-row sm:items-center sm:justify-between"
+      className="border-accent pixel flex flex-col gap-3 border-2 p-4 sm:flex-row sm:items-center sm:justify-between"
     >
       <div className="space-y-1">
         <h2 id="current-match-heading" className="text-xl">
@@ -75,7 +75,7 @@ export function CurrentMatch() {
           hover, which would fight the accent fill. */}
       <LocaleLink
         href={`/matches/${active.id}`}
-        className="bg-accent text-on-accent rounded px-3 py-2 text-center text-sm hover:opacity-90"
+        className="bg-accent text-on-accent pixel px-3 py-2 text-center text-sm hover:opacity-90"
       >
         {t("continue")}
       </LocaleLink>

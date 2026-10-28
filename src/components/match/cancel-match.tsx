@@ -43,7 +43,7 @@ export function CancelMatch({
               type="button"
               disabled={cancel.isPending}
               onClick={() => cancel.mutate({ matchId })}
-              className="border-danger text-danger rounded border px-3 py-2 text-sm disabled:opacity-50"
+              className="border-danger text-danger pixel border px-3 py-2 text-sm disabled:opacity-50"
             >
               {cancel.isPending ? t("cancelling") : t("cancelYes")}
             </button>
@@ -51,7 +51,7 @@ export function CancelMatch({
               type="button"
               disabled={cancel.isPending}
               onClick={() => setConfirming(false)}
-              className="border-border-strong rounded border px-3 py-2 text-sm disabled:opacity-50"
+              className="border-border-strong pixel border px-3 py-2 text-sm disabled:opacity-50"
             >
               {t("cancelNo")}
             </button>

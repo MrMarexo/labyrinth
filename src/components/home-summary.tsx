@@ -24,13 +24,13 @@ export function HomeSummary() {
             hover, which would fight the border style. */}
         <LocaleLink
           href="/matches"
-          className="border-border-strong hover:border-fg rounded border px-3 py-2 text-sm"
+          className="border-border-strong hover:border-fg pixel border px-3 py-2 text-sm"
         >
           {t("newMatch")}
         </LocaleLink>
         <LocaleLink
           href="/labyrinths"
-          className="border-border-strong hover:border-fg rounded border px-3 py-2 text-sm"
+          className="border-border-strong hover:border-fg pixel border px-3 py-2 text-sm"
         >
           {t("newLabyrinth")}
         </LocaleLink>
@@ -116,7 +116,7 @@ function StatCard({
   stats: { key: string; label: string; value: number | string }[];
 }) {
   return (
-    <section className="border-border space-y-3 rounded border p-4">
+    <section className="border-border pixel space-y-3 border p-4">
       <h2 className="text-xl">{heading}</h2>
       <dl className="grid grid-cols-[repeat(auto-fit,minmax(5.5rem,1fr))] gap-x-4 gap-y-3">
         {stats.map((s) => (

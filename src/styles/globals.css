@@ -3,6 +3,11 @@
 @theme {
   --font-sans: var(--font-vt323), ui-monospace, monospace;
 
+  /* Lines are one pixel of the icons and the font thick: 2px, the grain of
+     a 10-pixel glyph at 20px and of VT323 at body size. `border` and
+     `divide-*` read this. */
+  --default-border-width: 2px;
+
   /* VT323 draws about two thirds the size of a proportional face at the
      same em, so every step of the scale is raised to read the same. */
   --text-xs: 1.125rem;
@@ -71,6 +76,9 @@
 }
 
 :root {
+  /* The site header's fixed height: the editor fills the screen below it. */
+  --header-h: 3.75rem;
+
   /* Native scrollbars and form controls follow the theme. */
   color-scheme: light;
 
@@ -236,5 +244,92 @@ h2 {
     button::after {
       transition: opacity 100ms ease-out;
     }
+  }
+}
+
+/*
+ * `pixel`: a box with stepped corners, as if drawn in pixels. Each corner
+ * steps in twice; the edges between stay straight. A step is one pixel of
+ * the icons and the font, the same as every border (`--default-border-width`).
+ *
+ * The clip cuts the steps out of the box's own border; `::before`, a copy of
+ * that border one step further in, is masked down to the four pixels that
+ * join each corner's two edges. In the base layer, so `absolute` and `fixed`
+ * still override the `relative`.
+ */
+@layer base {
+  .pixel {
+    --pixel-s: var(--default-border-width);
+    --pixel-s2: calc(2 * var(--pixel-s));
+    position: relative;
+    isolation: isolate;
+    clip-path: polygon(
+      var(--pixel-s2) 0,
+      calc(100% - var(--pixel-s2)) 0,
+      calc(100% - var(--pixel-s2)) var(--pixel-s),
+      calc(100% - var(--pixel-s)) var(--pixel-s),
+      calc(100% - var(--pixel-s)) var(--pixel-s2),
+      100% var(--pixel-s2),
+      100% calc(100% - var(--pixel-s2)),
+      calc(100% - var(--pixel-s)) calc(100% - var(--pixel-s2)),
+      calc(100% - var(--pixel-s)) calc(100% - var(--pixel-s)),
+      calc(100% - var(--pixel-s2)) calc(100% - var(--pixel-s)),
+      calc(100% - var(--pixel-s2)) 100%,
+      var(--pixel-s2) 100%,
+      var(--pixel-s2) calc(100% - var(--pixel-s)),
+      var(--pixel-s) calc(100% - var(--pixel-s)),
+      var(--pixel-s) calc(100% - var(--pixel-s2)),
+      0 calc(100% - var(--pixel-s2)),
+      0 var(--pixel-s2),
+      var(--pixel-s) var(--pixel-s2),
+      var(--pixel-s) var(--pixel-s),
+      var(--pixel-s2) var(--pixel-s)
+    );
+  }
+
+  .pixel::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border: inherit;
+    pointer-events: none;
+    mask:
+      linear-gradient(#000 0 0) top left / var(--pixel-s) var(--pixel-s)
+        no-repeat,
+      linear-gradient(#000 0 0) top right / var(--pixel-s) var(--pixel-s)
+        no-repeat,
+      linear-gradient(#000 0 0) bottom left / var(--pixel-s) var(--pixel-s)
+        no-repeat,
+      linear-gradient(#000 0 0) bottom right / var(--pixel-s) var(--pixel-s)
+        no-repeat;
+  }
+
+  /* No `::before` on these, so nothing could join a stepped corner: one
+     step only. */
+  :is(svg, input, textarea, select).pixel {
+    clip-path: polygon(
+      var(--pixel-s) 0,
+      calc(100% - var(--pixel-s)) 0,
+      calc(100% - var(--pixel-s)) var(--pixel-s),
+      100% var(--pixel-s),
+      100% calc(100% - var(--pixel-s)),
+      calc(100% - var(--pixel-s)) calc(100% - var(--pixel-s)),
+      calc(100% - var(--pixel-s)) 100%,
+      var(--pixel-s) 100%,
+      var(--pixel-s) calc(100% - var(--pixel-s)),
+      0 calc(100% - var(--pixel-s)),
+      0 var(--pixel-s),
+      var(--pixel-s) var(--pixel-s)
+    );
+  }
+
+  /* The focus ring is drawn outside the box, where the clip would hide it. */
+  .pixel:focus-visible {
+    clip-path: none;
+  }
+
+  .pixel:focus-visible::before {
+    display: none;
   }
 }

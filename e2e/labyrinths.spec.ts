@@ -193,7 +193,6 @@ test.describe("concepts", () => {
     await page.goto("/en/labyrinths");
     await createFromForm(page, "Fresh");
     await expect(page.locator("svg[data-board]")).toBeVisible();
-    await expect(page.locator("[data-concept-note]")).toBeVisible();
 
     const save = page.locator("[data-save-concept]");
     await expect(save).toHaveText("Save labyrinth");
@@ -250,6 +249,27 @@ test.describe("concepts", () => {
     await expect(page.getByText("Keep me")).toHaveCount(0);
   });
 
+  test("the editor fits a desktop screen without scrolling", async ({
+    players,
+    isMobile,
+  }) => {
+    test.skip(isMobile, "a phone scrolls down to the panel below the board");
+    const page = await players({ name: "Seed", cellCount: 64, gateCount: 0 });
+    await page.goto("/en/labyrinths");
+    await createFromForm(page, "Fresh");
+    const board = page.locator("svg[data-board]");
+    await expect(board).toBeVisible();
+
+    const viewport = page.viewportSize()!;
+    const box = (await board.boundingBox())!;
+    expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollHeight <= window.innerHeight,
+      ),
+    ).toBe(true);
+  });
+
   test("edits a ready labyrinth through a concept, saved back into it", async ({
     players,
   }) => {
@@ -261,9 +281,6 @@ test.describe("concepts", () => {
 
     await page.getByRole("button", { name: "Edit", exact: true }).click();
     await expect(page.locator("svg[data-board]")).toBeVisible();
-    await expect(page.locator("[data-concept-note]")).toContainText(
-      "changes to Mine",
-    );
     await panToCorner(page);
     // Moves the treasure: still valid.
     await page.getByRole("radio", { name: "Treasure", exact: true }).click();

@@ -16,7 +16,7 @@ export default async function MatchesPage() {
   const member = viewer.kind === "member";
 
   return (
-    <main className="mx-auto max-w-3xl space-y-6 p-8">
+    <main className="mx-auto max-w-5xl space-y-6 p-8">
       <h1 className="text-3xl">{t("title")}</h1>
       <CurrentMatch />
       {member ? <NewMatchForm /> : <SignUpNotice kind="matches" />}

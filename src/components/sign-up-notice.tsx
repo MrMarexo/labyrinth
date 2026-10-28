@@ -20,7 +20,7 @@ export function SignUpNotice({ kind }: { kind: "matches" | "labyrinths" }) {
   return (
     <section
       data-sign-up-notice={kind}
-      className="border-border space-y-3 rounded border p-4"
+      className="border-border pixel space-y-3 border p-4"
     >
       <p>{t("notice")}</p>
       <div className="flex flex-wrap gap-3">

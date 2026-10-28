@@ -251,7 +251,7 @@ function WatchPlayer({
             type="button"
             data-jump-live
             onClick={() => dispatch({ type: "jumpToLive" })}
-            className="border-border-strong min-h-11 rounded border px-3 py-2 text-sm"
+            className="border-border-strong pixel min-h-11 border px-3 py-2 text-sm"
           >
             {t("jumpToLive")}
           </button>
@@ -294,7 +294,7 @@ function WatchPlayer({
         <button
           type="button"
           onClick={() => dispatch({ type: state.playing ? "pause" : "play" })}
-          className="bg-accent text-on-accent min-h-11 min-w-20 rounded px-3 py-2 text-sm"
+          className="bg-accent text-on-accent pixel min-h-11 min-w-20 px-3 py-2 text-sm"
         >
           {state.playing ? t("pause") : t("play")}
         </button>
@@ -378,8 +378,8 @@ function SpeedPicker({
             onKeyDown={handleKeyDown}
             className={
               active
-                ? "bg-accent text-on-accent min-h-11 rounded px-3 py-2 text-sm"
-                : "border-border-strong min-h-11 rounded border px-3 py-2 text-sm"
+                ? "bg-accent text-on-accent pixel min-h-11 px-3 py-2 text-sm"
+                : "border-border-strong pixel min-h-11 border px-3 py-2 text-sm"
             }
           >
             {t("speedOption", { speed: option })}

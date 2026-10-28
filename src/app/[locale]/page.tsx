@@ -8,14 +8,14 @@ import { api } from "~/trpc/server";
 // The plain locale link: the shared `Link` fades its text colour on hover,
 // which would fight the border style.
 const buttonLink =
-  "border-border-strong hover:border-fg rounded border px-3 py-2 text-sm";
+  "border-border-strong hover:border-fg pixel border px-3 py-2 text-sm";
 
 export default async function HomePage() {
   const t = await getTranslations();
   const viewer = await api.viewer.get();
 
   return (
-    <main className="mx-auto max-w-3xl space-y-6 p-8">
+    <main className="mx-auto max-w-5xl space-y-6 p-8">
       <div>
         <h1 className="text-3xl">{t("app.name")}</h1>
         <p className="mt-2">{t("app.tagline")}</p>

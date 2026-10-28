@@ -284,8 +284,6 @@
     "retry": "Retry",
     "useInMatch": "Use in this match",
     "reload": "Reload",
-    "conceptNote": "Concept: autosaved, but not in your labyrinths until you save it.",
-    "conceptOf": "Concept: changes to {name}. The saved labyrinth stays as it was until you save.",
     "saveLabyrinth": "Save labyrinth",
     "savingLabyrinth": "Saving…",
     "saveAtLimit": "You have {limit} labyrinths, the most you can keep. Delete one to save this one."

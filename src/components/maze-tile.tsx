@@ -13,7 +13,7 @@ export function mazeTileClass({
   hoverable = false,
 }: { selected?: boolean; hoverable?: boolean } = {}): string {
   const base =
-    "flex w-40 flex-col gap-2 rounded-lg border-2 p-2 text-left text-sm sm:w-44";
+    "flex w-40 flex-col gap-2 pixel border-2 p-2 text-left text-sm sm:w-44";
   if (selected) return `${base} border-accent`;
   return hoverable
     ? `${base} border-border hover:border-border-strong`
@@ -44,7 +44,7 @@ export function MazeTile({
         maze ? (
           <MazePreview maze={maze} />
         ) : (
-          <div className="bg-cell-void aspect-square w-full rounded" />
+          <div className="bg-cell-void pixel aspect-square w-full" />
         ),
       )}
       {children}

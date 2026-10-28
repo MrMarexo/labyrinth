@@ -67,7 +67,7 @@ function ReplaceConcept({
       aria-modal="true"
       aria-labelledby={titleId}
       onClose={onKeep}
-      className="bg-bg text-fg border-border-strong backdrop:bg-fg/40 m-auto w-[min(24rem,calc(100vw-2rem))] space-y-4 rounded border p-6"
+      className="bg-bg text-fg border-border-strong backdrop:bg-fg/40 pixel m-auto w-[min(24rem,calc(100vw-2rem))] space-y-4 border p-6"
     >
       <h2 id={titleId} className="text-xl">
         {t("replaceTitle")}
@@ -77,14 +77,14 @@ function ReplaceConcept({
         <button
           type="button"
           onClick={onConfirm}
-          className="border-danger text-danger rounded border px-3 py-2 text-sm"
+          className="border-danger text-danger pixel border px-3 py-2 text-sm"
         >
           {t("replaceConfirm")}
         </button>
         <button
           type="button"
           onClick={() => ref.current?.close()}
-          className="border-border-strong rounded border px-3 py-2 text-sm"
+          className="border-border-strong pixel border px-3 py-2 text-sm"
         >
           {t("replaceCancel")}
         </button>

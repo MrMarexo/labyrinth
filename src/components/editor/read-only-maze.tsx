@@ -52,12 +52,12 @@ export function ReadOnlyMaze({
           role="img"
           aria-label={name}
           viewBox={mazeViewBox(maze.cells, CELL_PX)}
-          className="border-border-strong bg-cell-void h-auto w-full max-w-[560px] rounded border"
+          className="border-border-strong bg-cell-void pixel h-auto w-full max-w-[560px] border"
         >
           <MazeDrawing maze={maze} />
         </svg>
       ) : (
-        <div className="bg-cell-void aspect-square w-full max-w-[560px] rounded" />
+        <div className="bg-cell-void pixel aspect-square w-full max-w-[560px]" />
       )}
       <Link href="/labyrinths" className="inline-block text-sm">
         {t("backToList")}
@@ -106,7 +106,7 @@ function EditMaze({
             copyName: t("editOfName", { name }).slice(0, 80),
           })
         }
-        className="bg-accent text-on-accent rounded px-3 py-2 text-sm disabled:opacity-50"
+        className="bg-accent text-on-accent pixel px-3 py-2 text-sm disabled:opacity-50"
       >
         {busy ? t("editing") : used ? t("editCopy") : t("edit")}
       </button>
