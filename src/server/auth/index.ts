@@ -10,6 +10,7 @@ import { cache } from "react";
 import { env } from "~/env";
 import { MIN_PASSWORD_LENGTH } from "~/lib/password";
 import { db } from "~/server/db";
+import { linkGuest, removeLinkedGuest } from "~/server/guest/link";
 import { servingLoopback } from "~/server/env-guards";
 
 // The rate limiter may only be switched off for a local end-to-end run.
@@ -66,7 +67,9 @@ export const auth = betterAuth({
     updateAge: 60 * 60 * 24,
     // A signed copy of the session in a cookie, so a request (every move)
     // skips the session query. A revoked session lives on in it for up to
-    // maxAge; nothing reads more than `session.user.id` from it.
+    // maxAge, and so does its user's `isAnonymous`. That is safe because a
+    // guest never becomes a member in place: linking signs in as another
+    // user, whose new session gets a cache of its own.
     cookieCache: { enabled: true, maxAge: 5 * 60 },
   },
   // Writes the cache cookie that `getSession` refreshes back onto the
@@ -75,7 +78,19 @@ export const auth = betterAuth({
   plugins: [
     anonymous({
       generateName: () => String(1000 + randomInt(9000)),
+      // The plugin would delete the guest itself, cascading away a seat
+      // linking had to leave behind; `removeLinkedGuest` deletes it only
+      // once it holds no seat.
       disableDeleteAnonymousUser: true,
+      // Runs once the new session exists. Not caught: a failed link fails
+      // the request, where it shows in the logs.
+      onLinkAccount: async ({ anonymousUser, newUser }) => {
+        const guestId = anonymousUser.user.id;
+        const accountId = newUser.user.id;
+        if (accountId === guestId || newUser.user.isAnonymous) return;
+        const { keepGuest } = await linkGuest(db, { guestId, accountId });
+        if (!keepGuest) await removeLinkedGuest(db, guestId);
+      },
     }),
     nextCookies(),
   ],
