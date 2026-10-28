@@ -17,6 +17,27 @@ type PlayerOptions = {
 };
 
 /**
+ * Seeds a valid labyrinth owned by whoever `page` is signed in as, member or
+ * guest, through the app's own session so the maze belongs to them.
+ */
+export async function seedMaze(
+  page: Page,
+  options: Omit<PlayerOptions, never>,
+): Promise<void> {
+  await page.goto("/en/matches");
+  const seeded = await page.evaluate<unknown, typeof options>(async (input) => {
+    const response = await fetch("/api/trpc/testSupport.seedMaze", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ json: input }),
+    });
+    if (!response.ok) throw new Error(`seed failed: ${response.status}`);
+    return (await response.json()) as unknown;
+  }, options);
+  expect(seeded).toBeTruthy();
+}
+
+/**
  * A signed-in page with a valid labyrinth already seeded at the given size.
  *
  * The maze is seeded through `testSupport.seedMaze` rather than drawn,
@@ -61,18 +82,7 @@ async function playerWithMaze(
   await signUpRequest.dispose();
   const page = await context.newPage();
 
-  // Seed through the app's own session so the maze belongs to this player.
-  await page.goto("/en/matches");
-  const seeded = await page.evaluate<unknown, typeof options>(async (input) => {
-    const response = await fetch("/api/trpc/testSupport.seedMaze", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ json: input }),
-    });
-    if (!response.ok) throw new Error(`seed failed: ${response.status}`);
-    return (await response.json()) as unknown;
-  }, options);
-  expect(seeded).toBeTruthy();
+  await seedMaze(page, options);
 
   return page;
 }
@@ -141,4 +151,18 @@ export async function joinMatch(guest: Page, matchId: string): Promise<void> {
   await guest.goto(`/en/matches/${matchId}/join`);
   await guest.getByRole("button", { name: "Join", exact: true }).click();
   await expect(guest).toHaveURL(new RegExp(`/en/matches/${matchId}$`));
+}
+
+/**
+ * Opens a match's join page as a visitor, joins as a guest, and waits to be
+ * seated. The visitor's first join signs them in anonymously.
+ */
+export async function joinAsGuest(
+  visitor: Page,
+  matchId: string,
+): Promise<void> {
+  await visitor.goto(`/en/matches/${matchId}/join`);
+  // Reads "Join" once the visitor already is a guest.
+  await visitor.getByRole("button", { name: /^Join( as guest)?$/ }).click();
+  await expect(visitor).toHaveURL(new RegExp(`/en/matches/${matchId}$`));
 }
