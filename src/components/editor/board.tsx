@@ -37,6 +37,13 @@ import {
   StartIcon,
   TreasureIcon,
 } from "~/components/maze-icons";
+import {
+  pixelWalls,
+  TILE_CHIP,
+  TILE_GAP,
+  tilesPath,
+  WALL_WIDTH,
+} from "~/components/pixel-geometry";
 import { PixelIcon } from "~/components/pixel-icons";
 import {
   clampCamera,
@@ -910,12 +917,8 @@ export function Board({
           y={at.y * CELL_PX}
           width={CELL_PX}
           height={CELL_PX}
-          className={
-            painted.has(key)
-              ? "fill-cell-painted stroke-grid-line outline-none"
-              : "fill-cell-void stroke-grid-line outline-none"
-          }
-          strokeWidth={1}
+          // The grid between the tiles: the shape layer draws the tiles.
+          className="fill-grid-line outline-none"
           onKeyDown={(event) => live.current.handleCellKeyDown(event, at)}
           onFocus={(event) => {
             setFocusedCell(at);
@@ -929,9 +932,33 @@ export function Board({
     });
   }, [draft, painted, keyGateAt, focusedCell, t]);
 
-  const shapeLayer = useMemo(
-    () => (
+  const shapeLayer = useMemo(() => {
+    const outline = outlineEdges(draft.cells);
+    const walls = pixelWalls(
+      [...outline, ...draft.segments.filter((s) => s.kind !== "gate")],
+      CELL_PX,
+      WALL_WIDTH,
+    );
+    const paintedKeys = new Set(draft.cells.map(cellKey));
+    return (
       <>
+        <path
+          aria-hidden="true"
+          pointerEvents="none"
+          d={tilesPath(draft.cells, CELL_PX, TILE_GAP, TILE_CHIP)}
+          className="fill-cell-painted"
+        />
+        <path
+          aria-hidden="true"
+          pointerEvents="none"
+          d={tilesPath(
+            ALL_CELLS.filter((c) => !paintedKeys.has(cellKey(c))),
+            CELL_PX,
+            TILE_GAP,
+            TILE_CHIP,
+          )}
+          className="fill-cell-void"
+        />
         {draft.start && (
           <StartIcon
             data-start
@@ -965,14 +992,14 @@ export function Board({
         ))}
 
         {/* The shape's own border: implicit walls (spec §2.3), never stored. */}
-        {outlineEdges(draft.cells).map((edge) => (
+        {outline.map((edge) => (
           <line
             key={`outline-${edgeKey(edge)}`}
             data-outline={edgeKey(edge)}
             aria-hidden="true"
             pointerEvents="none"
-            {...edgeLine(edge)}
-            strokeWidth={4}
+            {...walls.line(edge)}
+            strokeWidth={WALL_WIDTH}
             strokeLinecap="square"
             className="stroke-wall"
           />
@@ -998,17 +1025,25 @@ export function Board({
               data-segment={edgeKey(segment)}
               aria-hidden="true"
               pointerEvents="none"
-              {...edgeLine(segment)}
-              strokeWidth={4}
+              {...walls.line(segment)}
+              strokeWidth={WALL_WIDTH}
               strokeLinecap="square"
               className="stroke-wall"
             />
           );
         })}
+        {walls.corners.map((pixel) => (
+          <rect
+            key={`corner-${pixel.x},${pixel.y}`}
+            aria-hidden="true"
+            pointerEvents="none"
+            {...pixel}
+            className="fill-wall"
+          />
+        ))}
       </>
-    ),
-    [draft],
-  );
+    );
+  }, [draft]);
 
   const edgeLayer = useMemo(() => {
     if (!edgesActive) return null;
@@ -1061,11 +1096,11 @@ export function Board({
     // The space the board fills. On a phone the full width, and as tall as
     // that or the screen, whichever is less: a square upright, a wide strip
     // on its side. On a desktop everything beside the panel and below the
-    // title, capped so a very wide or very tall monitor does not get a
-    // giant board.
+    // title (the page is the screen's height), capped so a very wide or very
+    // tall monitor does not get a giant board.
     <div
       ref={boxRef}
-      className="h-[min(calc(100vw-2rem),calc(100dvh-2rem))] w-full min-w-0 lg:h-[min(calc(100dvh-11rem),60rem)] lg:max-w-[100rem] lg:flex-1"
+      className="h-[min(calc(100vw-2rem),calc(100dvh-2rem))] w-full min-w-0 lg:h-full lg:max-h-[60rem] lg:max-w-[100rem] lg:flex-1"
     >
       <svg
         ref={svgRef}
@@ -1078,7 +1113,7 @@ export function Board({
         // touch-none: a swipe draws instead of scrolling the page. The board
         // already fits the width, so losing pinch-zoom on it costs little.
         className={cn(
-          "border-border-strong block h-full w-full touch-none rounded border select-none",
+          "border-border-strong pixel block h-full w-full touch-none border select-none",
           panning ? "cursor-grabbing" : tool === "move" && "cursor-grab",
         )}
         onContextMenu={(event) => event.preventDefault()}

@@ -54,7 +54,7 @@ export function SaveConcept({
         onClick={() =>
           save.mutate({ id: conceptId, expectedVersion: version() })
         }
-        className="bg-accent text-on-accent rounded px-3 py-2 text-sm disabled:opacity-50"
+        className="bg-accent text-on-accent pixel px-3 py-2 text-sm disabled:opacity-50"
       >
         {pending ? t("savingLabyrinth") : t("saveLabyrinth")}
       </button>

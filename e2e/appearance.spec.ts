@@ -188,5 +188,22 @@ test.describe("editor palette", () => {
     await gate.hover();
     await expect(tooltip).toHaveText("Gate");
     await expect(tooltip).toHaveCSS("opacity", "1");
+
+    // In the top layer: a disabled, half-transparent button neither fades
+    // its label nor lets the text above draw over it.
+    const undo = page.getByRole("button", { name: "Undo", exact: true });
+    await expect(undo).toBeDisabled();
+    await undo.hover();
+    const undoTip = undo.locator("[data-tooltip]");
+    await expect(undoTip).toHaveCSS("opacity", "1");
+    expect(await undoTip.evaluate((el) => el.matches(":popover-open"))).toBe(
+      true,
+    );
+    const tip = (await undoTip.boundingBox())!;
+    const button = (await undo.boundingBox())!;
+    expect(tip.y + tip.height).toBeLessThanOrEqual(button.y);
+    expect(
+      Math.abs(tip.x + tip.width / 2 - (button.x + button.width / 2)),
+    ).toBeLessThan(1);
   });
 });

@@ -17,6 +17,13 @@ import {
   StartIcon,
   TreasureIcon,
 } from "~/components/maze-icons";
+import {
+  pixelWalls,
+  TILE_CHIP,
+  TILE_GAP,
+  tilesPath,
+  WALL_WIDTH,
+} from "~/components/pixel-geometry";
 import { useReducedMotion } from "~/components/use-reduced-motion";
 import {
   capturePointer,
@@ -355,6 +362,12 @@ export function RunBoard({ map, at, heldKeys, bump, lean }: RunBoardProps) {
 
   const pulsing = usePulse(bump?.id ?? null);
 
+  const walls = pixelWalls(
+    map.segments.filter((s) => s.kind !== "gate"),
+    CELL_PX,
+    WALL_WIDTH,
+  );
+
   const drawSegment = (
     segment: RevealedSegment,
     key: string,
@@ -378,7 +391,8 @@ export function RunBoard({ map, at, heldKeys, bump, lean }: RunBoardProps) {
         key={key}
         data-run-segment={extra.hook ? edgeKey(segment) : undefined}
         aria-hidden="true"
-        {...edgeLine(segment)}
+        // The bump's thick copy stays straight: it swells the whole wall.
+        {...(extra.hook ? walls.line(segment) : edgeLine(segment))}
         strokeWidth={extra.strokeWidth}
         strokeLinecap="square"
         className="stroke-wall"
@@ -404,7 +418,7 @@ export function RunBoard({ map, at, heldKeys, bump, lean }: RunBoardProps) {
       className={cn(
         // The void is the element's own background, not a rect in the
         // drawing: it then covers whatever the viewBox shows, mid-pan too.
-        "border-border-strong bg-cell-void aspect-square h-auto w-full max-w-[700px] rounded border",
+        "border-border-strong bg-cell-void pixel aspect-square h-auto w-full max-w-[700px] border",
         capped && "touch-none select-none",
         capped && (panning ? "cursor-grabbing" : "cursor-grab"),
       )}
@@ -422,7 +436,11 @@ export function RunBoard({ map, at, heldKeys, bump, lean }: RunBoardProps) {
             y={c.y * CELL_PX}
             width={CELL_PX}
             height={CELL_PX}
-            className="fill-cell-painted stroke-grid-line"
+            className="fill-grid-line"
+          />
+          <path
+            d={tilesPath([c], CELL_PX, TILE_GAP, TILE_CHIP)}
+            className="fill-cell-painted"
           />
           {/* Standing on a cell is what reveals it, so a drawn treasure has
               been reached and a drawn key has been picked up. */}
@@ -472,8 +490,19 @@ export function RunBoard({ map, at, heldKeys, bump, lean }: RunBoardProps) {
       ))}
 
       {map.segments.map((s) =>
-        drawSegment(s, `seg-${edgeKey(s)}`, { strokeWidth: 4, hook: true }),
+        drawSegment(s, `seg-${edgeKey(s)}`, {
+          strokeWidth: WALL_WIDTH,
+          hook: true,
+        }),
       )}
+      {walls.corners.map((pixel) => (
+        <rect
+          key={`corner-${pixel.x},${pixel.y}`}
+          aria-hidden="true"
+          {...pixel}
+          className="fill-wall"
+        />
+      ))}
 
       {/* Only while pulsing: left on, the thick copy would keep the wall
           swollen until the next bump. */}

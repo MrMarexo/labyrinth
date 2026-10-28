@@ -66,7 +66,7 @@ export function SiteMenu({
         aria-expanded={open}
         aria-controls={panelId}
         onClick={() => setOpen((was) => !was)}
-        className="border-border-strong flex size-9 items-center justify-center rounded border"
+        className="border-border-strong pixel flex size-9 items-center justify-center border"
       >
         <PixelIcon name="menu" className="size-5" />
       </button>

@@ -32,7 +32,7 @@ export function ConfirmUse({
           type="button"
           disabled={pending || !ready}
           onClick={onConfirm}
-          className="bg-accent text-on-accent rounded px-3 py-2 text-sm disabled:opacity-50"
+          className="bg-accent text-on-accent pixel px-3 py-2 text-sm disabled:opacity-50"
         >
           {pending ? t("submitting") : t("confirmYes")}
         </button>
@@ -40,7 +40,7 @@ export function ConfirmUse({
           type="button"
           disabled={pending}
           onClick={onCancel}
-          className="border-border-strong rounded border px-3 py-2 text-sm disabled:opacity-50"
+          className="border-border-strong pixel border px-3 py-2 text-sm disabled:opacity-50"
         >
           {t("confirmNo")}
         </button>

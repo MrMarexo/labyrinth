@@ -284,8 +284,6 @@
     "retry": "Skúsiť znova",
     "useInMatch": "Použiť v tomto zápase",
     "reload": "Načítať znova",
-    "conceptNote": "Koncept: ukladá sa priebežne, ale medzi vaše bludiská sa dostane, až keď ho uložíte.",
-    "conceptOf": "Koncept: zmeny bludiska {name}. Uložené bludisko zostane, aké bolo, kým koncept neuložíte.",
     "saveLabyrinth": "Uložiť bludisko",
     "savingLabyrinth": "Ukladá sa…",
     "saveAtLimit": "Máte {limit} bludísk, viac ich mať nemôžete. Ak chcete uložiť toto, jedno zmažte."

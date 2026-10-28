@@ -379,7 +379,10 @@ test.describe("the labyrinths list", () => {
     // the shape's outline.
     const preview = tile.locator("svg[data-maze-preview]");
     await expect(preview).toHaveAttribute("aria-hidden", "true");
-    await expect(preview.locator("rect")).toHaveCount(3);
+    await expect(preview.locator("[data-squares]")).toHaveAttribute(
+      "data-squares",
+      "3",
+    );
     await expect(preview.locator("[data-outline]")).toHaveCount(8);
 
     // Name above the preview, and both open the labyrinth.

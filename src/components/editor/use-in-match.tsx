@@ -51,7 +51,7 @@ export function UseInMatch({
         data-use-in-match
         disabled={!ready || pending}
         onClick={() => submit.mutate({ matchId: match.id, mazeId })}
-        className="bg-accent text-on-accent rounded px-3 py-2 text-sm disabled:opacity-50"
+        className="bg-accent text-on-accent pixel px-3 py-2 text-sm disabled:opacity-50"
       >
         {pending ? tl("submitting") : t("useInMatch")}
       </button>

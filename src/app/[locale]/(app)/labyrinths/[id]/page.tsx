@@ -1,5 +1,4 @@
 import { notFound } from "next/navigation";
-import { getTranslations } from "next-intl/server";
 
 import { MazeEditor } from "~/components/editor/maze-editor";
 import { ReadOnlyMaze } from "~/components/editor/read-only-maze";
@@ -16,7 +15,6 @@ export default async function EditorPage({
   searchParams: Promise<{ match?: string | string[] }>;
 }) {
   const { id } = await params;
-  const t = await getTranslations("editor");
   const { match: matchId } = await searchParams;
 
   const row = await api.maze.get({ id }).catch(() => null);
@@ -26,7 +24,7 @@ export default async function EditorPage({
   // match, opened from it, is theirs to see.
   const guest = (await api.viewer.get()).kind === "guest";
   const guestNotice = (
-    <main className="mx-auto max-w-3xl p-8">
+    <main className="mx-auto max-w-5xl p-8">
       <SignUpNotice kind="labyrinths" />
     </main>
   );
@@ -51,8 +49,8 @@ export default async function EditorPage({
     );
   }
 
-  // The labyrinth this concept saves back into, named in its note. Gone or
-  // used since, the concept saves on its own, and the note says nothing.
+  // The labyrinth this concept saves back into. Gone or used since, the
+  // concept saves on its own.
   const source = row.sourceId
     ? await api.maze.get({ id: row.sourceId }).catch(() => null)
     : null;
@@ -72,14 +70,10 @@ export default async function EditorPage({
   if (guest && !forMatch) return guestNotice;
 
   return (
-    // Wide, unlike the other pages: the board grows to fill the screen.
-    <main className="mx-auto max-w-[120rem] space-y-6 px-4 py-6 lg:px-8">
-      <div className="space-y-1">
-        <h1 className="text-2xl">{row.name}</h1>
-        <p data-concept-note className="text-muted text-sm">
-          {sourceName ? t("conceptOf", { name: sourceName }) : t("conceptNote")}
-        </p>
-      </div>
+    // Wide, unlike the other pages: the board grows to fill the screen. On a
+    // desktop exactly the screen below the header, so it never scrolls.
+    <main className="mx-auto flex max-w-[120rem] flex-col gap-4 px-4 py-6 lg:h-[calc(100dvh-var(--header-h))] lg:px-8">
+      <h1 className="shrink-0 text-2xl">{row.name}</h1>
       <MazeEditor
         id={row.id}
         initial={parsed.data}

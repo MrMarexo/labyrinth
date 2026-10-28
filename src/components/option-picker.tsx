@@ -46,8 +46,8 @@ export function OptionPicker<T extends number | string>({
         className="flex flex-wrap gap-2"
         buttonClass={(active) =>
           active
-            ? "bg-accent text-on-accent border-accent min-w-10 rounded border px-3 py-2 text-sm"
-            : "border-border-strong min-w-10 rounded border px-3 py-2 text-sm disabled:opacity-50"
+            ? "bg-accent text-on-accent border-accent min-w-10 pixel border px-3 py-2 text-sm"
+            : "border-border-strong min-w-10 pixel border px-3 py-2 text-sm disabled:opacity-50"
         }
       />
     </div>

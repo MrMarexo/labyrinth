@@ -5,6 +5,14 @@ import {
   StartIcon,
   TreasureIcon,
 } from "~/components/maze-icons";
+import {
+  pixelWalls,
+  squaresPath,
+  TILE_CHIP,
+  TILE_GAP,
+  tilesPath,
+  WALL_WIDTH,
+} from "~/components/pixel-geometry";
 import { mazeViewBox } from "~/lib/maze-view-box";
 import {
   edgeKey,
@@ -55,19 +63,21 @@ export function MazeDrawing({
   const under = (p: Point | null) =>
     runnerAt !== undefined && p?.x === runnerAt.x && p.y === runnerAt.y;
 
+  const outline = outlineEdges(maze.cells);
+  const walls = pixelWalls(
+    [...outline, ...maze.segments.filter((s) => s.kind !== "gate")],
+    CELL_PX,
+    WALL_WIDTH,
+  );
+
   return (
     <>
-      {maze.cells.map((c) => (
-        <rect
-          key={`${c.x},${c.y}`}
-          x={c.x * CELL_PX}
-          y={c.y * CELL_PX}
-          width={CELL_PX}
-          height={CELL_PX}
-          className="fill-cell-painted stroke-grid-line"
-          strokeWidth={1}
-        />
-      ))}
+      <path d={squaresPath(maze.cells, CELL_PX)} className="fill-grid-line" />
+      <path
+        data-squares={maze.cells.length}
+        d={tilesPath(maze.cells, CELL_PX, TILE_GAP, TILE_CHIP)}
+        className="fill-cell-painted"
+      />
 
       {maze.start && (
         <StartIcon
@@ -99,12 +109,12 @@ export function MazeDrawing({
       ))}
 
       {/* The shape's own border: implicit walls (spec §2.3), never stored. */}
-      {outlineEdges(maze.cells).map((edge) => (
+      {outline.map((edge) => (
         <line
           key={`outline-${edgeKey(edge)}`}
           data-outline={edgeKey(edge)}
-          {...edgeLine(edge)}
-          strokeWidth={4}
+          {...walls.line(edge)}
+          strokeWidth={WALL_WIDTH}
           strokeLinecap="square"
           className="stroke-wall"
         />
@@ -120,13 +130,16 @@ export function MazeDrawing({
         ) : (
           <line
             key={`seg-${edgeKey(s)}`}
-            {...edgeLine(s)}
-            strokeWidth={4}
+            {...walls.line(s)}
+            strokeWidth={WALL_WIDTH}
             strokeLinecap="square"
             className="stroke-wall"
           />
         ),
       )}
+      {walls.corners.map((pixel) => (
+        <rect key={`${pixel.x},${pixel.y}`} {...pixel} className="fill-wall" />
+      ))}
     </>
   );
 }
@@ -141,7 +154,7 @@ export function MazePreview({ maze }: { maze: DrawableMaze }) {
       data-maze-preview
       aria-hidden="true"
       viewBox={mazeViewBox(maze.cells, CELL_PX)}
-      className="bg-cell-void aspect-square w-full rounded"
+      className="bg-cell-void pixel aspect-square w-full"
     >
       <MazeDrawing maze={maze} />
     </svg>

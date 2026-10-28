@@ -43,7 +43,7 @@ export function FinishPopup({
       aria-modal="true"
       aria-labelledby={titleId}
       onClose={onClose}
-      className="bg-bg text-fg border-border-strong backdrop:bg-fg/40 m-auto w-[min(24rem,calc(100vw-2rem))] space-y-4 rounded border p-6"
+      className="bg-bg text-fg border-border-strong backdrop:bg-fg/40 pixel m-auto w-[min(24rem,calc(100vw-2rem))] space-y-4 border p-6"
     >
       <h2 id={titleId} className="text-2xl">
         {t("finishTitle")}
@@ -67,7 +67,7 @@ export function FinishPopup({
             type="button"
             autoFocus
             onClick={() => ref.current?.close()}
-            className="bg-accent text-on-accent min-h-11 rounded px-3 py-2 text-sm"
+            className="bg-accent text-on-accent pixel min-h-11 px-3 py-2 text-sm"
           >
             {t("finishSeeResult")}
           </button>
@@ -84,7 +84,7 @@ export function FinishPopup({
           type="button"
           autoFocus={!ready}
           onClick={() => ref.current?.close()}
-          className="border-border-strong min-h-11 rounded border px-3 py-2 text-sm"
+          className="border-border-strong pixel min-h-11 border px-3 py-2 text-sm"
         >
           {t("finishClose")}
         </button>

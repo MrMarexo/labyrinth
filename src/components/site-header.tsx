@@ -13,7 +13,7 @@ export async function SiteHeader() {
   const member = session && !guest ? session.user : null;
 
   return (
-    <header className="border-border flex items-center justify-between border-b px-4 py-3">
+    <header className="border-border flex h-(--header-h) items-center justify-between border-b px-4">
       <Link href="/" className="tracking-wider uppercase">
         {t("app.name")}
       </Link>

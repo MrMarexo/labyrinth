@@ -36,7 +36,7 @@ export default async function JoinPage({
   const t = await getTranslations("lobby");
 
   return (
-    <main className="mx-auto max-w-3xl space-y-6 p-8">
+    <main className="mx-auto max-w-5xl space-y-6 p-8">
       <h1 className="text-3xl">{t("joinTitle")}</h1>
       {preview ? (
         <JoinPreview

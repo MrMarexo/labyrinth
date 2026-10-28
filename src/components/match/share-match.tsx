@@ -57,7 +57,7 @@ export function ShareMatch({ matchId }: { matchId: string }) {
         type="button"
         data-share-match
         onClick={() => void share()}
-        className="bg-accent text-on-accent rounded px-3 py-2 text-sm"
+        className="bg-accent text-on-accent pixel px-3 py-2 text-sm"
       >
         {t("share")}
       </button>

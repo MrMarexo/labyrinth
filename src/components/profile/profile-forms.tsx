@@ -9,9 +9,9 @@ import { resolveErrorKey } from "~/lib/resolve-error-key";
 import { api } from "~/trpc/react";
 
 const INPUT_CLASS =
-  "border-border-strong bg-bg w-full rounded border px-3 py-2 aria-[invalid=true]:border-danger";
+  "border-border-strong bg-bg w-full pixel border px-3 py-2 aria-[invalid=true]:border-danger";
 const SUBMIT_CLASS =
-  "bg-accent text-on-accent rounded px-3 py-2 text-sm disabled:opacity-50";
+  "bg-accent text-on-accent pixel px-3 py-2 text-sm disabled:opacity-50";
 
 function textField(data: FormData, name: string): string {
   const value = data.get(name);

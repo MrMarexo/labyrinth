@@ -67,7 +67,7 @@ function validate(
 }
 
 const INPUT_CLASS =
-  "border-border-strong bg-bg w-full rounded border px-3 py-2 aria-[invalid=true]:border-danger";
+  "border-border-strong bg-bg w-full pixel border px-3 py-2 aria-[invalid=true]:border-danger";
 
 function EyeIcon({ crossed }: { crossed: boolean }) {
   return <PixelIcon name={crossed ? "eye-off" : "eye"} className="size-5" />;
@@ -274,7 +274,7 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
       <button
         type="submit"
         disabled={pending}
-        className="bg-accent text-on-accent w-full rounded px-3 py-2 disabled:opacity-50"
+        className="bg-accent text-on-accent pixel w-full px-3 py-2 disabled:opacity-50"
       >
         {mode === "sign-up" ? t("signUpSubmit") : t("signInSubmit")}
       </button>

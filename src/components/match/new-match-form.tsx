@@ -36,7 +36,7 @@ export function NewMatchForm() {
     return (
       <div
         data-already-waiting
-        className="border-border-strong space-y-2 rounded border p-4"
+        className="border-border-strong pixel space-y-2 border p-4"
       >
         <h2 className="text-xl">{t("createHeading")}</h2>
         <p className="text-sm">{t("alreadyWaiting")}</p>
@@ -50,7 +50,7 @@ export function NewMatchForm() {
     return (
       <div
         data-already-active
-        className="border-border-strong space-y-2 rounded border p-4"
+        className="border-border-strong pixel space-y-2 border p-4"
       >
         <h2 className="text-xl">{t("createHeading")}</h2>
         <p className="text-sm">{t("alreadyActive")}</p>
@@ -81,7 +81,7 @@ function CreateMatchForm() {
 
   return (
     <form
-      className="border-border-strong space-y-3 rounded border p-4"
+      className="border-border-strong pixel space-y-3 border p-4"
       onSubmit={(event) => {
         event.preventDefault();
         create.mutate({ cellCount, gateCount, access });
@@ -143,7 +143,7 @@ function CreateMatchForm() {
       <button
         type="submit"
         disabled={create.isPending}
-        className="bg-accent text-on-accent rounded px-3 py-2 text-sm disabled:opacity-50"
+        className="bg-accent text-on-accent pixel px-3 py-2 text-sm disabled:opacity-50"
       >
         {create.isPending ? t("creating") : t("create")}
       </button>
