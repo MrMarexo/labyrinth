@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import { getTranslations } from "next-intl/server";
 
+import { AuthLinks } from "~/components/auth-links";
 import { Link } from "~/components/link";
 import { SiteMenu } from "~/components/site-menu";
 import { getSession } from "~/server/auth";
@@ -35,16 +36,7 @@ export async function SiteHeader() {
             {t("players.guestName", { number: guest.name })}
           </span>
         )}
-        {!member && (
-          <>
-            <Link href="/sign-in" className="text-sm">
-              {t("nav.signIn")}
-            </Link>
-            <Link href="/sign-up" className="text-sm">
-              {t("nav.signUp")}
-            </Link>
-          </>
-        )}
+        {!member && <AuthLinks />}
         <SiteMenu viewer={member ? "member" : guest ? "guest" : "visitor"} />
       </div>
     </header>

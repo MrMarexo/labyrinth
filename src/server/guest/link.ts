@@ -29,12 +29,13 @@ const accountRequest = alias(matchRequest, "account_request");
  *
  * A match the account already sits in cannot take a second seat, so it stays
  * with the guest, along with the mazes it uses, and `keepGuest` says the
- * guest row must survive to hold it.
+ * guest row must survive to hold it. `changedMatchIds` names the matches
+ * whose seats or requests moved, for the caller to publish once this commits.
  */
 export async function linkGuest(
   db: typeof Database,
   { guestId, accountId }: { guestId: string; accountId: string },
-): Promise<{ keepGuest: boolean }> {
+): Promise<{ keepGuest: boolean; changedMatchIds: string[] }> {
   return db.transaction(async (tx) => {
     await lockAuthor(tx, accountId);
     await lockAuthor(tx, guestId);
@@ -129,10 +130,11 @@ export async function linkGuest(
           ),
         ),
       );
-    await tx
+    const movedRequests = await tx
       .update(matchRequest)
       .set({ userId: accountId })
-      .where(eq(matchRequest.userId, guestId));
+      .where(eq(matchRequest.userId, guestId))
+      .returning({ matchId: matchRequest.matchId });
 
     // Only one concept per author. The guest's wins while it is the drawing
     // for a match that just moved; the account's is then kept in its
@@ -168,7 +170,12 @@ export async function linkGuest(
         ),
       );
 
-    return { keepGuest: colliding.size > 0 };
+    return {
+      keepGuest: colliding.size > 0,
+      changedMatchIds: [
+        ...new Set([...movingIds, ...movedRequests.map((r) => r.matchId)]),
+      ],
+    };
   });
 }
 

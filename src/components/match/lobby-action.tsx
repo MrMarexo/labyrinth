@@ -85,7 +85,13 @@ export function LobbyAction({
   // there is no window in which a guest reads as a visitor.
   const asGuest = async (mutate: () => void) => {
     setSignInFailed(false);
-    const current = await utils.viewer.get.fetch();
+    let current;
+    try {
+      current = await utils.viewer.get.fetch();
+    } catch {
+      setSignInFailed(true);
+      return;
+    }
     if (current.kind === "visitor") {
       setSigningIn(true);
       const { data, error } = await signIn.anonymous();

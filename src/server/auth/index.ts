@@ -12,6 +12,7 @@ import { MIN_PASSWORD_LENGTH } from "~/lib/password";
 import { db } from "~/server/db";
 import { linkGuest, removeLinkedGuest } from "~/server/guest/link";
 import { servingLoopback } from "~/server/env-guards";
+import { publishMatchChanged } from "~/server/realtime/events";
 
 // The rate limiter may only be switched off for a local end-to-end run.
 // Three independent conditions must all hold: the flag is explicitly set,
@@ -54,6 +55,9 @@ export const auth = betterAuth({
   // Better Auth's rate limiter caps /sign-up and /sign-in at 3 requests per
   // 10s per IP. Playwright's desktop and mobile projects share a loopback
   // address and trip it. See `disableRateLimit` above for the guard.
+  // `/sign-in/anonymous` gets a looser rule of its own: friends on one
+  // network (one IP) joining a match as guests at once would otherwise
+  // trip the 3-per-10s limit.
   rateLimit: {
     ...(disableRateLimit ? { enabled: false } : {}),
     customRules: { "/sign-in/anonymous": { window: 60, max: 20 } },
@@ -83,13 +87,19 @@ export const auth = betterAuth({
       // once it holds no seat.
       disableDeleteAnonymousUser: true,
       // Runs once the new session exists. Not caught: a failed link fails
-      // the request, where it shows in the logs.
+      // the request, where it shows in the logs. The publishes come after
+      // the link commits and never reject, so the opponent sees the new name
+      // without a failed publish failing the sign-in.
       onLinkAccount: async ({ anonymousUser, newUser }) => {
         const guestId = anonymousUser.user.id;
         const accountId = newUser.user.id;
         if (accountId === guestId || newUser.user.isAnonymous) return;
-        const { keepGuest } = await linkGuest(db, { guestId, accountId });
+        const { keepGuest, changedMatchIds } = await linkGuest(db, {
+          guestId,
+          accountId,
+        });
         if (!keepGuest) await removeLinkedGuest(db, guestId);
+        await Promise.all(changedMatchIds.map(publishMatchChanged));
       },
     }),
     nextCookies(),

@@ -5,6 +5,7 @@ import { createCaller } from "~/server/api/root";
 import { createTRPCContext } from "~/server/api/trpc";
 import { auth } from "~/server/auth";
 import { db } from "~/server/db";
+import { linkGuest } from "~/server/guest/link";
 import {
   match,
   matchPlayer,
@@ -251,6 +252,32 @@ describe("linking a guest to an account", () => {
         ),
       );
     expect(seat).toBeDefined();
+  });
+
+  it("names the matches whose seats and requests moved", async () => {
+    const accountId = (await signedIn()).session!.user.id;
+    const guestCtx = await guestSignedIn();
+    const guestId = guestCtx.session!.user.id;
+    const guest = createCaller(guestCtx);
+    const locked = await createCaller(await signedIn()).match.create({
+      ...settings,
+      access: "locked",
+    });
+    await guest.match.requestJoin({ matchId: locked.id });
+    const open = await createCaller(await signedIn()).match.create(settings);
+    await guest.match.join({ matchId: open.id });
+    const matchId = open.id;
+
+    const { keepGuest, changedMatchIds } = await linkGuest(db, {
+      guestId,
+      accountId,
+    });
+
+    expect(keepGuest).toBe(false);
+    expect(changedMatchIds).toHaveLength(2);
+    expect(changedMatchIds).toEqual(
+      expect.arrayContaining([matchId, locked.id]),
+    );
   });
 
   it("a wrong password links nothing", async () => {
