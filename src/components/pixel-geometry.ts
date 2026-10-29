@@ -13,7 +13,7 @@ export const WALL_WIDTH = 4;
 export const TILE_GAP = 2;
 
 /** How far each tile's corner is chipped. */
-export const TILE_CHIP = 4;
+export const TILE_CHIP = 2;
 
 /** A wall's line, for a `<line>`; its square cap adds half a width. */
 export type WallLine = { x1: number; y1: number; x2: number; y2: number };
@@ -79,13 +79,17 @@ const vertexKey = (v: Vertex) => `${v.x},${v.y}`;
  * as they are.
  *
  * `line` gives the line to draw for any of `walls`; `corners` the joining
- * pixels to fill.
+ * pixels to fill, and `cornersOf` the ones at a given wall's ends.
  */
 export function pixelWalls(
   walls: readonly Edge[],
   cellPx: number,
   width: number,
-): { line: (edge: Edge) => WallLine; corners: WallPixel[] } {
+): {
+  line: (edge: Edge) => WallLine;
+  corners: WallPixel[];
+  cornersOf: (edge: Edge) => WallPixel[];
+} {
   // Which way each wall leaves each of its ends.
   const leaving = new Map<string, Array<{ dx: number; dy: number }>>();
   for (const wall of walls) {
@@ -101,8 +105,7 @@ export function pixelWalls(
     at(b).push({ dx: -dx, dy: -dy });
   }
 
-  const bends = new Set<string>();
-  const corners: WallPixel[] = [];
+  const bends = new Map<string, WallPixel>();
   for (const [key, dirs] of leaving) {
     if (dirs.length !== 2) continue;
     const [p, q] = dirs as [
@@ -110,9 +113,8 @@ export function pixelWalls(
       { dx: number; dy: number },
     ];
     if (p.dx * q.dx + p.dy * q.dy !== 0) continue;
-    bends.add(key);
     const [vx, vy] = key.split(",").map(Number) as [number, number];
-    corners.push({
+    bends.set(key, {
       x: vx * cellPx + (p.dx + q.dx) * width - width / 2,
       y: vy * cellPx + (p.dy + q.dy) * width - width / 2,
       width,
@@ -150,6 +152,8 @@ export function pixelWalls(
         y2: b.y * cellPx,
       };
     },
-    corners,
+    corners: [...bends.values()],
+    cornersOf: (edge) =>
+      ends(edge).flatMap((v) => bends.get(vertexKey(v)) ?? []),
   };
 }

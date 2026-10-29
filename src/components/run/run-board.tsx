@@ -81,6 +81,8 @@ const LEAN_MS = 100;
 const SETTLE_MS = 120;
 const PULSE_MS = 200;
 const ZOOM_MS = 200;
+/** The bumped wall's swollen copy, fading back to WALL_WIDTH. */
+const BUMP_WIDTH = 6;
 /** Something already found or left behind: a key picked up, the treasure
  * reached, the start door. */
 const TAKEN_OPACITY = 0.15;
@@ -391,8 +393,7 @@ export function RunBoard({ map, at, heldKeys, bump, lean }: RunBoardProps) {
         key={key}
         data-run-segment={extra.hook ? edgeKey(segment) : undefined}
         aria-hidden="true"
-        // The bump's thick copy stays straight: it swells the whole wall.
-        {...(extra.hook ? walls.line(segment) : edgeLine(segment))}
+        {...walls.line(segment)}
         strokeWidth={extra.strokeWidth}
         strokeLinecap="square"
         className="stroke-wall"
@@ -513,7 +514,22 @@ export function RunBoard({ map, at, heldKeys, bump, lean }: RunBoardProps) {
           aria-hidden="true"
           className="motion-safe:animate-bump-wall"
         >
-          {drawSegment(bump.segment, "bump", { strokeWidth: 6 })}
+          {drawSegment(bump.segment, "bump", { strokeWidth: BUMP_WIDTH })}
+          {/* The bend pixels swell with it, so a corner keeps its step. */}
+          {bump.segment.kind !== "gate" &&
+            walls.cornersOf(bump.segment).map((pixel) => {
+              const grow = (BUMP_WIDTH - WALL_WIDTH) / 2;
+              return (
+                <rect
+                  key={`bump-corner-${pixel.x},${pixel.y}`}
+                  x={pixel.x - grow}
+                  y={pixel.y - grow}
+                  width={pixel.width + 2 * grow}
+                  height={pixel.height + 2 * grow}
+                  className="fill-wall"
+                />
+              );
+            })}
         </g>
       )}
 

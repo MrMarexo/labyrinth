@@ -21,6 +21,15 @@ describe("pixelWalls", () => {
     expect(corners).toEqual([{ x: 34, y: 42, width: 4, height: 4 }]);
   });
 
+  it("gives each wall the corner pixels at its own ends", () => {
+    const far = wall("H", 3, 3);
+    const { cornersOf } = pixelWalls([bottom, right, far], 40, 4);
+    const bend = { x: 34, y: 42, width: 4, height: 4 };
+    expect(cornersOf(bottom)).toEqual([bend]);
+    expect(cornersOf(right)).toEqual([bend]);
+    expect(cornersOf(far)).toEqual([]);
+  });
+
   it("leaves straight runs, T-junctions and loose ends alone", () => {
     const straight = [wall("H", 0, 0), wall("H", 1, 0)];
     expect(pixelWalls(straight, 40, 4).corners).toEqual([]);

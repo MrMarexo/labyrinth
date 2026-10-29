@@ -804,20 +804,14 @@ export function Board({
         .filter((p) => show(cellKey(p)))
         .slice(0, limit);
       if (squares.length === 0) return null;
+      // Each square's corners step in as the walls' do.
       return (
-        <g {...cell}>
-          {squares.map((p) => (
-            <rect
-              key={cellKey(p)}
-              x={p.x * CELL_PX}
-              y={p.y * CELL_PX}
-              width={CELL_PX}
-              height={CELL_PX}
-              opacity={0.35}
-              className={className}
-            />
-          ))}
-        </g>
+        <path
+          {...cell}
+          d={tilesPath(squares, CELL_PX, 0, WALL_WIDTH)}
+          opacity={0.35}
+          className={className}
+        />
       );
     };
 
