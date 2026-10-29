@@ -21,7 +21,6 @@ async function submitFirstMaze(page: Page): Promise<void> {
   await page.reload();
   await page.locator("[data-maze-option]").first().click();
   await page.getByRole("button", { name: "Use this labyrinth" }).click();
-  await page.getByRole("button", { name: "Use it", exact: true }).click();
   await expect(
     page.locator('[data-you-submitted="true"], [data-run-view]').first(),
   ).toBeAttached();

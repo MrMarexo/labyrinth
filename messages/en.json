@@ -143,7 +143,6 @@
     "confirmDeleteShort": "Confirm",
     "deleteCancel": "Cancel",
     "deleting": "Deleting…",
-    "backToList": "Back to your labyrinths",
     "count": "{count} / {limit} labyrinths",
     "atLimit": "You have {limit} labyrinths, the most you can keep. You can still draw, but delete one before saving another.",
     "filterState": "Show",
@@ -158,9 +157,7 @@
     "sortName": "Name",
     "sortSize": "Size",
     "noMatches": "No labyrinths match these filters.",
-    "conceptBadge": "Concept",
-    "edit": "Edit",
-    "editing": "Opening…"
+    "conceptBadge": "Concept"
   },
   "matches": {
     "title": "Matches",
@@ -291,9 +288,6 @@
     "drawNew": "Draw a new one",
     "submit": "Use this labyrinth",
     "submitting": "Using…",
-    "confirmSubmit": "Use {name} in this match? After that it can't be edited, but you can reuse it in other matches.",
-    "confirmYes": "Use it",
-    "confirmNo": "Cancel",
     "deadline": "Expires {when}",
     "abandoned": "This match was abandoned. Nobody won.",
     "forfeited": "You ran out of time on this one.",

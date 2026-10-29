@@ -143,7 +143,6 @@
     "confirmDeleteShort": "Potvrdiť",
     "deleteCancel": "Zrušiť",
     "deleting": "Maže sa…",
-    "backToList": "Späť na vaše bludiská",
     "count": "{count} / {limit} bludísk",
     "atLimit": "Máte {limit} bludísk, viac ich mať nemôžete. Kresliť môžete aj naďalej, ale pred uložením ďalšieho jedno zmažte.",
     "filterState": "Zobraziť",
@@ -158,9 +157,7 @@
     "sortName": "Názov",
     "sortSize": "Veľkosť",
     "noMatches": "Týmto filtrom nezodpovedá žiadne bludisko.",
-    "conceptBadge": "Koncept",
-    "edit": "Upraviť",
-    "editing": "Otvára sa…"
+    "conceptBadge": "Koncept"
   },
   "matches": {
     "title": "Zápasy",
@@ -291,9 +288,6 @@
     "drawNew": "Nakresliť nové",
     "submit": "Použiť toto bludisko",
     "submitting": "Používa sa…",
-    "confirmSubmit": "Použiť {name} v tomto zápase? Potom ho už nebude možné upraviť, ale môžete ho znova použiť v iných zápasoch.",
-    "confirmYes": "Použiť",
-    "confirmNo": "Zrušiť",
     "deadline": "Platí do {when}",
     "abandoned": "Tento zápas bol opustený. Nikto nevyhral.",
     "forfeited": "V tomto zápase vám vypršal čas.",

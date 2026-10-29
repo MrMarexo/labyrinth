@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, count, eq, sql } from "drizzle-orm";
+import { and, count, eq, or, sql } from "drizzle-orm";
 
 import { IssueCause } from "~/lib/issues";
 import { MAZE_LIMIT } from "~/maze";
@@ -20,6 +20,17 @@ export async function lockAuthor(tx: DbClient, authorId: string) {
     .for("no key update");
 }
 
+/**
+ * A concept with nothing in it worth keeping: no painted squares, or a copy
+ * of a saved labyrinth that still matches it. Opening a saved labyrinth
+ * makes such a copy, so just looking at one never leaves a concept to ask
+ * about.
+ */
+export const isDisposable = or(
+  sql`jsonb_array_length(${maze.data} -> 'cells') = 0`,
+  sql`exists (select 1 from ${maze} as source where source.id = ${maze.sourceId} and source.data = ${maze.data})`,
+);
+
 /** The author's concept, if they have one. Call under `lockAuthor`. */
 export async function conceptOf(tx: DbClient, authorId: string) {
   const [row] = await tx
@@ -30,6 +41,7 @@ export async function conceptOf(tx: DbClient, authorId: string) {
       cellCount: maze.cellCount,
       gateCount: maze.gateCount,
       cells: sql<number>`jsonb_array_length(${maze.data} -> 'cells')`,
+      disposable: sql<boolean>`${isDisposable}`,
     })
     .from(maze)
     .where(and(eq(maze.authorId, authorId), eq(maze.concept, true)));
@@ -39,15 +51,16 @@ export async function conceptOf(tx: DbClient, authorId: string) {
 /**
  * Deletes the author's concept to make way for a new one. Refused with
  * `errors.conceptExists`, naming it, unless `replace` says the author agreed
- * to lose it; an empty one is lost without asking. Call under `lockAuthor`.
+ * to lose it; a disposable one is lost without asking. Call under
+ * `lockAuthor`.
  */
 export async function dropConcept(
   tx: DbClient,
-  existing: { id: string; name: string; cells: number } | undefined,
+  existing: { id: string; name: string; disposable: boolean } | undefined,
   replace: boolean,
 ) {
   if (!existing) return;
-  if (!replace && existing.cells > 0) {
+  if (!replace && !existing.disposable) {
     throw new TRPCError({
       code: "CONFLICT",
       message: "errors.conceptExists",

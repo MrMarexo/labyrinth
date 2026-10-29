@@ -1,10 +1,13 @@
+import { TRPCError } from "@trpc/server";
 import { notFound } from "next/navigation";
+import { getLocale } from "next-intl/server";
 
 import { MazeEditor } from "~/components/editor/maze-editor";
-import { ReadOnlyMaze } from "~/components/editor/read-only-maze";
+import { OpenSavedMaze } from "~/components/editor/open-saved-maze";
 import { SignUpNotice } from "~/components/sign-up-notice";
+import { redirect } from "~/i18n/navigation";
 import { mayUseInMatch } from "~/match";
-import { draftMazeSchema, draftToMaze } from "~/maze";
+import { draftMazeSchema } from "~/maze";
 import { api } from "~/trpc/server";
 
 export default async function EditorPage({
@@ -30,23 +33,32 @@ export default async function EditorPage({
   );
   if (guest && !row.concept) return guestNotice;
 
+  // Saved: never edited in place, so it opens as the author's concept.
+  // Only when that would delete a different concept does the page stop,
+  // for the client to ask first.
+  if (!row.concept) {
+    const concept = await api.maze
+      .editAsConcept({ id: row.id })
+      .catch((error: unknown) => {
+        if (
+          error instanceof TRPCError &&
+          error.message === "errors.conceptExists"
+        )
+          return null;
+        throw error;
+      });
+    if (!concept) {
+      return (
+        <main className="mx-auto max-w-5xl p-8">
+          <OpenSavedMaze id={row.id} />
+        </main>
+      );
+    }
+    redirect({ href: `/labyrinths/${concept.id}`, locale: await getLocale() });
+  }
+
   const parsed = draftMazeSchema.safeParse(row.data);
   if (!parsed.success) notFound();
-
-  // Saved: shown, and changed only through a concept (its Edit button).
-  if (!row.concept) {
-    return (
-      <main className="mx-auto max-w-5xl p-8">
-        <ReadOnlyMaze
-          id={row.id}
-          name={row.name}
-          cellCount={row.cellCount}
-          gateCount={row.gateCount}
-          maze={draftToMaze(parsed.data)}
-        />
-      </main>
-    );
-  }
 
   // The labyrinth this concept saves back into. Deleted since, the concept
   // saves on its own.

@@ -26,6 +26,7 @@ import {
 import {
   conceptOf,
   dropConcept,
+  isDisposable,
   lockAuthor,
   promoteConcept,
 } from "~/server/maze/concept";
@@ -63,12 +64,6 @@ function assertOwned<T>(row: T | undefined): T {
 function ownedBy(id: string, userId: string) {
   return and(eq(maze.id, id), eq(maze.authorId, userId));
 }
-
-/** A concept with no painted squares: nothing in it is worth keeping. */
-const isEmptyConcept = and(
-  eq(maze.concept, true),
-  sql`jsonb_array_length(${maze.data} -> 'cells') = 0`,
-);
 
 export const mazeRouter = createTRPCRouter({
   list: memberProcedure.query(async ({ ctx }) =>
@@ -260,16 +255,22 @@ export const mazeRouter = createTRPCRouter({
     }),
 
   /**
-   * Deletes the maze only if it is the caller's own concept with no painted
-   * squares; anything else is left alone without an error, so the editor
-   * can call it blindly on the way out.
+   * Deletes the maze only if it is the caller's own concept with nothing
+   * worth keeping (`isDisposable`); anything else is left alone without an
+   * error, so the editor can call it blindly on the way out.
    */
   discardIfEmpty: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const deleted = await ctx.db
         .delete(maze)
-        .where(and(ownedBy(input.id, ctx.session.user.id), isEmptyConcept))
+        .where(
+          and(
+            ownedBy(input.id, ctx.session.user.id),
+            eq(maze.concept, true),
+            isDisposable,
+          ),
+        )
         .returning({ id: maze.id });
       return { discarded: deleted.length > 0 };
     }),

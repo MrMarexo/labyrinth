@@ -104,6 +104,27 @@ test.describe("the lobby's maze picker", () => {
     await expect(use).toHaveCount(0);
   });
 
+  test("uses the selected labyrinth in one click, with no confirmation", async ({
+    players,
+  }) => {
+    const host = await players({
+      name: "One click",
+      cellCount: 36,
+      gateCount: 0,
+    });
+    const guest = await players({ name: "Other", cellCount: 36, gateCount: 0 });
+    await joinMatch(guest, await createMatch(host, { cells: 36, gates: 0 }));
+
+    await host.reload();
+    await host.locator("[data-maze-option]").click();
+    await host.getByRole("button", { name: "Use this labyrinth" }).click();
+
+    await expect(host.locator("[data-you-submitted]")).toHaveAttribute(
+      "data-you-submitted",
+      "true",
+    );
+  });
+
   test("explains an empty list, and still offers a new one", async ({
     players,
   }) => {
@@ -282,7 +303,6 @@ test.describe("the editor's match check", () => {
     async function openWithMatch(page: Page, name: string) {
       await page.goto("/en/labyrinths");
       await page.getByRole("link", { name }).click();
-      await page.getByRole("button", { name: "Edit", exact: true }).click();
       await expect(page.locator("svg[data-board]")).toBeVisible();
       await page.goto(`${page.url()}?match=${matchId}`);
       await expect(page.locator("svg[data-board]")).toBeVisible();

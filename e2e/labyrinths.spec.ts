@@ -265,6 +265,39 @@ test.describe("concepts", () => {
     expect(logged).toEqual([]);
   });
 
+  test("asks before opening a saved labyrinth replaces the concept", async ({
+    players,
+  }) => {
+    const page = await players({ name: "Saved", cellCount: 36, gateCount: 0 });
+    await createConcept(page, { name: "Keep me", cellCount: 36, gateCount: 0 });
+    // Painted: an empty concept is replaced without asking.
+    await page.goto("/en/labyrinths");
+    await page.getByRole("link", { name: "Keep me" }).click();
+    await panToCorner(page);
+    await cell(page, 0, 0).click();
+    await expect(page.locator("[data-save-state]")).toHaveAttribute(
+      "data-save-state",
+      "saved",
+    );
+
+    await page.goto("/en/labyrinths");
+    await page.getByRole("link", { name: "Saved" }).click();
+    const dialog = page.locator("dialog[data-replace-concept]");
+    await expect(dialog).toContainText("Keep me");
+    await dialog.getByRole("button", { name: "Keep it" }).click();
+    await expect(page).toHaveURL(/\/en\/labyrinths$/);
+    await expect(page.locator("[data-concept]")).toContainText("Keep me");
+
+    await page.getByRole("link", { name: "Saved" }).click();
+    await dialog
+      .getByRole("button", { name: "Delete it and continue" })
+      .click();
+    await expect(page.locator("svg[data-board]")).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Saved", level: 1 }),
+    ).toBeVisible();
+  });
+
   test("the editor fits a desktop screen without scrolling", async ({
     players,
     isMobile,
@@ -286,17 +319,16 @@ test.describe("concepts", () => {
     ).toBe(true);
   });
 
-  test("edits a ready labyrinth through a concept, saved back into it", async ({
+  test("opens a ready labyrinth straight in the editor, saved back into it", async ({
     players,
   }) => {
     const page = await players({ name: "Mine", cellCount: 36, gateCount: 0 });
     await page.goto("/en/labyrinths");
     await page.getByRole("link", { name: "Mine" }).click();
-    await expect(page.locator("[data-maze-readonly]")).toBeVisible();
-    await expect(page.locator("svg[data-board]")).toHaveCount(0);
-
-    await page.getByRole("button", { name: "Edit", exact: true }).click();
     await expect(page.locator("svg[data-board]")).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Mine", level: 1 }),
+    ).toBeVisible();
     await panToCorner(page);
     // Moves the treasure: still valid.
     await page.getByRole("radio", { name: "Treasure", exact: true }).click();
@@ -313,12 +345,12 @@ test.describe("concepts", () => {
       1,
     );
 
-    // Edit again: the same concept, no question asked.
+    // Open it again: the same concept, no question asked.
     await page
       .locator("[data-library]")
       .getByRole("link", { name: "Mine" })
       .click();
-    await page.getByRole("button", { name: "Edit", exact: true }).click();
+    await expect(page.locator("svg[data-board]")).toBeVisible();
     await expect(page.locator("dialog[data-replace-concept]")).toHaveCount(0);
     await page.locator("[data-save-concept]").click();
 
@@ -337,7 +369,6 @@ test.describe("concepts", () => {
     await host.goto("/en/labyrinths");
     await host.getByRole("link", { name: "Host maze" }).click();
 
-    await host.getByRole("button", { name: "Edit", exact: true }).click();
     await expect(host.locator("svg[data-board]")).toBeVisible();
     await expect(
       host.getByRole("heading", { name: "Host maze", level: 1 }),

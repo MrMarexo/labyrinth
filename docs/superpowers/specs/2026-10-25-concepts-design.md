@@ -26,7 +26,7 @@ player chose to keep, and wants a used labyrinth to be editable as a copy.
 
 ## Replacing the concept
 
-New labyrinth, the lobby's Draw a new one, and Edit each replace the
+New labyrinth, the lobby's Draw a new one, and opening a saved labyrinth each replace the
 player's concept. Each is refused with `errors.conceptExists` unless the
 call says `replace: true`; the client then asks in a popup ("Delete your
 concept?", naming it) and repeats the call. No popup when nothing would be
@@ -34,13 +34,16 @@ lost:
 
 - An empty concept is replaced without asking.
 - Draw a new one hands back an empty concept already at the match's size.
-- Edit hands back the concept already editing that labyrinth, a copy
-  included.
+- Opening a saved labyrinth hands back the concept already editing it, a
+  copy included, and replaces an unchanged copy of another one.
 
 ## Editing a saved labyrinth
 
-A saved labyrinth opens read-only, with an **Edit** button
-(`maze.editAsConcept`):
+Opening a saved labyrinth goes straight to the editor, through
+`maze.editAsConcept` (amended 2026-10-29; it used to open read-only, with an
+**Edit** button). A concept that is empty, or an unchanged copy of its
+labyrinth, is replaced without asking and discarded when the editor is left,
+so just looking at a labyrinth never leaves a concept behind to ask about.
 
 - **Ready** (or an unfinished one saved before concepts): the concept keeps
   the name and records `sourceId`. Saving writes the concept's drawing back

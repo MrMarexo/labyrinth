@@ -80,7 +80,6 @@ export async function startRunningMatch(
     await page.reload();
     await page.locator("[data-maze-option]").first().click();
     await page.getByRole("button", { name: "Use this labyrinth" }).click();
-    await page.getByRole("button", { name: "Use it", exact: true }).click();
     // The click returns before the mutation commits. Without this wait the
     // next step can race it: the guest submits before the host's submission
     // lands, or the host reloads before the guest's does, and the match is

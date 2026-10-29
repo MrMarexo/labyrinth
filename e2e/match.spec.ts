@@ -33,7 +33,6 @@ test.describe("match lifecycle", () => {
     await host.reload();
     await host.locator("[data-maze-option]").first().click();
     await host.getByRole("button", { name: "Use this labyrinth" }).click();
-    await host.getByRole("button", { name: "Use it", exact: true }).click();
     await expect(host.locator("[data-you-submitted]")).toHaveAttribute(
       "data-you-submitted",
       "true",
@@ -45,7 +44,6 @@ test.describe("match lifecycle", () => {
 
     await guest.locator("[data-maze-option]").first().click();
     await guest.getByRole("button", { name: "Use this labyrinth" }).click();
-    await guest.getByRole("button", { name: "Use it", exact: true }).click();
 
     // Since Phase 4 a running match shows the run view in place of the
     // lobby (spec §10.3.1), so `running` is read off the screen that only
@@ -57,7 +55,7 @@ test.describe("match lifecycle", () => {
     await expect(host.locator("[data-run-view]")).toBeVisible();
   });
 
-  test("a submitted labyrinth opens like any saved one, with Edit", async ({
+  test("a submitted labyrinth opens in the editor like any saved one", async ({
     players,
   }) => {
     const host = await players({ name: "One way", ...SIZE });
@@ -69,47 +67,20 @@ test.describe("match lifecycle", () => {
     await host.reload();
     await host.locator("[data-maze-option]").first().click();
     await host.getByRole("button", { name: "Use this labyrinth" }).click();
-    await host.getByRole("button", { name: "Use it", exact: true }).click();
     await expect(host.locator("[data-you-submitted]")).toHaveAttribute(
       "data-you-submitted",
       "true",
     );
 
-    // Any save attempt at all would mean the editor was mounted: a saved
-    // labyrinth changes only through Edit, never in place.
-    const saves: string[] = [];
-    host.on("request", (r) => {
-      if (r.url().includes("maze.saveDraft")) saves.push(r.url());
-    });
-
-    // The library still lists it, and opens it as a picture, not an editor.
+    // The library still lists it, and opens it for editing as a concept.
     await host.goto("/en/labyrinths");
     await host.getByRole("link", { name: "One way" }).click();
-    const view = host.locator("[data-maze-readonly]");
-    await expect(view).toBeVisible();
+    await expect(host.locator("svg[data-board]")).toBeVisible();
     await expect(
-      view.getByRole("heading", { name: "One way", level: 1 }),
+      host.getByRole("heading", { name: "One way", level: 1 }),
     ).toBeVisible();
-    await expect(view).toContainText("36 squares, 0 gates");
-    await expect(
-      view.getByRole("button", { name: "Edit", exact: true }),
-    ).toBeVisible();
-    expect(await view.locator("[data-outline]").count()).toBeGreaterThan(0);
-    await expect(host.locator("svg[data-board]")).toHaveCount(0);
-    await expect(host.getByRole("radio", { name: "Erase square" })).toHaveCount(
-      0,
-    );
-    await expect(host.getByRole("button", { name: "Undo" })).toHaveCount(0);
-
-    // A `?match=` link to it changes nothing: still read-only, no use button.
-    await host.goto(`${host.url()}?match=${matchId}`);
-    await expect(view).toBeVisible();
-    await expect(host.locator("[data-use-in-match]")).toHaveCount(0);
-
-    // And back to the list.
-    await view.getByRole("link", { name: "Back to your labyrinths" }).click();
-    await expect(host).toHaveURL(/\/en\/labyrinths$/);
-    expect(saves).toEqual([]);
+    await host.goto("/en/labyrinths");
+    await expect(host.locator("[data-concept]")).toContainText("One way");
   });
 
   test("an unknown match's join page says it is no longer open", async ({

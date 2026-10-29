@@ -702,9 +702,8 @@ for match {code}", and opens it in the editor as `/labyrinths/{id}?match={matchI
 The editor page checks that match on the server: the caller is in it, it is in
 `drawing`, they have not submitted, and its settings equal the maze's. If so,
 the save-status area offers **Use in this match**, enabled only once the maze
-is valid and saved; it asks for the same confirmation as the lobby, submits,
-and returns to the match. If any check fails the parameter is ignored, with no
-error. Each option in the picker is a row with a small, decorative preview
+is valid and saved; it submits and returns to the match. If any check fails
+the parameter is ignored, with no error. Each option in the picker is a row with a small, decorative preview
 of that maze — the same drawing as the result screen's — beside its name.
 
 The side panel runs the validator continuously and reports only facts, never

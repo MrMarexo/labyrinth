@@ -4,7 +4,6 @@ import { useFormatter, useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { CancelMatch } from "~/components/match/cancel-match";
-import { ConfirmUse } from "~/components/match/confirm-use";
 import { JoinRequests } from "~/components/match/join-requests";
 import { MazePicker } from "~/components/match/maze-picker";
 import { ShareMatch } from "~/components/match/share-match";
@@ -35,22 +34,19 @@ export function MatchLobby({ matchId, initialData }: MatchLobbyProps) {
     { initialData },
   );
   // Same query key `MazePicker` reads below, so once the picker is showing
-  // this is a cache read, not a second request — it exists here to look up
-  // the chosen maze's name for the confirmation sentence, and to leave out
-  // the use button when there is nothing to use. Gated on
-  // the same condition as the picker itself, so it is not fetched at all
-  // for a match in any other status.
+  // this is a cache read, not a second request — it exists here to leave out
+  // the use button when there is nothing to use. Gated on the same
+  // condition as the picker itself, so it is not fetched at all for a match
+  // in any other status.
   const { data: mazes } = api.match.eligibleMazes.useQuery(
     { matchId },
     { enabled: data?.status === "drawing" && !data.you.hasSubmitted },
   );
 
   const [selected, setSelected] = useState<string | null>(null);
-  const [confirming, setConfirming] = useState(false);
 
   const submit = api.match.submitMaze.useMutation({
     onSuccess: () => {
-      setConfirming(false);
       void utils.match.get.invalidate({ id: matchId });
       void utils.match.list.invalidate();
     },
@@ -120,33 +116,19 @@ export function MatchLobby({ matchId, initialData }: MatchLobbyProps) {
 
       {data.status === "drawing" && !data.you.hasSubmitted && (
         <div className="space-y-3">
-          <MazePicker
-            match={data}
-            selected={selected}
-            onSelect={(id) => {
-              setSelected(id);
-              setConfirming(false);
-            }}
-          />
+          <MazePicker match={data} selected={selected} onSelect={setSelected} />
 
           {/* Nothing chosen yet (or nothing eligible): no use button. */}
-          {!selectedMaze ? null : confirming ? (
-            <ConfirmUse
-              name={selectedMaze.name}
-              pending={submit.isPending}
-              onConfirm={() => {
-                if (!selected) return;
-                submit.mutate({ matchId, mazeId: selected });
-              }}
-              onCancel={() => setConfirming(false)}
-            />
-          ) : (
+          {selectedMaze && (
             <button
               type="button"
-              onClick={() => setConfirming(true)}
-              className="bg-accent text-on-accent pixel px-3 py-2 text-sm"
+              disabled={submit.isPending}
+              onClick={() =>
+                submit.mutate({ matchId, mazeId: selectedMaze.id })
+              }
+              className="bg-accent text-on-accent pixel px-3 py-2 text-sm disabled:opacity-50"
             >
-              {t("submit")}
+              {submit.isPending ? t("submitting") : t("submit")}
             </button>
           )}
 

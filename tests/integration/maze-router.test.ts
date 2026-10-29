@@ -598,6 +598,21 @@ describe("maze.discardIfEmpty", () => {
     expect(row).toBeDefined();
   });
 
+  it("deletes an unchanged copy of a saved labyrinth, and keeps a changed one", async () => {
+    const caller = createCaller(await signedIn());
+    const saved = await savedReady(caller);
+
+    const untouched = await caller.maze.editAsConcept({ id: saved.id });
+    await caller.maze.discardIfEmpty({ id: untouched.id });
+    expect(await rowOf(untouched.id)).toBeUndefined();
+
+    const changed = await caller.maze.editAsConcept({ id: saved.id });
+    await paint(caller, changed.id);
+    await caller.maze.discardIfEmpty({ id: changed.id });
+    expect(await rowOf(changed.id)).toBeDefined();
+    expect(await rowOf(saved.id)).toBeDefined();
+  });
+
   it("keeps a saved labyrinth, even an empty one", async () => {
     const ctx = await signedIn();
     const caller = createCaller(ctx);
@@ -809,6 +824,17 @@ describe("maze.editAsConcept", () => {
 
     await caller.maze.editAsConcept({ id: saved.id, replace: true });
     expect(await rowOf(other.id)).toBeUndefined();
+  });
+
+  it("replaces an unchanged copy of another labyrinth without asking", async () => {
+    const caller = createCaller(await signedIn());
+    const first = await savedReady(caller, "First");
+    const second = await savedReady(caller, "Second");
+    const untouched = await caller.maze.editAsConcept({ id: first.id });
+
+    const opened = await caller.maze.editAsConcept({ id: second.id });
+    expect(await rowOf(untouched.id)).toBeUndefined();
+    expect((await rowOf(opened.id))?.sourceId).toBe(second.id);
   });
 
   it("refuses a concept, a deleted labyrinth and someone else's", async () => {
